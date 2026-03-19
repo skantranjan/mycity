@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Category Listings - My City Info</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">MYCITYINFO</a>
+      <nav>
+        <ul class="nav-menu">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html">About Us</a></li>
+          <li><a href="blog.html">Blog</a></li>
+          <li><a href="contact.html">Contact</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <a href="submit-listing.html" class="btn btn-primary">Add Listing</a>
+        <a href="signin.html" class="btn btn-outline">Sign In</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero page-hero">
+      <div class="container">
+        <h1 id="category-title">Category Listings</h1>
+      </div>
+    </section>
+
+    <section class="listings-section">
+      <div class="container">
+        <div class="listings-grid">
+          <article class="card">
+            <div class="card-image">
+              <div style="width:100%;height:100%;background:linear-gradient(135deg,#e2e8f0,#cbd5e1);display:flex;align-items:center;justify-content:center;color:var(--secondary);">Listing</div>
+            </div>
+            <div class="card-body">
+              <span class="card-category">Category</span>
+              <h3 class="card-title">Business Name</h3>
+              <p class="card-address">Address, City</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer footer-simple">
+    <div class="container">
+      <ul class="footer-links">
+        <li><a href="terms.html">Terms of Use</a></li>
+        <li><a href="privacy-policy.html">Privacy Policy</a></li>
+        <li><a href="contact.html">Contact Us</a></li>
+      </ul>
+      <div class="footer-bottom">
+        <p>Copyright &copy; 2024 MyCityInfo. All Rights Reserved.</p>
+      </div>
+    </div>
+  </footer>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const cat = params.get('cat');
+    if (cat) {
+      document.getElementById('category-title').textContent = cat.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' Listings';
+    }
+  </script>
+</body>
+</html>
