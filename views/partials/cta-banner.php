@@ -17,10 +17,10 @@
       </div>
       <div class="col-12 col-lg-4">
         <div class="d-flex flex-column flex-sm-row flex-lg-column gap-2 mci-cta-banner__actions">
-          <a class="btn btn-light btn-lg fw-semibold rounded-pill px-4 shadow" href="/submit-listing.php">
+          <a class="btn btn-light btn-lg fw-semibold rounded-pill px-4 shadow" href="/submit-business-listing/">
             List your business
           </a>
-          <a class="btn btn-outline-light btn-lg fw-semibold rounded-pill px-4" href="/register.php">
+          <a class="btn btn-outline-light btn-lg fw-semibold rounded-pill px-4" href="/register/">
             Register
           </a>
         </div>

@@ -11,14 +11,23 @@ $subActive = '';
 $hideCta = true;
 $appArea = 'subscriber';
 
+$csrfAction = 'subscriber_profile_update';
+require_once __DIR__ . '/../includes/mci_csrf.php';
+$csrfToken = mci_csrf_token($csrfAction);
+
 $flashOk = '';
 $flashErr = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $result = mci_app_profile_save_from_request('subscriber');
-    if ($result['ok']) {
-        $flashOk = 'Profile saved. Your photo appears in the header menu.';
+    $csrfPost = trim((string) ($_POST['csrf_token'] ?? ''));
+    if (!mci_csrf_verify($csrfAction, $csrfPost)) {
+        $flashErr = 'Invalid request token. Please refresh and try again.';
     } else {
-        $flashErr = $result['error'] ?? 'Something went wrong.';
+        $result = mci_app_profile_save_from_request('subscriber');
+        if ($result['ok']) {
+            $flashOk = 'Profile saved. Your photo appears in the header menu.';
+        } else {
+            $flashErr = $result['error'] ?? 'Something went wrong.';
+        }
     }
 }
 
@@ -49,6 +58,7 @@ ob_start();
         <?php endif; ?>
 
         <form action="" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>" />
           <div class="row g-3">
             <div class="col-12 col-md-6">
               <label class="form-label" for="full_name">Full name</label>

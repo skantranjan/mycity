@@ -326,7 +326,8 @@ $(function () {
 
   $('#previewListingBtn').on('click', function () {
     savePreview();
-    window.open('/listing-preview.php', '_blank');
+    // Prevent tabnabbing when opening preview in a new tab.
+    window.open('/listing-preview.php', '_blank', 'noopener,noreferrer');
   });
 
   $('#mciSubmitForm').on('submit', function () {

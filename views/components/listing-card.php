@@ -43,7 +43,7 @@ $cardExtraClass .= $isCompact ? ' mci-listing-card--compact' : '';
 <?php if (!$isCompact): ?>
 <div class="<?= $cardClass ?>">
 <?php endif; ?>
-  <a href="/business.php?slug=<?= urlencode($slug) ?>" class="text-decoration-none text-body d-block h-100">
+  <a href="/business/?slug=<?= urlencode($slug) ?>" class="text-decoration-none text-body d-block h-100">
     <div class="card h-100 border-0 shadow-sm mci-listing-card<?= $cardExtraClass ?>">
       <div class="card-img-wrap">
         <img

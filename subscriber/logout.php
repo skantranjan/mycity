@@ -11,7 +11,7 @@ if (isset($_GET['perform']) && $_GET['perform'] === '1') {
         $_SESSION['mci_sub_profile_name'],
         $_SESSION['mci_sub_profile_avatar']
     );
-    header('Location: /index.php');
+    header('Location: /');
     exit;
 }
 
@@ -42,8 +42,8 @@ ob_start();
         </div>
 
         <div class="d-flex gap-2 mt-3 flex-wrap">
-          <a class="btn btn-outline-secondary" href="/subscriber/dashboard.php">Cancel</a>
-          <a class="btn btn-dark" href="/subscriber/logout.php?perform=1">Logout</a>
+          <a class="btn btn-outline-secondary" href="/subscriber/dashboard/">Cancel</a>
+          <a class="btn btn-dark" href="/subscriber/logout/?perform=1">Logout</a>
         </div>
       </div>
     </div>

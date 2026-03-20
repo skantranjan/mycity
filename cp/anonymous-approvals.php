@@ -57,7 +57,7 @@ ob_start();
                       <button class="btn btn-sm btn-outline-danger" type="button" disabled>
                         Reject
                       </button>
-                      <a class="btn btn-sm btn-outline-dark" href="/business.php">Preview</a>
+                      <a class="btn btn-sm btn-outline-dark" href="/business/">Preview</a>
                     </div>
                     <div class="text-muted small mt-1">Backend approval/moderation wiring later.</div>
                   </td>

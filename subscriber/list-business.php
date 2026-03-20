@@ -8,6 +8,17 @@ $subActive = 'list-business';
 $hideCta = true;
 $appArea = 'subscriber';
 
+$csrfAction = 'subscriber_submit_listing';
+require_once __DIR__ . '/../includes/mci_csrf.php';
+$mciSubmitCsrfToken = mci_csrf_token($csrfAction);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $csrfPost = trim((string) ($_POST['csrf_token'] ?? ''));
+    if (!mci_csrf_verify($csrfAction, $csrfPost)) {
+        http_response_code(403);
+        throw new RuntimeException('Invalid CSRF token.');
+    }
+}
+
 $extraHead = <<<'HTML'
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css" />
 <link rel="stylesheet" href="/assets/css/submit-listing.css" />

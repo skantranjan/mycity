@@ -71,7 +71,7 @@ ob_start();
                     <td class="text-muted small"><?= htmlspecialchars($r['action']) ?></td>
                     <td>
                       <div class="d-flex gap-2 flex-wrap">
-                        <a class="btn btn-sm btn-outline-dark" href="/cp/anonymous-approvals.php">Review</a>
+                        <a class="btn btn-sm btn-outline-dark" href="/cp/anonymous-approvals/">Review</a>
                         <button class="btn btn-sm btn-outline-secondary" type="button" disabled>Reject</button>
                       </div>
                     </td>

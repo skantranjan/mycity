@@ -34,8 +34,10 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
             $n = $i + 1;
             ?>
           <button type="button" class="mci-step-btn <?= $n === 1 ? 'is-active' : '' ?>" data-step="<?= $n ?>"
-            aria-current="<?= $n === 1 ? 'step' : 'false' ?>"
             aria-label="Step <?= $n ?>: <?= htmlspecialchars($s['label']) ?>">
+            <?php if ($n === 1): ?>
+              aria-current="step"
+            <?php endif; ?>
             <span class="mci-step-btn__dot">
               <i class="bi <?= htmlspecialchars($s['icon']) ?>"></i>
               <span class="mci-step-btn__check"><i class="bi bi-check-lg"></i></span>
@@ -55,6 +57,7 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
       <form action="#" method="post" enctype="multipart/form-data" id="mciSubmitForm" novalidate>
         <input type="hidden" name="form_origin" value="ui_subscriber_listing" />
         <input type="hidden" name="posting_type" value="registered" />
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string) ($mciSubmitCsrfToken ?? ''), ENT_QUOTES, 'UTF-8') ?>" />
 
         <!-- STEP 1 — Business + tags -->
         <div class="mci-step is-active" data-step="1">
@@ -287,13 +290,49 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
               </div>
               <div class="mci-hours-row__slots">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <select class="form-select form-select-sm mci-hours-select" name="hours[slot1_start][<?= $key ?>]"><option value="">Open</option><?php foreach ($times as $t): ?><option><?= $t ?></option><?php endforeach; ?></select>
+                  <select
+                    class="form-select form-select-sm mci-hours-select"
+                    name="hours[slot1_start][<?= $key ?>]"
+                    aria-label="Open time slot 1 (<?= htmlspecialchars($day, ENT_QUOTES, 'UTF-8') ?>)"
+                  >
+                    <option value="">Open</option>
+                    <?php foreach ($times as $t): ?>
+                      <option><?= $t ?></option>
+                    <?php endforeach; ?>
+                  </select>
                   <span class="text-muted small">–</span>
-                  <select class="form-select form-select-sm mci-hours-select" name="hours[slot1_end][<?= $key ?>]"><option value="">Close</option><?php foreach ($times as $t): ?><option><?= $t ?></option><?php endforeach; ?></select>
+                  <select
+                    class="form-select form-select-sm mci-hours-select"
+                    name="hours[slot1_end][<?= $key ?>]"
+                    aria-label="Close time slot 1 (<?= htmlspecialchars($day, ENT_QUOTES, 'UTF-8') ?>)"
+                  >
+                    <option value="">Close</option>
+                    <?php foreach ($times as $t): ?>
+                      <option><?= $t ?></option>
+                    <?php endforeach; ?>
+                  </select>
                   <span class="text-muted small d-none d-sm-inline">2nd:</span>
-                  <select class="form-select form-select-sm mci-hours-select" name="hours[slot2_start][<?= $key ?>]"><option value="">—</option><?php foreach ($times as $t): ?><option><?= $t ?></option><?php endforeach; ?></select>
+                  <select
+                    class="form-select form-select-sm mci-hours-select"
+                    name="hours[slot2_start][<?= $key ?>]"
+                    aria-label="Open time slot 2 (<?= htmlspecialchars($day, ENT_QUOTES, 'UTF-8') ?>)"
+                  >
+                    <option value="">—</option>
+                    <?php foreach ($times as $t): ?>
+                      <option><?= $t ?></option>
+                    <?php endforeach; ?>
+                  </select>
                   <span class="text-muted small">–</span>
-                  <select class="form-select form-select-sm mci-hours-select" name="hours[slot2_end][<?= $key ?>]"><option value="">—</option><?php foreach ($times as $t): ?><option><?= $t ?></option><?php endforeach; ?></select>
+                  <select
+                    class="form-select form-select-sm mci-hours-select"
+                    name="hours[slot2_end][<?= $key ?>]"
+                    aria-label="Close time slot 2 (<?= htmlspecialchars($day, ENT_QUOTES, 'UTF-8') ?>)"
+                  >
+                    <option value="">—</option>
+                    <?php foreach ($times as $t): ?>
+                      <option><?= $t ?></option>
+                    <?php endforeach; ?>
+                  </select>
                 </div>
               </div>
             </div>
@@ -470,7 +509,7 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
           <!-- (Removed external preview CTA; inline preview is shown above) -->
           <div class="form-check mb-4">
             <input class="form-check-input" type="checkbox" id="agreeTerms" required />
-            <label class="form-check-label" for="agreeTerms">I agree to the <a href="/terms.php">Terms of Service</a> for listing on My City Info.</label>
+            <label class="form-check-label" for="agreeTerms">I agree to the <a href="/terms/">Terms of Service</a> for listing on My City Info.</label>
           </div>
           <button class="btn btn-dark btn-lg px-5 w-100" type="submit" id="submitBtn">
             <i class="bi bi-check2-circle me-2" aria-hidden="true"></i>Submit listing
