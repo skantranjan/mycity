@@ -5,49 +5,66 @@ $subActive = 'enquiries';
 $hideCta = true;
 $appArea = 'subscriber';
 
+$csrfAction = 'subscriber_enquiries_reply';
+require_once __DIR__ . '/../includes/mci_csrf.php';
+$csrfToken = mci_csrf_token($csrfAction);
+$csrfOk = false;
+
 $replyFlash = '';
 $statusFilter = trim((string) ($_GET['status'] ?? 'all'));
 $statusFilter = $statusFilter !== '' ? $statusFilter : 'all';
+$fromDate = trim((string) ($_GET['from_date'] ?? ''));
+$toDate = trim((string) ($_GET['to_date'] ?? ''));
 $replyFor = trim((string) ($_POST['enquiry_id'] ?? ''));
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $replyFor !== '') {
     $replyText = trim((string) ($_POST['reply_text'] ?? ''));
     if ($replyText !== '') {
-        $replyFlash = 'Reply sent for enquiry #' . htmlspecialchars($replyFor, ENT_QUOTES, 'UTF-8') . ' (UI demo).';
+        $csrfPost = trim((string) ($_POST['csrf_token'] ?? ''));
+        if (!mci_csrf_verify($csrfAction, $csrfPost)) {
+            $replyFlash = 'Invalid request token. Please refresh and try again.';
+            $csrfOk = false;
+        } else {
+            $replyFlash = 'Reply sent for enquiry #' . htmlspecialchars($replyFor, ENT_QUOTES, 'UTF-8') . ' (UI demo).';
+            $csrfOk = true;
+        }
     }
 }
 
 $enquiries = [
     [
-        'id' => 'ENQ-1032',
+        'id' => '4f2286e9-d99f-4337-97e6-2ee38f8b14d5',
         'listing' => 'JXF Painting Service',
         'from' => 'Ava Thompson',
         'email' => 'ava.t@example.com',
         'message' => 'Do you handle exterior repainting for small retail shops? Looking for work in next 2 weeks.',
         'when' => '2 hours ago',
+        'date' => '2026-03-20',
         'status' => 'New',
     ],
     [
-        'id' => 'ENQ-1029',
+        'id' => '7f6a4ff8-08d0-47a8-8928-a89ffeb15b88',
         'listing' => 'Locker Shop UK Ltd',
         'from' => 'School Admin Team',
         'email' => 'ops@school-demo.org',
         'message' => 'Need quote for 120 student lockers with delivery timeline. Can you share options?',
         'when' => 'Yesterday',
+        'date' => '2026-03-19',
         'status' => 'Waiting reply',
     ],
     [
-        'id' => 'ENQ-1024',
+        'id' => 'f0d42f4e-92fe-425d-9fd9-15c58c181e2a',
         'listing' => 'Property 852',
         'from' => 'Noah Lee',
         'email' => 'noahl@example.net',
         'message' => 'Please share if 800-1000 sq ft office spaces are available this month.',
         'when' => '2 days ago',
+        'date' => '2026-03-18',
         'status' => 'Replied',
     ],
 ];
 
 // UI demo: update status after reply
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $replyFor !== '' && $replyFlash !== '') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $replyFor !== '' && $replyFlash !== '' && $csrfOk) {
     foreach ($enquiries as &$q) {
         if ((string) $q['id'] === (string) $replyFor) {
             $q['status'] = 'Replied';
@@ -74,6 +91,24 @@ if ($wanted !== 'all') {
     }));
 }
 
+$fromDateObj = DateTime::createFromFormat('Y-m-d', $fromDate) ?: null;
+$toDateObj = DateTime::createFromFormat('Y-m-d', $toDate) ?: null;
+if ($fromDateObj || $toDateObj) {
+    $enquiries = array_values(array_filter($enquiries, static function (array $q) use ($fromDateObj, $toDateObj): bool {
+        $itemDate = DateTime::createFromFormat('Y-m-d', (string) ($q['date'] ?? '')) ?: null;
+        if ($itemDate === null) {
+            return false;
+        }
+        if ($fromDateObj && $itemDate < $fromDateObj) {
+            return false;
+        }
+        if ($toDateObj && $itemDate > $toDateObj) {
+            return false;
+        }
+        return true;
+    }));
+}
+
 ob_start();
 ?>
 
@@ -90,7 +125,7 @@ ob_start();
             <div class="text-muted small">View incoming enquiries and reply to each one from here (UI demo).</div>
           </div>
           <div class="d-flex align-items-center gap-2 flex-wrap">
-            <form method="get" class="d-flex align-items-center gap-2">
+            <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
               <label class="form-label small mb-0">Status</label>
               <select name="status" class="form-select form-select-sm" aria-label="Filter enquiries by status">
                 <option value="all" <?= $wanted === 'all' ? 'selected' : '' ?>>All</option>
@@ -98,6 +133,10 @@ ob_start();
                 <option value="awaiting" <?= $wanted === 'Waiting reply' ? 'selected' : '' ?>>Awaiting response</option>
                 <option value="replied" <?= $wanted === 'Replied' ? 'selected' : '' ?>>Replied</option>
               </select>
+              <label class="form-label small mb-0">From</label>
+              <input type="date" name="from_date" class="form-control form-control-sm" value="<?= htmlspecialchars($fromDate, ENT_QUOTES, 'UTF-8') ?>" aria-label="Filter enquiries from date" />
+              <label class="form-label small mb-0">To</label>
+              <input type="date" name="to_date" class="form-control form-control-sm" value="<?= htmlspecialchars($toDate, ENT_QUOTES, 'UTF-8') ?>" aria-label="Filter enquiries to date" />
               <button type="submit" class="btn btn-sm btn-outline-dark">Filter</button>
             </form>
             <span class="badge text-bg-light border px-3 py-2">Total: <?= count($enquiries) ?></span>
@@ -122,6 +161,7 @@ ob_start();
 
               <form method="post" action="" class="row g-2 align-items-end">
                 <input type="hidden" name="enquiry_id" value="<?= htmlspecialchars($q['id']) ?>" />
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>" />
                 <div class="col-12 col-md-9">
                   <label class="form-label small mb-1">Reply to this enquiry</label>
                   <textarea class="form-control form-control-sm" name="reply_text" rows="2" placeholder="Type your response…" required></textarea>

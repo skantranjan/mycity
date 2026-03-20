@@ -9,7 +9,7 @@ if (isset($_GET['perform']) && $_GET['perform'] === '1') {
         $_SESSION['mci_cp_profile_name'],
         $_SESSION['mci_cp_profile_avatar']
     );
-    header('Location: /index.php');
+    header('Location: /');
     exit;
 }
 
@@ -38,8 +38,8 @@ ob_start();
         </div>
 
         <div class="d-flex gap-2 flex-wrap">
-          <a class="btn btn-outline-secondary" href="/cp/dashboard.php">Cancel</a>
-          <a class="btn btn-dark" href="/cp/logout.php?perform=1">Logout</a>
+          <a class="btn btn-outline-secondary" href="/cp/dashboard/">Cancel</a>
+          <a class="btn btn-dark" href="/cp/logout/?perform=1">Logout</a>
         </div>
       </div>
     </div>

@@ -19,16 +19,16 @@ function cpLinkClass(string $key, string $cpActive): string
   </div>
 
   <nav class="mci-app-sidebar__nav" aria-label="Admin navigation">
-    <a class="<?= cpLinkClass('dashboard', $cpActive) ?>" href="/cp/dashboard.php">
+    <a class="<?= cpLinkClass('dashboard', $cpActive) ?>" href="/cp/dashboard/">
       <i class="bi bi-grid-1x2-fill" aria-hidden="true"></i> Dashboard
     </a>
-    <a class="<?= cpLinkClass('users', $cpActive) ?>" href="/cp/users.php">
+    <a class="<?= cpLinkClass('users', $cpActive) ?>" href="/cp/users/">
       <i class="bi bi-people-fill" aria-hidden="true"></i> Registered users
     </a>
-    <a class="<?= cpLinkClass('listings', $cpActive) ?>" href="/cp/listings.php">
+    <a class="<?= cpLinkClass('listings', $cpActive) ?>" href="/cp/listings/">
       <i class="bi bi-collection" aria-hidden="true"></i> All listings
     </a>
-    <a class="<?= cpLinkClass('anonymous', $cpActive) ?>" href="/cp/anonymous-approvals.php">
+    <a class="<?= cpLinkClass('anonymous', $cpActive) ?>" href="/cp/anonymous-approvals/">
       <i class="bi bi-person-fill-slash" aria-hidden="true"></i> Anonymous approvals
     </a>
   </nav>

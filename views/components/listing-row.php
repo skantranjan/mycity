@@ -17,7 +17,7 @@ if (!$image) {
 }
 ?>
 <div class="col-12">
-  <a href="/business.php?slug=<?= urlencode($slug) ?>" class="text-decoration-none text-body d-block mci-listing-row-link">
+  <a href="/business/?slug=<?= urlencode($slug) ?>" class="text-decoration-none text-body d-block mci-listing-row-link">
     <div class="card border-0 shadow-sm mci-listing-row-card h-100 overflow-hidden">
       <div class="row g-0 align-items-stretch">
         <div class="col-4 col-sm-3 col-md-3 col-lg-4">

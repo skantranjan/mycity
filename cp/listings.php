@@ -20,7 +20,7 @@ ob_start();
             <div class="fw-semibold">Manage All Listings</div>
             <div class="text-muted small">Moderate, verify, and manage listing lifecycle (UI demo).</div>
           </div>
-          <a class="btn btn-sm btn-outline-dark" href="/cp/anonymous-approvals.php">Anonymous queue</a>
+          <a class="btn btn-sm btn-outline-dark" href="/cp/anonymous-approvals/">Anonymous queue</a>
         </div>
 
         <div class="table-responsive">
@@ -51,9 +51,15 @@ ob_start();
                   <td><span class="badge text-bg-light border"><?= htmlspecialchars($r['status']) ?></span></td>
                   <td>
                     <div class="d-flex gap-2 flex-wrap">
-                      <a class="btn btn-sm btn-outline-dark" href="/business.php?slug=<?= urlencode(strtolower(str_replace(' ', '-', $r['title']))) ?>">View</a>
-                      <button class="btn btn-sm btn-outline-secondary" type="button" disabled>Edit</button>
-                      <button class="btn btn-sm btn-outline-danger" type="button" disabled>Remove</button>
+                      <a class="btn btn-sm btn-outline-dark" href="/business/?slug=<?= urlencode(strtolower(str_replace(' ', '-', $r['title']))) ?>">
+                        <i class="bi bi-eye me-1" aria-hidden="true"></i>View
+                      </a>
+                      <button class="btn btn-sm btn-outline-secondary" type="button" disabled>
+                        <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger" type="button" disabled>
+                        <i class="bi bi-trash-fill me-1" aria-hidden="true"></i>Remove
+                      </button>
                     </div>
                   </td>
                 </tr>

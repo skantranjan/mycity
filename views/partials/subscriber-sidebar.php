@@ -1,6 +1,6 @@
 <?php
 // Subscriber sidebar partial.
-// Expects $subActive: dashboard | list-business | listings | enquiries | reviews | '' (no highlight).
+// Expects $subActive: dashboard | list-business | listings | favourites | enquiries | reviews | '' (no highlight).
 $subActive = $subActive ?? 'dashboard';
 
 function subLinkClass(string $key, string $subActive): string
@@ -16,19 +16,22 @@ function subLinkClass(string $key, string $subActive): string
   </div>
 
   <nav class="mci-app-sidebar__nav" aria-label="Subscriber navigation">
-    <a class="<?= subLinkClass('dashboard', $subActive) ?>" href="/subscriber/dashboard.php">
+    <a class="<?= subLinkClass('dashboard', $subActive) ?>" href="/subscriber/dashboard/">
       <i class="bi bi-speedometer2" aria-hidden="true"></i> Dashboard
     </a>
-    <a class="<?= subLinkClass('list-business', $subActive) ?>" href="/subscriber/list-business.php">
-      <i class="bi bi-plus-circle-fill" aria-hidden="true"></i> List business
+    <a class="<?= subLinkClass('list-business', $subActive) ?>" href="/subscriber/list-business/">
+      <i class="bi bi-plus-circle-fill" aria-hidden="true"></i> List your business
     </a>
-    <a class="<?= subLinkClass('listings', $subActive) ?>" href="/subscriber/listings.php">
+    <a class="<?= subLinkClass('listings', $subActive) ?>" href="/subscriber/listings/">
       <i class="bi bi-shop-window" aria-hidden="true"></i> My listings
     </a>
-    <a class="<?= subLinkClass('enquiries', $subActive) ?>" href="/subscriber/enquiries.php">
+    <a class="<?= subLinkClass('favourites', $subActive) ?>" href="/subscriber/favourites/">
+      <i class="bi bi-heart-fill" aria-hidden="true"></i> Favourites
+    </a>
+    <a class="<?= subLinkClass('enquiries', $subActive) ?>" href="/subscriber/enquiries/">
       <i class="bi bi-chat-left-text" aria-hidden="true"></i> Enquiries
     </a>
-    <a class="<?= subLinkClass('reviews', $subActive) ?>" href="/subscriber/reviews.php">
+    <a class="<?= subLinkClass('reviews', $subActive) ?>" href="/subscriber/reviews/">
       <i class="bi bi-star-half" aria-hidden="true"></i> Comments &amp; ratings
     </a>
   </nav>

@@ -20,14 +20,14 @@ ob_start();
             <div class="fw-semibold">My Listings</div>
             <div class="text-muted small">See and modify your submitted listings (UI demo).</div>
           </div>
-          <a class="btn btn-sm btn-dark" href="/subscriber/list-business.php">List your business</a>
+          <a class="btn btn-sm btn-dark" href="/subscriber/list-business/">List your business</a>
         </div>
 
         <div class="table-responsive">
           <table class="table table-bordered align-middle bg-white">
             <thead class="table-light">
               <tr>
-                <th>Title</th>
+                <th>Business</th>
                 <th>Category</th>
                 <th>Status</th>
                 <th style="min-width: 240px;">Actions</th>
@@ -36,24 +36,33 @@ ob_start();
             <tbody>
               <?php
               $rows = [
-                ['slug' => 'property-852', 'title' => 'Property 852', 'category' => 'Real Estate', 'status' => 'Live'],
-                ['slug' => 'locker-shop-uk', 'title' => 'Locker Shop UK Ltd', 'category' => 'Furniture Store', 'status' => 'Pending'],
-                ['slug' => 'jxf-painting', 'title' => 'JXF Painting Service', 'category' => 'Painter', 'status' => 'Live'],
-                ['slug' => 'hunter-hill-physio', 'title' => 'Hunter Hill Physiotherapy', 'category' => 'Health', 'status' => 'Rejected'],
+                ['slug' => 'property-852', 'title' => 'Property 852', 'address' => '12 Orchard Lane, Downtown', 'category' => 'Real Estate', 'status' => 'Live'],
+                ['slug' => 'locker-shop-uk', 'title' => 'Locker Shop UK Ltd', 'address' => '88 Market Street, Central District', 'category' => 'Furniture Store', 'status' => 'Pending'],
+                ['slug' => 'jxf-painting', 'title' => 'JXF Painting Service', 'address' => '4 Riverside Avenue, West End', 'category' => 'Painter', 'status' => 'Live'],
+                ['slug' => 'hunter-hill-physio', 'title' => 'Hunter Hill Physiotherapy', 'address' => '19 Hillcrest Road, Northside', 'category' => 'Health', 'status' => 'Rejected'],
               ];
               foreach ($rows as $r):
               ?>
                 <tr>
-                  <td class="fw-semibold"><?= htmlspecialchars($r['title']) ?></td>
+                  <td>
+                    <div class="fw-semibold"><?= htmlspecialchars($r['title']) ?></div>
+                    <div class="text-muted small"><?= htmlspecialchars($r['address']) ?></div>
+                  </td>
                   <td class="text-muted small"><?= htmlspecialchars($r['category']) ?></td>
                   <td>
                     <span class="badge text-bg-light border"><?= htmlspecialchars($r['status']) ?></span>
                   </td>
                   <td>
                     <div class="d-flex gap-2 flex-wrap">
-                      <a class="btn btn-sm btn-outline-dark" href="/business.php?slug=<?= urlencode((string) $r['slug']) ?>">View</a>
-                      <a class="btn btn-sm btn-outline-secondary" href="/subscriber/list-business.php?edit=1&slug=<?= urlencode((string) $r['slug']) ?>">Edit</a>
-                      <a class="btn btn-sm btn-outline-danger" href="/subscriber/listing-delete.php?slug=<?= urlencode((string) $r['slug']) ?>&title=<?= urlencode((string) $r['title']) ?>">Delete</a>
+                      <a class="btn btn-sm btn-outline-dark" href="/business/?slug=<?= urlencode((string) $r['slug']) ?>" target="_blank" rel="noopener noreferrer" title="Open business page in a new window">
+                        <i class="bi bi-eye me-1" aria-hidden="true"></i>View <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
+                      </a>
+                      <a class="btn btn-sm btn-outline-secondary" href="/subscriber/list-business/?edit=1&slug=<?= urlencode((string) $r['slug']) ?>">
+                        <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit
+                      </a>
+                      <a class="btn btn-sm btn-outline-danger" href="/subscriber/listing-delete/?slug=<?= urlencode((string) $r['slug']) ?>&title=<?= urlencode((string) $r['title']) ?>">
+                        <i class="bi bi-trash-fill me-1" aria-hidden="true"></i>Delete
+                      </a>
                     </div>
                   </td>
                 </tr>

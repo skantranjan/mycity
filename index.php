@@ -74,8 +74,8 @@ ob_start();
         </p>
 
         <div class="d-none d-lg-flex flex-wrap align-items-center home-hero-cta-row gap-3">
-          <a href="/submit-listing.php" class="btn btn-home-primary btn-home-cta-primary">List your business</a>
-          <a href="/listings.php" class="btn btn-home-ghost btn-home-cta-secondary">Browse all</a>
+          <a href="/submit-business-listing/" class="btn btn-home-primary btn-home-cta-primary">List your business</a>
+          <a href="/business-listing/" class="btn btn-home-ghost btn-home-cta-secondary">Browse all</a>
         </div>
       </div>
 
@@ -95,7 +95,7 @@ ob_start();
     </div>
 
     <div class="home-search-card mt-4 mt-lg-5 p-3 p-md-4 position-relative mci-z-content">
-      <form action="/listings.php" method="get">
+      <form action="/business-listing/" method="get">
         <div class="row g-3 align-items-end">
           <div class="col-12 col-md-5">
             <label class="form-label" for="homeWhat">What</label>
@@ -113,8 +113,8 @@ ob_start();
     </div>
 
     <div class="d-flex d-lg-none flex-wrap align-items-stretch home-hero-cta-row gap-3 mt-3 position-relative mci-z-content">
-      <a href="/submit-listing.php" class="btn btn-home-primary btn-home-cta-primary flex-grow-1 text-center">List your business</a>
-      <a href="/listings.php" class="btn btn-home-ghost btn-home-cta-secondary flex-grow-1 text-center">Browse</a>
+      <a href="/submit-business-listing/" class="btn btn-home-primary btn-home-cta-primary flex-grow-1 text-center">List your business</a>
+      <a href="/business-listing/" class="btn btn-home-ghost btn-home-cta-secondary flex-grow-1 text-center">Browse</a>
     </div>
   </section>
 
@@ -151,13 +151,16 @@ ob_start();
         <h2 class="home-section-title h3 mb-1">Browse categories</h2>
         <p class="text-muted small mb-0">Jump into popular services and places</p>
       </div>
-      <a href="/listings.php" class="btn btn-home-outline btn-sm align-self-stretch align-self-sm-auto text-center mci-touch-target mci-touch-target--sm">See all listings →</a>
+      <div class="d-flex flex-column flex-sm-row gap-2 align-self-stretch align-self-sm-auto">
+        <a href="/business-listing/" class="btn btn-home-outline btn-sm text-center mci-touch-target mci-touch-target--sm">See all listings →</a>
+        <a href="/category/" class="btn btn-home-outline btn-sm text-center mci-touch-target mci-touch-target--sm">See all categories →</a>
+      </div>
     </div>
 
     <div class="row g-3">
       <?php foreach ($categories as $cat): ?>
         <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-          <a class="home-category-tile w-100" href="/listings.php?category=<?= urlencode($cat['name']) ?>">
+          <a class="home-category-tile w-100" href="/business-listing/?category=<?= urlencode($cat['name']) ?>">
             <span class="home-category-icon" aria-hidden="true"><?= htmlspecialchars($cat['emoji']) ?></span>
             <span><?= htmlspecialchars($cat['name']) ?></span>
           </a>
@@ -174,7 +177,7 @@ ob_start();
         <h2 class="home-section-title h3 mb-1">Recent listings</h2>
         <p class="text-muted small mb-0">Newly added businesses—name, category, and full address at a glance</p>
       </div>
-      <a class="btn btn-home-primary btn-sm text-center mci-touch-target mci-touch-target--sm" href="/submit-listing.php">+ List business</a>
+      <a class="btn btn-home-primary btn-sm text-center mci-touch-target mci-touch-target--sm" href="/submit-business-listing/">+ List your business</a>
     </div>
 
     <div class="row g-3 g-lg-4">
@@ -195,7 +198,7 @@ ob_start();
         </h2>
         <p class="text-muted small mb-0">Highly viewed listings near you—updated when we detect your area</p>
       </div>
-      <a href="/listings.php" class="btn btn-home-outline btn-sm align-self-stretch align-self-sm-auto text-center mci-touch-target mci-touch-target--sm">See all in directory →</a>
+      <a href="/business-listing/" class="btn btn-home-outline btn-sm align-self-stretch align-self-sm-auto text-center mci-touch-target mci-touch-target--sm">See all in directory →</a>
     </div>
 
     <div class="row g-3 g-lg-4">

@@ -53,13 +53,13 @@ This repository is a server-rendered PHP web app (“My City Info”) for discov
 ### Subscriber navigation (left sidebar)
 - `views/partials/subscriber-sidebar.php` includes:
   - Dashboard
-  - List business
+  - List your business
   - My listings
   - Enquiries
   - Comments & ratings
 - Sidebars were slimmed down per the “top bar handles profile/logout” approach.
 
-### Subscriber “List business” (post-login wizard)
+### Subscriber “List your business” (post-login wizard)
 - Page: `subscriber/list-business.php`
 - UI: 7-step wizard:
   1. Business (details + tags)

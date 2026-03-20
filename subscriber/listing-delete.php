@@ -20,25 +20,37 @@ if ($stage > 2) {
 $error = '';
 $ok = '';
 
+$csrfAction = 'subscriber_listing_delete_action';
+require_once __DIR__ . '/../includes/mci_csrf.php';
+$csrfToken = mci_csrf_token($csrfAction);
+$csrfOk = false;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postedStage = (int) ($_POST['stage'] ?? 1);
     $action = trim((string) ($_POST['action'] ?? ''));
+    $csrfPost = trim((string) ($_POST['csrf_token'] ?? ''));
+    if (!mci_csrf_verify($csrfAction, $csrfPost)) {
+        $error = 'Invalid request token. Please refresh and try again.';
+        $csrfOk = false;
+    } else {
+        $csrfOk = true;
 
-    if ($action === 'close') {
-        $ok = 'Listing marked as permanently closed (demo).';
-        $stage = 1;
-    } elseif ($action === 'delete') {
-        if ($postedStage === 2) {
-            $confirm = trim((string) ($_POST['confirm_delete'] ?? ''));
-            if (strtolower($confirm) !== 'delete') {
-                $error = 'Type `delete` exactly to confirm permanent deletion.';
-                $stage = 2;
+        if ($action === 'close') {
+            $ok = 'Listing marked as permanently closed (demo).';
+            $stage = 1;
+        } elseif ($action === 'delete') {
+            if ($postedStage === 2) {
+                $confirm = trim((string) ($_POST['confirm_delete'] ?? ''));
+                if (strtolower($confirm) !== 'delete') {
+                    $error = 'Type `delete` exactly to confirm permanent deletion.';
+                    $stage = 2;
+                } else {
+                    $ok = 'Listing deleted permanently (demo).';
+                    $stage = 1;
+                }
             } else {
-                $ok = 'Listing deleted permanently (demo).';
-                $stage = 1;
+                $stage = 2;
             }
-        } else {
-            $stage = 2;
         }
     }
 }
@@ -64,7 +76,7 @@ ob_start();
         <?php if ($ok !== ''): ?>
           <div class="alert alert-success py-2 small mb-3" role="status"><?= htmlspecialchars($ok, ENT_QUOTES, 'UTF-8') ?></div>
           <div class="d-flex gap-2 flex-wrap">
-            <a class="btn btn-dark" href="/subscriber/listings.php">Back to My listings</a>
+            <a class="btn btn-dark" href="/subscriber/listings/">Back to My listings</a>
           </div>
         <?php else: ?>
           <?php if ($error !== ''): ?>
@@ -86,6 +98,7 @@ ob_start();
             <?php if ($stage === 1): ?>
               <form method="post" action="">
                 <input type="hidden" name="stage" value="1" />
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>" />
 
                 <div class="d-flex gap-2 flex-wrap">
                   <button type="submit" class="btn btn-outline-danger" name="action" value="delete">
@@ -109,6 +122,7 @@ ob_start();
               <form method="post" action="">
                 <input type="hidden" name="stage" value="2" />
                 <input type="hidden" name="action" value="delete" />
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>" />
 
                 <label class="form-label mci-field-label" for="confirm_delete">
                   Type <strong>delete</strong> to confirm
@@ -126,7 +140,7 @@ ob_start();
                   <button type="submit" class="btn btn-dark">
                     <i class="bi bi-trash-fill me-1" aria-hidden="true"></i>Confirm deletion
                   </button>
-                  <a class="btn btn-outline-dark" href="/subscriber/listing-delete.php?slug=<?= urlencode($slug) ?>&title=<?= urlencode($title) ?>&stage=1">Back</a>
+                  <a class="btn btn-outline-dark" href="/subscriber/listing-delete/?slug=<?= urlencode($slug) ?>&title=<?= urlencode($title) ?>&stage=1">Back</a>
                 </div>
               </form>
             <?php endif; ?>
