@@ -1,0 +1,304 @@
+/**
+ * Subscriber + Control Panel — same visual language as public site
+ * (indigo tokens, Bricolage display, neutral depth). Scoped under .mci-app-area.
+ */
+
+/* ─── Main canvas ─────────────────────────────────────── */
+.mci-app-area .mci-main {
+  background: linear-gradient(180deg, var(--mci-surface-2, #f8fafc) 0%, #ffffff 32%);
+  padding-top: 1.75rem;
+  padding-bottom: 3rem;
+  min-height: 52vh;
+}
+
+/* Subscriber listing wizard: full width inside column */
+.mci-app-area .mci-submit-wrap {
+  max-width: 100%;
+}
+
+/* ─── Page & section titles (avoid table cells) ───────── */
+.mci-app-area .card-body > .d-flex .fw-semibold {
+  font-family: var(--mci-font-display, "Bricolage Grotesque", sans-serif);
+  font-weight: 800;
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+  color: var(--mci-body-color, #0f172a);
+}
+
+.mci-app-area .card-body > .fw-semibold.mb-2 {
+  font-family: var(--mci-font-display, "Bricolage Grotesque", sans-serif);
+  font-weight: 800;
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+  color: var(--mci-body-color, #0f172a);
+}
+
+.mci-app-area .card-body .mt-4 > .fw-semibold.mb-2 {
+  font-family: var(--mci-font-display, "Bricolage Grotesque", sans-serif);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: var(--mci-body-color, #0f172a);
+}
+
+/* ─── Sidebar ─────────────────────────────────────────── */
+.mci-app-sidebar {
+  border-radius: var(--mci-radius-xl, 1.25rem);
+  border: 1.5px solid var(--mci-border, #e2e8f0);
+  box-shadow: var(--mci-shadow-sm);
+  overflow: hidden;
+  background: var(--mci-surface, #fff);
+}
+
+.mci-app-sidebar__head {
+  padding: 1rem 1.15rem 0.85rem;
+  background: linear-gradient(160deg, var(--mci-color-primary-soft, #eef2ff) 0%, #ffffff 72%);
+  border-bottom: 1px solid var(--mci-border, #e2e8f0);
+}
+
+.mci-app-sidebar__title {
+  font-family: var(--mci-font-display, "Bricolage Grotesque", sans-serif);
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: var(--mci-color-primary-deep, #4f46e5);
+  margin: 0;
+}
+
+.mci-app-sidebar__sub {
+  font-size: 0.75rem;
+  color: var(--mci-muted, #64748b);
+  margin-top: 0.2rem;
+}
+
+.mci-app-sidebar__nav {
+  padding: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.mci-app-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--mci-radius-md, 0.75rem);
+  color: var(--mci-muted, #64748b);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mci-app-nav-link i {
+  font-size: 1.05rem;
+  opacity: 0.88;
+  width: 1.25rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.mci-app-nav-link:hover {
+  background: var(--mci-color-primary-soft, #eef2ff);
+  color: var(--mci-color-primary-deep, #4f46e5);
+}
+
+.mci-app-nav-link.is-active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.14) 0%, rgba(99, 102, 241, 0.06) 100%);
+  color: var(--mci-color-primary-deep, #4f46e5);
+  border-color: rgba(99, 102, 241, 0.28);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.08);
+}
+
+.mci-app-sidebar__foot {
+  padding: 0.75rem 1rem 1rem;
+  border-top: 1px solid var(--mci-border, #e2e8f0);
+  font-size: 0.72rem;
+  color: var(--mci-muted, #94a3b8);
+  line-height: 1.45;
+}
+
+/* CP — warm admin accent on sidebar head */
+.mci-app-area--cp .mci-app-sidebar__head {
+  background: linear-gradient(160deg, #fef3c7 0%, #ffffff 65%);
+}
+
+.mci-app-area--cp .mci-app-sidebar__title {
+  color: var(--mci-body-color, #0f172a);
+}
+
+.mci-app-badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.22);
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+/* ─── Main content cards ─────────────────────────────── */
+.mci-app-area .mci-main .row.g-4 > .col-lg-9 > .card {
+  border-radius: var(--mci-radius-xl, 1.25rem) !important;
+  border: 1.5px solid var(--mci-border, #e2e8f0) !important;
+  box-shadow: var(--mci-shadow-md) !important;
+  background: var(--mci-surface, #fff);
+}
+
+.mci-app-area .mci-main .row.g-4 > .col-lg-9 > .card .card-body {
+  padding: 1.5rem 1.35rem;
+}
+
+@media (min-width: 768px) {
+  .mci-app-area .mci-main .row.g-4 > .col-lg-9 > .card .card-body {
+    padding: 1.75rem 1.75rem;
+  }
+}
+
+/* ─── Stat tiles ─────────────────────────────────────── */
+.mci-app-area .bg-light.border.rounded-3 {
+  background: linear-gradient(180deg, #ffffff 0%, var(--mci-surface-2, #f8fafc) 100%) !important;
+  border-color: var(--mci-border, #e2e8f0) !important;
+  border-radius: var(--mci-radius-lg, 1rem) !important;
+  box-shadow: var(--mci-shadow-xs);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mci-app-area .bg-light.border.rounded-3:hover {
+  border-color: rgba(99, 102, 241, 0.25) !important;
+  box-shadow: var(--mci-shadow-sm);
+}
+
+.mci-app-area .bg-light.border.rounded-3 .fs-4 {
+  font-family: var(--mci-font-display, "Bricolage Grotesque", sans-serif);
+  color: var(--mci-color-primary-deep, #4f46e5);
+  letter-spacing: -0.03em;
+}
+
+/* ─── Tables ─────────────────────────────────────────── */
+.mci-app-area .table {
+  border-color: var(--mci-border, #e2e8f0);
+}
+
+.mci-app-area .table thead.table-light th {
+  background: var(--mci-color-primary-soft, #eef2ff) !important;
+  color: var(--mci-color-primary-deep, #4f46e5);
+  font-weight: 700;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-color: var(--mci-border, #e2e8f0);
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.mci-app-area .table tbody td {
+  vertical-align: middle;
+}
+
+/* ─── Form labels ────────────────────────────────────── */
+.mci-app-area .form-label {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--mci-body-color, #334155);
+}
+
+.mci-app-area .form-control:focus,
+.mci-app-area .form-select:focus {
+  border-color: var(--mci-color-primary-dark, #6366f1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* ─── Alerts ─────────────────────────────────────────── */
+.mci-app-area .alert-warning {
+  background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+/* ─── Badges in tables ───────────────────────────────── */
+.mci-app-area .badge.text-bg-light.border {
+  background: var(--mci-surface-2, #f8fafc) !important;
+  border-color: var(--mci-border, #e2e8f0) !important;
+  color: var(--mci-muted, #64748b) !important;
+  font-weight: 600;
+}
+
+/* ─── Header profile menu (subscriber / CP) ──────────── */
+.mci-header-user__toggle {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 50%;
+}
+.mci-header-user__toggle::after {
+  display: none;
+}
+.mci-header-user__toggle:focus-visible {
+  outline: 2px solid var(--mci-color-primary, #818cf8);
+  outline-offset: 3px;
+}
+
+.mci-header-user__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.mci-header-user__avatar--placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(129, 140, 248, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 1.25rem;
+}
+
+.mci-header-user__menu {
+  min-width: 15.5rem;
+  padding: 0;
+  margin-top: 0.5rem !important;
+  border-radius: var(--mci-radius-lg, 1rem);
+  overflow: hidden;
+}
+
+.mci-header-user__card {
+  padding: 1rem 1.1rem 1.15rem;
+  background: var(--mci-surface, #fff);
+}
+
+.mci-header-user__label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--mci-muted, #64748b);
+  margin-bottom: 0.2rem;
+}
+
+.mci-header-user__name {
+  font-family: var(--mci-font-display, "Bricolage Grotesque", sans-serif);
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: var(--mci-body-color, #0f172a);
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.mci-app-area--cp .mci-header-user__avatar--placeholder {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fcd34d;
+}

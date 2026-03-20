@@ -1,0 +1,135 @@
+/* Register / auth split layouts — benefits panel + form */
+
+.mci-auth-split {
+  padding-top: 1.5rem;
+  padding-bottom: 2.5rem;
+}
+
+@media (min-width: 992px) {
+  .mci-auth-split {
+    padding-top: 2.5rem;
+    padding-bottom: 3.5rem;
+    min-height: min(70vh, 720px);
+    align-items: center;
+  }
+}
+
+.mci-auth-benefits {
+  background: linear-gradient(
+    160deg,
+    var(--mci-color-primary-soft) 0%,
+    #fff 50%,
+    #f8faff 100%
+  );
+  border: 1px solid var(--mci-border);
+  border-radius: var(--mci-radius-xl);
+  box-shadow: var(--mci-shadow-sm);
+  padding: 1.75rem 1.5rem;
+  height: 100%;
+}
+
+@media (min-width: 992px) {
+  .mci-auth-benefits {
+    padding: 2.25rem 2rem;
+  }
+}
+
+.mci-auth-benefits__kicker {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mci-color-primary-deep);
+  margin-bottom: 0.5rem;
+}
+
+.mci-auth-benefits__title {
+  font-size: clamp(1.35rem, 2.5vw, 1.75rem);
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--mci-body-color);
+  margin-bottom: 0.75rem;
+}
+
+.mci-auth-benefits__lead {
+  color: var(--mci-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-bottom: 1.25rem;
+}
+
+.mci-auth-benefits__figure {
+  margin: 0 0 1.5rem;
+  border-radius: var(--mci-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--mci-shadow-md);
+  border: 1px solid rgba(99,102,241,0.15);
+}
+
+.mci-auth-benefits__figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.mci-auth-benefits__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.mci-auth-benefits__item {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+
+.mci-auth-benefits__icon {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--mci-radius-sm);
+  background: #fff;
+  border: 1px solid var(--mci-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mci-color-primary-deep);
+  font-size: 1.1rem;
+  box-shadow: var(--mci-shadow-sm);
+}
+
+.mci-auth-benefits__item strong {
+  display: block;
+  font-size: 0.95rem;
+  margin-bottom: 0.15rem;
+  color: var(--mci-body-color);
+}
+
+.mci-auth-benefits__item p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--mci-muted);
+  line-height: 1.5;
+}
+
+.mci-auth-form-card {
+  border-radius: var(--mci-radius-xl);
+  border: 1px solid var(--mci-border) !important;
+  box-shadow: var(--mci-shadow-md) !important;
+}
+
+.mci-auth-form-card .card-body {
+  padding: 1.5rem 1.35rem;
+}
+
+@media (min-width: 576px) {
+  .mci-auth-form-card .card-body {
+    padding: 1.75rem 1.75rem;
+  }
+}
