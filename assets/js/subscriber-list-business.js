@@ -236,6 +236,13 @@ $(function () {
 
   if (dropArea && fileInput) {
     dropArea.addEventListener('click', function () { fileInput.click(); });
+    dropArea.addEventListener('keydown', function (e) {
+      // Make the upload tile keyboard accessible (Enter / Space).
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
     ['dragover','dragenter'].forEach(function (ev) {
       dropArea.addEventListener(ev, function (e) {
         e.preventDefault(); e.stopPropagation();

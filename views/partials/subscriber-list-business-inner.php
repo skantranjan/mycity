@@ -111,8 +111,8 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
             <div class="mci-faq-item" data-svc-index="0">
               <div class="mci-faq-item__handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></div>
               <div class="flex-grow-1">
-                <input class="form-control form-control-sm mb-2" type="text" name="service_name[]" placeholder="Name, e.g. Interior Painting" />
-                <textarea class="form-control form-control-sm" name="service_desc[]" rows="2" placeholder="Short description — what's included, turnaround…"></textarea>
+                <input class="form-control form-control-sm mb-2" type="text" name="service_name[]" placeholder="Name, e.g. Interior Painting" aria-label="Service name" />
+                <textarea class="form-control form-control-sm" name="service_desc[]" rows="2" placeholder="Short description — what's included, turnaround…" aria-label="Service description"></textarea>
               </div>
               <button type="button" class="btn btn-sm removeSvcBtn mci-faq-item__remove" aria-label="Remove"><i class="bi bi-x-lg"></i></button>
             </div>
@@ -124,8 +124,8 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
             <div class="mci-faq-item" data-svc-index="__INDEX__">
               <div class="mci-faq-item__handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></div>
               <div class="flex-grow-1">
-                <input class="form-control form-control-sm mb-2" type="text" name="service_name[]" placeholder="Name, e.g. Interior Painting" />
-                <textarea class="form-control form-control-sm" name="service_desc[]" rows="2" placeholder="Short description…"></textarea>
+                <input class="form-control form-control-sm mb-2" type="text" name="service_name[]" placeholder="Name, e.g. Interior Painting" aria-label="Service name" />
+                <textarea class="form-control form-control-sm" name="service_desc[]" rows="2" placeholder="Short description…" aria-label="Service description"></textarea>
               </div>
               <button type="button" class="btn btn-sm removeSvcBtn mci-faq-item__remove" aria-label="Remove"><i class="bi bi-x-lg"></i></button>
             </div>
@@ -384,8 +384,8 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
             <div class="faq-item mci-faq-item" data-faq-index="0">
               <div class="mci-faq-item__handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></div>
               <div class="flex-grow-1">
-                <input class="form-control form-control-sm mb-2" type="text" name="faq_question[]" placeholder="Question…" />
-                <textarea class="form-control form-control-sm" name="faq_answer[]" rows="2" placeholder="Your answer…"></textarea>
+                <input class="form-control form-control-sm mb-2" type="text" name="faq_question[]" placeholder="Question…" aria-label="FAQ question" />
+                <textarea class="form-control form-control-sm" name="faq_answer[]" rows="2" placeholder="Your answer…" aria-label="FAQ answer"></textarea>
               </div>
               <button type="button" class="btn btn-sm removeFaqBtn mci-faq-item__remove" aria-label="Remove FAQ"><i class="bi bi-x-lg"></i></button>
             </div>
@@ -397,8 +397,8 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
             <div class="faq-item mci-faq-item" data-faq-index="__INDEX__">
               <div class="mci-faq-item__handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></div>
               <div class="flex-grow-1">
-                <input class="form-control form-control-sm mb-2" type="text" name="faq_question[]" placeholder="Question…" />
-                <textarea class="form-control form-control-sm" name="faq_answer[]" rows="2" placeholder="Your answer…"></textarea>
+                <input class="form-control form-control-sm mb-2" type="text" name="faq_question[]" placeholder="Question…" aria-label="FAQ question" />
+                <textarea class="form-control form-control-sm" name="faq_answer[]" rows="2" placeholder="Your answer…" aria-label="FAQ answer"></textarea>
               </div>
               <button type="button" class="btn btn-sm removeFaqBtn mci-faq-item__remove" aria-label="Remove FAQ"><i class="bi bi-x-lg"></i></button>
             </div>
