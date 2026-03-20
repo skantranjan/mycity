@@ -125,7 +125,9 @@ ob_start();
               <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-2">
                 <div class="d-flex align-items-center gap-2">
                   <span class="badge rounded-pill text-bg-light border">Anonymous</span>
-                  <div class="small"><?= starsHtml((int) $c['stars']) ?></div>
+                  <div class="small" role="img" aria-label="Rating: <?= htmlspecialchars((string) (int) $c['stars'], ENT_QUOTES, 'UTF-8') ?> out of 5">
+                    <?= starsHtml((int) $c['stars']) ?>
+                  </div>
                 </div>
                 <div class="text-muted small"><?= htmlspecialchars($c['when']) ?></div>
               </div>

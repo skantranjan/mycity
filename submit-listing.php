@@ -292,6 +292,13 @@ $(function () {
 
   if (dropArea && fileInput) {
     dropArea.addEventListener('click', function () { fileInput.click(); });
+    dropArea.addEventListener('keydown', function (e) {
+      // Make the upload area keyboard accessible (Enter / Space).
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
     ['dragover','dragenter'].forEach(function (ev) {
       dropArea.addEventListener(ev, function (e) {
         e.preventDefault(); e.stopPropagation();
@@ -540,8 +547,8 @@ ob_start();
                 <div class="mci-faq-item" data-svc-index="0">
                   <div class="mci-faq-item__handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></div>
                   <div class="flex-grow-1">
-                    <input class="form-control form-control-sm mb-2" type="text" name="service_name[]" placeholder="Name, e.g. Interior Painting" />
-                    <textarea class="form-control form-control-sm" name="service_desc[]" rows="2" placeholder="Short description — what's included, price range, turnaround…"></textarea>
+                    <input class="form-control form-control-sm mb-2" type="text" name="service_name[]" placeholder="Name, e.g. Interior Painting" aria-label="Service name" />
+                    <textarea class="form-control form-control-sm" name="service_desc[]" rows="2" placeholder="Short description — what's included, price range, turnaround…" aria-label="Service description"></textarea>
                   </div>
                   <button type="button" class="btn btn-sm removeSvcBtn mci-faq-item__remove" aria-label="Remove service"><i class="bi bi-x-lg"></i></button>
                 </div>
@@ -554,8 +561,8 @@ ob_start();
                 <div class="mci-faq-item" data-svc-index="__INDEX__">
                   <div class="mci-faq-item__handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></div>
                   <div class="flex-grow-1">
-                    <input class="form-control form-control-sm mb-2" type="text" name="service_name[]" placeholder="Name, e.g. Interior Painting" />
-                    <textarea class="form-control form-control-sm" name="service_desc[]" rows="2" placeholder="Short description — what's included, price range, turnaround…"></textarea>
+                    <input class="form-control form-control-sm mb-2" type="text" name="service_name[]" placeholder="Name, e.g. Interior Painting" aria-label="Service name" />
+                    <textarea class="form-control form-control-sm" name="service_desc[]" rows="2" placeholder="Short description — what's included, price range, turnaround…" aria-label="Service description"></textarea>
                   </div>
                   <button type="button" class="btn btn-sm removeSvcBtn mci-faq-item__remove" aria-label="Remove service"><i class="bi bi-x-lg"></i></button>
                 </div>
@@ -870,8 +877,8 @@ ob_start();
             <div class="faq-item mci-faq-item" data-faq-index="0">
               <div class="mci-faq-item__handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></div>
               <div class="flex-grow-1">
-                <input class="form-control form-control-sm mb-2" type="text" name="faq_question[]" placeholder="Question, e.g. Do you offer home delivery?" />
-                <textarea class="form-control form-control-sm" name="faq_answer[]" rows="2" placeholder="Your answer…"></textarea>
+                <input class="form-control form-control-sm mb-2" type="text" name="faq_question[]" placeholder="Question, e.g. Do you offer home delivery?" aria-label="FAQ question" />
+                <textarea class="form-control form-control-sm" name="faq_answer[]" rows="2" placeholder="Your answer…" aria-label="FAQ answer"></textarea>
               </div>
               <button type="button" class="btn btn-sm removeFaqBtn mci-faq-item__remove" aria-label="Remove FAQ"><i class="bi bi-x-lg"></i></button>
             </div>
@@ -884,8 +891,8 @@ ob_start();
             <div class="faq-item mci-faq-item" data-faq-index="__INDEX__">
               <div class="mci-faq-item__handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></div>
               <div class="flex-grow-1">
-                <input class="form-control form-control-sm mb-2" type="text" name="faq_question[]" placeholder="Question, e.g. Do you offer home delivery?" />
-                <textarea class="form-control form-control-sm" name="faq_answer[]" rows="2" placeholder="Your answer…"></textarea>
+                <input class="form-control form-control-sm mb-2" type="text" name="faq_question[]" placeholder="Question, e.g. Do you offer home delivery?" aria-label="FAQ question" />
+                <textarea class="form-control form-control-sm" name="faq_answer[]" rows="2" placeholder="Your answer…" aria-label="FAQ answer"></textarea>
               </div>
               <button type="button" class="btn btn-sm removeFaqBtn mci-faq-item__remove" aria-label="Remove FAQ"><i class="bi bi-x-lg"></i></button>
             </div>

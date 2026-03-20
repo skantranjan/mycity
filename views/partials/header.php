@@ -57,7 +57,18 @@ function navActive(string $key, string $activePage): string
           $mciHdrName = mci_app_profile_display_name('subscriber');
           $mciHdrAvatar = mci_app_profile_avatar_data_uri('subscriber');
           ?>
-          <div class="dropdown mci-header-user ms-lg-auto pt-2 pt-lg-0">
+          <div class="d-flex align-items-center gap-2 ms-lg-auto pt-2 pt-lg-0">
+            <button
+              type="button"
+              class="btn btn-sm rounded-pill mci-theme-toggle"
+              id="mciThemeToggle"
+              aria-pressed="false"
+              aria-label="Toggle dark mode"
+            >
+              <i class="bi bi-sun-fill mci-theme-toggle__icon mci-theme-toggle__icon--light" aria-hidden="true"></i>
+              <i class="bi bi-moon-stars-fill mci-theme-toggle__icon mci-theme-toggle__icon--dark d-none" aria-hidden="true"></i>
+            </button>
+            <div class="dropdown mci-header-user">
             <button
               type="button"
               class="btn mci-header-user__toggle dropdown-toggle d-flex align-items-center justify-content-center"
@@ -89,13 +100,25 @@ function navActive(string $key, string $activePage): string
                 </div>
               </div>
             </div>
+            </div>
           </div>
         <?php elseif ($appArea === 'cp'): ?>
           <?php
           $mciHdrName = mci_app_profile_display_name('cp');
           $mciHdrAvatar = mci_app_profile_avatar_data_uri('cp');
           ?>
-          <div class="dropdown mci-header-user ms-lg-auto pt-2 pt-lg-0">
+          <div class="d-flex align-items-center gap-2 ms-lg-auto pt-2 pt-lg-0">
+            <button
+              type="button"
+              class="btn btn-sm rounded-pill mci-theme-toggle"
+              id="mciThemeToggle"
+              aria-pressed="false"
+              aria-label="Toggle dark mode"
+            >
+              <i class="bi bi-sun-fill mci-theme-toggle__icon mci-theme-toggle__icon--light" aria-hidden="true"></i>
+              <i class="bi bi-moon-stars-fill mci-theme-toggle__icon mci-theme-toggle__icon--dark d-none" aria-hidden="true"></i>
+            </button>
+            <div class="dropdown mci-header-user">
             <button
               type="button"
               class="btn mci-header-user__toggle dropdown-toggle d-flex align-items-center justify-content-center"
@@ -127,9 +150,20 @@ function navActive(string $key, string $activePage): string
                 </div>
               </div>
             </div>
+            </div>
           </div>
         <?php else: ?>
         <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-lg-center gap-2 ms-lg-2 pt-2 pt-lg-0 mci-header-login">
+          <button
+            type="button"
+            class="btn btn-sm rounded-pill mci-theme-toggle align-self-start align-self-lg-center"
+            id="mciThemeToggle"
+            aria-pressed="false"
+            aria-label="Toggle dark mode"
+          >
+            <i class="bi bi-sun-fill mci-theme-toggle__icon mci-theme-toggle__icon--light" aria-hidden="true"></i>
+            <i class="bi bi-moon-stars-fill mci-theme-toggle__icon mci-theme-toggle__icon--dark d-none" aria-hidden="true"></i>
+          </button>
           <a class="btn btn-sm rounded-pill px-3 mci-touch-target text-center w-100 w-lg-auto btn-header-register" href="/register.php">Register</a>
           <a class="btn btn-sm rounded-pill px-3 mci-touch-target text-center w-100 w-lg-auto btn-header-login" href="/login.php">Login</a>
         </div>
