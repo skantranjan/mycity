@@ -387,6 +387,38 @@ iframe { max-width: 100%; }
 /* ─── Footer muted text ─────────────────────────────── */
 .site-footer .text-muted { word-break: break-word; }
 
+/* ─── Footer depth (less flat) ───────────────────────────── */
+.site-footer {
+  margin-top: 0;
+  background: linear-gradient(180deg, rgba(238,242,255,0.55) 0%, rgba(248,250,252,1) 100%);
+  border-top: 1px solid rgba(226,232,240,0.9) !important;
+  box-shadow: 0 -1px 18px rgba(15,23,42,0.05);
+}
+
+.site-footer .container {
+  position: relative;
+}
+
+.site-footer a.text-muted {
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.site-footer a.text-muted:hover {
+  color: var(--mci-color-primary-deep) !important;
+  opacity: 1 !important;
+  text-decoration: none;
+}
+
+:root[data-theme="dark"] .site-footer {
+  background: linear-gradient(180deg, rgba(17,24,39,1) 0%, rgba(15,23,42,1) 100%);
+  border-top: 1px solid rgba(148,163,184,0.22) !important;
+  box-shadow: 0 -1px 18px rgba(0,0,0,0.35);
+}
+
+:root[data-theme="dark"] .site-footer .text-muted {
+  color: rgba(226,232,240,0.85) !important;
+}
+
 /* ─── Reduced motion ────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *,*::before,*::after {
@@ -396,3 +428,170 @@ iframe { max-width: 100%; }
     scroll-behavior: auto !important;
   }
 }
+
+/* ─── Theme: dark mode tokens (session-controlled) ───────────────────────── */
+:root[data-theme="dark"] {
+  --mci-body-bg: #0b1220;
+  --mci-body-color: #e5e7eb;
+
+  --mci-surface: #0f172a;
+  --mci-surface-2: #111827;
+  --mci-border: rgba(148,163,184,0.25);
+  --mci-muted: #94a3b8;
+
+  --mci-header-bg: #070815;
+  --mci-header-bg-top: #0b0a20;
+  --mci-header-border: rgba(255,255,255,0.08);
+  --mci-header-link: rgba(255,255,255,0.82);
+  --mci-header-link-hover: rgba(255,255,255,0.95);
+  --mci-header-active-bg: rgba(129,140,248,0.25);
+  --mci-header-active-color: #c7d2fe;
+
+  /* neutral shadows tuned for dark canvas */
+  --mci-shadow-xs: 0 1px 2px rgba(0,0,0,0.35);
+  --mci-shadow-sm: 0 1px 3px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.25);
+  --mci-shadow-md: 0 8px 24px -4px rgba(0,0,0,0.35), 0 2px 8px -2px rgba(0,0,0,0.25);
+  --mci-shadow-lg: 0 20px 40px -8px rgba(0,0,0,0.5), 0 8px 16px -8px rgba(0,0,0,0.3);
+}
+
+/* ─── Header theme toggle ───────────────────────────────────────────────── */
+.mci-theme-toggle {
+  border: 1px solid rgba(255,255,255,0.22) !important;
+  background: rgba(255,255,255,0.08) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+}
+
+.mci-theme-toggle:hover,
+.mci-theme-toggle:focus-visible {
+  background: rgba(255,255,255,0.14) !important;
+  border-color: rgba(255,255,255,0.32) !important;
+}
+
+.mci-theme-toggle__icon {
+  font-size: 1.05rem;
+}
+
+/* ─── Dark mode component overrides (readability) ───────────────────────── */
+:root[data-theme="dark"] body.mci-body {
+  background-color: var(--mci-body-bg) !important;
+  color: var(--mci-body-color) !important;
+}
+
+/* Bootstrap utility backgrounds are frequently used as `.bg-white` in the app.
+   In dark mode those cause light backgrounds with light text. */
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .card.bg-white,
+:root[data-theme="dark"] .bg-white.bg-white {
+  background-color: var(--mci-surface) !important;
+}
+
+:root[data-theme="dark"] .bg-light {
+  background-color: var(--mci-surface-2) !important;
+}
+
+:root[data-theme="dark"] .card {
+  background-color: var(--mci-surface) !important;
+  border-color: var(--mci-border) !important;
+  color: var(--mci-body-color) !important;
+}
+
+:root[data-theme="dark"] .text-muted,
+:root[data-theme="dark"] .form-text,
+:root[data-theme="dark"] .text-muted.small {
+  color: rgba(148,163,184,0.95) !important;
+}
+
+:root[data-theme="dark"] .form-label {
+  color: rgba(226,232,240,0.95) !important;
+}
+
+:root[data-theme="dark"] .form-control,
+:root[data-theme="dark"] .form-select {
+  background-color: rgba(15,23,42,0.95) !important;
+  color: var(--mci-body-color) !important;
+  border-color: rgba(148,163,184,0.35) !important;
+}
+
+:root[data-theme="dark"] .form-control::placeholder {
+  color: rgba(148,163,184,0.7) !important;
+}
+
+:root[data-theme="dark"] .form-control:focus,
+:root[data-theme="dark"] .form-select:focus {
+  border-color: rgba(99,102,241,0.8) !important;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.22) !important;
+}
+
+:root[data-theme="dark"] .input-group-text {
+  background-color: rgba(15,23,42,0.95) !important;
+  border-color: rgba(148,163,184,0.35) !important;
+  color: rgba(226,232,240,0.95) !important;
+}
+
+:root[data-theme="dark"] .dropdown-menu,
+:root[data-theme="dark"] .modal-content {
+  background-color: var(--mci-surface) !important;
+  border-color: var(--mci-border) !important;
+  color: var(--mci-body-color) !important;
+}
+
+:root[data-theme="dark"] .table {
+  color: var(--mci-body-color) !important;
+}
+:root[data-theme="dark"] .table thead th {
+  background-color: var(--mci-color-primary-soft) !important;
+  color: var(--mci-color-primary-deep) !important;
+  border-color: var(--mci-border) !important;
+}
+:root[data-theme="dark"] .table td,
+:root[data-theme="dark"] .table th {
+  border-color: var(--mci-border) !important;
+}
+
+:root[data-theme="dark"] .alert-light {
+  background: rgba(17,24,39,0.25) !important;
+  border-color: var(--mci-border) !important;
+  color: var(--mci-body-color) !important;
+}
+
+/* Buttons: ensure outline-secondary stays visible on dark backgrounds. */
+:root[data-theme="dark"] .btn-outline-secondary {
+  border-color: rgba(148,163,184,0.55) !important;
+  color: rgba(226,232,240,0.95) !important;
+  background: transparent !important;
+}
+:root[data-theme="dark"] .btn-outline-secondary:hover,
+:root[data-theme="dark"] .btn-outline-secondary:focus-visible {
+  border-color: transparent !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, var(--mci-color-primary) 0%, var(--mci-color-primary-dark) 100%) !important;
+  box-shadow: var(--mci-glow-primary) !important;
+}
+
+:root[data-theme="dark"] .btn-light,
+:root[data-theme="dark"] .btn-outline-light {
+  background-color: rgba(255,255,255,0.08) !important;
+  border-color: rgba(255,255,255,0.22) !important;
+  color: #fff !important;
+}
+
+:root[data-theme="dark"] .btn-light:hover,
+:root[data-theme="dark"] .btn-outline-light:hover,
+:root[data-theme="dark"] .btn-light:focus-visible,
+:root[data-theme="dark"] .btn-outline-light:focus-visible {
+  border-color: rgba(255,255,255,0.35) !important;
+  background-color: rgba(255,255,255,0.12) !important;
+  color: #fff !important;
+}
+
+:root[data-theme="dark"] .btn-close {
+  filter: invert(1) brightness(1.1);
+}
+
