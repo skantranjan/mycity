@@ -2,6 +2,8 @@
 $pageTitle = 'CP Dashboard - My City Info';
 $activePage = '';
 $cpActive = 'dashboard';
+$hideCta = true;
+$appArea = 'cp';
 
 ob_start();
 ?>

@@ -2,6 +2,8 @@
 $pageTitle = 'Subscriber Dashboard - My City Info';
 $activePage = '';
 $subActive = 'dashboard';
+$hideCta = true;
+$appArea = 'subscriber';
 
 ob_start();
 ?>
@@ -18,7 +20,7 @@ ob_start();
             <div class="fw-semibold">Dashboard</div>
             <div class="text-muted small">Overview of your listing activity (UI demo).</div>
           </div>
-          <a class="btn btn-sm btn-dark" href="/submit-listing.php">Add new listing</a>
+          <a class="btn btn-sm btn-dark" href="/subscriber/list-business.php">List your business</a>
         </div>
 
         <div class="row g-3">
@@ -57,9 +59,9 @@ ob_start();
               <tbody>
                 <?php
                 $rows = [
-                  ['title' => 'Property 852', 'status' => 'Live', 'updated' => '2 days ago'],
-                  ['title' => 'Locker Shop UK Ltd', 'status' => 'Pending', 'updated' => '1 day ago'],
-                  ['title' => 'JXF Painting Service', 'status' => 'Live', 'updated' => '5 days ago'],
+                  ['slug' => 'property-852', 'title' => 'Property 852', 'status' => 'Live', 'updated' => '2 days ago'],
+                  ['slug' => 'locker-shop-uk', 'title' => 'Locker Shop UK Ltd', 'status' => 'Pending', 'updated' => '1 day ago'],
+                  ['slug' => 'jxf-painting', 'title' => 'JXF Painting Service', 'status' => 'Live', 'updated' => '5 days ago'],
                 ];
                 foreach ($rows as $r):
                 ?>
@@ -71,9 +73,9 @@ ob_start();
                     <td class="text-muted small"><?= htmlspecialchars($r['updated']) ?></td>
                     <td>
                       <div class="d-flex gap-2 flex-wrap">
-                        <a class="btn btn-sm btn-outline-dark" href="/subscriber/listings.php">View</a>
-                        <a class="btn btn-sm btn-outline-secondary" href="/subscriber/listings.php">Edit</a>
-                        <button class="btn btn-sm btn-outline-danger" type="button" disabled>Delete</button>
+                        <a class="btn btn-sm btn-outline-dark" href="/business.php?slug=<?= urlencode((string) $r['slug']) ?>">View</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="/subscriber/list-business.php?edit=1&slug=<?= urlencode((string) $r['slug']) ?>">Edit</a>
+                        <a class="btn btn-sm btn-outline-danger" href="/subscriber/listing-delete.php?slug=<?= urlencode((string) $r['slug']) ?>&title=<?= urlencode((string) $r['title']) ?>">Delete</a>
                       </div>
                     </td>
                   </tr>

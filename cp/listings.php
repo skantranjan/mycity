@@ -2,6 +2,8 @@
 $pageTitle = 'Manage All Listings - My City Info';
 $activePage = '';
 $cpActive = 'listings';
+$hideCta = true;
+$appArea = 'cp';
 
 ob_start();
 ?>

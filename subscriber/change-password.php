@@ -1,7 +1,9 @@
 <?php
 $pageTitle = 'Change Password - My City Info';
 $activePage = '';
-$subActive = 'change-password';
+$subActive = '';
+$hideCta = true;
+$appArea = 'subscriber';
 
 ob_start();
 ?>

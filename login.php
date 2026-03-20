@@ -1,27 +1,116 @@
 <?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/includes/mci_session.php';
+
 $pageTitle = 'Login - My City Info';
 $activePage = '';
+$returnUrl = mci_safe_return_url();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $_SESSION['mci_user_id'] = bin2hex(random_bytes(16));
+    $_SESSION['mci_logged_in'] = true;
+    $em = trim((string) ($_POST['email'] ?? ''));
+    if ($em !== '' && empty($_SESSION['mci_sub_profile_name'])) {
+        $local = trim(explode('@', $em, 2)[0] ?? '');
+        if ($local !== '') {
+            $_SESSION['mci_sub_profile_name'] = $local;
+        }
+    }
+    $postedReturn = mci_safe_return_url(trim((string) ($_POST['return'] ?? '')));
+    // Default to subscriber dashboard if no specific return URL
+    if ($postedReturn === '/index.php') {
+        $postedReturn = '/subscriber/dashboard.php';
+    }
+    header('Location: ' . $postedReturn);
+    exit;
+}
+
+$hideCta = true;
+$extraHead = <<<'HTML'
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+<link rel="stylesheet" href="/assets/css/auth-pages.css" />
+HTML;
 
 ob_start();
 ?>
 
-<div class="row justify-content-center">
-  <div class="col-12 col-md-8 col-lg-5">
-    <div class="card border-0 shadow-sm bg-white">
-      <div class="card-body p-4">
-        <div class="text-center mb-4">
+<div class="row g-4 g-lg-5 mci-auth-split align-items-stretch">
+  <!-- Left: why sign in — access & features -->
+  <div class="col-12 col-lg-6 order-2 order-lg-1">
+    <div class="mci-auth-benefits h-100">
+      <p class="mci-auth-benefits__kicker mb-0">My City Info</p>
+      <h1 class="mci-auth-benefits__title">Welcome back—sign in to pick up where you left off</h1>
+      <p class="mci-auth-benefits__lead">
+        Your account keeps your reviews, saved searches, and claimed listings in one place.
+        Sign in to rate businesses, manage your profile, and discover what's new in your neighbourhood.
+      </p>
+
+      <figure class="mci-auth-benefits__figure" aria-hidden="true">
+        <img
+          src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&amp;fit=crop&amp;w=800&amp;h=600&amp;q=80"
+          alt="People using laptop and mobile devices — easy access"
+          width="800"
+          height="600"
+          loading="lazy"
+        />
+      </figure>
+
+      <ul class="mci-auth-benefits__list">
+        <li class="mci-auth-benefits__item">
+          <span class="mci-auth-benefits__icon" aria-hidden="true"><i class="bi bi-chat-heart"></i></span>
+          <div>
+            <strong>Rate and review anonymously</strong>
+            <p>Share your experience on any business page. Your reviews appear anonymously to the public, but you can track them in your dashboard.</p>
+          </div>
+        </li>
+        <li class="mci-auth-benefits__item">
+          <span class="mci-auth-benefits__icon" aria-hidden="true"><i class="bi bi-bookmark-star"></i></span>
+          <div>
+            <strong>Favourites & saved searches</strong>
+            <p>Bookmark places you love or might try later. When we add watchlists, you'll get alerts when saved businesses update their hours or add photos.</p>
+          </div>
+        </li>
+        <li class="mci-auth-benefits__item">
+          <span class="mci-auth-benefits__icon" aria-hidden="true"><i class="bi bi-building"></i></span>
+          <div>
+            <strong>Manage your listing</strong>
+            <p>If you've claimed a business, sign in to update details, reply to reviews, and upload fresh photos—all from your subscriber dashboard.</p>
+          </div>
+        </li>
+        <li class="mci-auth-benefits__item">
+          <span class="mci-auth-benefits__icon" aria-hidden="true"><i class="bi bi-lightning"></i></span>
+          <div>
+            <strong>One login, all devices</strong>
+            <p>Use the same credentials on desktop, tablet, and mobile—your session stays secure and your data syncs across devices.</p>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Right: sign in form -->
+  <div class="col-12 col-lg-6 order-1 order-lg-2">
+    <div class="card border-0 shadow-sm bg-white mci-auth-form-card h-100">
+      <div class="card-body d-flex flex-column">
+        <div class="mb-4">
           <div class="fw-bold fs-4">Sign in</div>
-          <div class="text-muted small">Use your email and password or continue with social login.</div>
+          <div class="text-muted small mt-1">Use your email and password or continue with social login.</div>
+          <div class="alert alert-info small mt-3 mb-0 text-start">
+            <strong>Demo:</strong> Submitting this form signs you in so you can try features (e.g. anonymous business reviews). Real authentication will replace this later.
+          </div>
         </div>
 
-        <form action="#" method="post">
+        <form action="/login.php" method="post" class="flex-grow-1 d-flex flex-column">
+          <input type="hidden" name="return" value="<?= htmlspecialchars($returnUrl) ?>" />
           <div class="mb-3">
-            <label class="form-label">Email</label>
-            <input class="form-control" type="email" name="email" placeholder="name@example.com" required />
+            <label class="form-label" for="loginEmail">Email</label>
+            <input class="form-control" id="loginEmail" type="email" name="email" placeholder="name@example.com" required autocomplete="email" />
           </div>
           <div class="mb-3">
-            <label class="form-label">Password</label>
-            <input class="form-control" type="password" name="password" placeholder="Your password" required />
+            <label class="form-label" for="loginPassword">Password</label>
+            <input class="form-control" id="loginPassword" type="password" name="password" placeholder="Your password" required autocomplete="current-password" />
           </div>
 
           <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
@@ -45,8 +134,8 @@ ob_start();
             </button>
           </div>
 
-          <div class="text-muted small mt-4 text-center">
-            Don't have an account? <a href="/register.php" class="text-decoration-none">Register</a>
+          <div class="text-muted small text-center mt-auto pt-3">
+            Don't have an account? <a href="/register.php?return=<?= rawurlencode($returnUrl) ?>" class="text-decoration-none fw-semibold">Register</a>
           </div>
         </form>
       </div>
@@ -58,4 +147,3 @@ ob_start();
 $content = ob_get_clean();
 include __DIR__ . '/views/layout.php';
 ?>
-

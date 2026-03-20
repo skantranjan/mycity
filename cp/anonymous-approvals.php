@@ -2,6 +2,8 @@
 $pageTitle = 'Anonymous Approvals - My City Info';
 $activePage = '';
 $cpActive = 'anonymous';
+$hideCta = true;
+$appArea = 'cp';
 
 ob_start();
 ?>

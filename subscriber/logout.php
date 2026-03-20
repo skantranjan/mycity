@@ -1,7 +1,25 @@
 <?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../includes/mci_session.php';
+
+if (isset($_GET['perform']) && $_GET['perform'] === '1') {
+    unset(
+        $_SESSION['mci_user_id'],
+        $_SESSION['mci_logged_in'],
+        $_SESSION['mci_sub_profile_name'],
+        $_SESSION['mci_sub_profile_avatar']
+    );
+    header('Location: /index.php');
+    exit;
+}
+
 $pageTitle = 'Logout - My City Info';
 $activePage = '';
-$subActive = 'logout';
+$subActive = '';
+$hideCta = true;
+$appArea = 'subscriber';
 
 ob_start();
 ?>
@@ -15,7 +33,7 @@ ob_start();
       <div class="card-body p-4">
         <div class="fw-semibold mb-2">Logout</div>
         <div class="text-muted small mb-3">
-          This is a UI placeholder. Backend logout will clear session and redirect to the home page.
+          You can also sign out anytime from the profile menu in the top bar.
         </div>
 
         <div class="alert alert-warning mb-0">
@@ -25,7 +43,7 @@ ob_start();
 
         <div class="d-flex gap-2 mt-3 flex-wrap">
           <a class="btn btn-outline-secondary" href="/subscriber/dashboard.php">Cancel</a>
-          <a class="btn btn-dark" href="/">Logout</a>
+          <a class="btn btn-dark" href="/subscriber/logout.php?perform=1">Logout</a>
         </div>
       </div>
     </div>
@@ -36,4 +54,3 @@ ob_start();
 $content = ob_get_clean();
 include __DIR__ . '/../views/layout.php';
 ?>
-

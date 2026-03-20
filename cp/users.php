@@ -2,6 +2,8 @@
 $pageTitle = 'Manage Registered Users - My City Info';
 $activePage = '';
 $cpActive = 'users';
+$hideCta = true;
+$appArea = 'cp';
 
 ob_start();
 ?>
