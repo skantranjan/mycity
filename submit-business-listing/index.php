@@ -34,39 +34,24 @@ $submitPublicGuest = !$isSubscriberLoggedIn;
 $submitHideStep7InlinePreview = true;
 
 if ($isSubscriberLoggedIn) {
-    $postingType = 'registered';
+    $wizardContext  = 'subscriber';
+    $postingType    = 'registered';
     $requesterLabel = 'Subscriber';
     $step7HeaderDesc = 'You\'re signed in — submit when everything looks right.';
     $step7AlertTitle = 'Preview & publish';
-    $step7AlertBody = 'Confirm the details below and submit your business for listing review.';
+    $step7AlertBody  = 'Confirm the details below and submit your business for listing review.';
     $step7SubmitText = 'Submit listing';
+    $submitRedirect  = '/subscriber/listings/';
 } else {
-    $postingType = 'anonymous';
+    $wizardContext  = 'guest';
+    $postingType    = 'anonymous';
     $requesterLabel = 'Guest';
     $step7HeaderDesc = 'Choose how to publish — then submit for review.';
     $step7AlertTitle = 'Account or anonymous';
-    $step7AlertBody = 'Create an account for faster updates and listing management, or submit without an account for admin review.';
+    $step7AlertBody  = 'Create an account for faster updates and listing management, or submit without an account for admin review.';
     $step7SubmitText = 'Submit for review';
+    $submitRedirect  = '/submit-business-listing/';
 }
-
-$categories = [
-    'Airport', 'Amusement Park', 'Aquarium', 'Art Gallery', 'ATM', 'Automotive',
-    'Bakery', 'Bank', 'Bar', 'Beauty Salon', 'Bicycle Store', 'Books & Stationary Store',
-    'Bus Stations', 'Cafe', 'Car Dealer', 'Car Rental', 'Car Repair', 'Car Wash',
-    'Cemetery', 'Church', 'City Attraction', 'Clothing Store', 'College',
-    'Convenience Store', 'Courier Services', 'Dentist', 'Departmental Store',
-    'Doctor', 'Electrician', 'Electronics Store', 'Fire Station', 'Florist',
-    'Funeral Home', 'Furniture Store', 'Gift Shop', 'Government Office', 'Gym',
-    'Hardware Store', 'Health', 'Hindu Temple', 'Home Appliances Products',
-    'Hospital', 'Hotels', 'Industrial and Manufacturing Supplies', 'Insurance Agency',
-    'Jewelry Store', 'Laundry', 'Lawyer', 'Library', 'Liquor Store', 'Locksmith',
-    'Medical Store', 'Monuments', 'Mosque', 'Movie Theater', 'Museum',
-    'NGO and Charitable Trusts', 'Night Club', 'Painter', 'Park', 'Pet Store',
-    'Petrol Pump', 'Physiotherapist', 'Plumber', 'Police Station', 'Post Office',
-    'Pre Schools and Day Care', 'Private Coaching Institutes', 'Real Estate',
-    'Resorts', 'Restaurant', 'School', 'Services', 'Shoe Store', 'Shopping', 'Spa',
-    'Stadium', 'Supermarket', 'Travel Agency', 'University', 'Veterinary Care',
-];
 
 $extraHead = <<<'HTML'
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
@@ -74,7 +59,15 @@ $extraHead = <<<'HTML'
 <link rel="stylesheet" href="/assets/css/submit-listing.css" />
 HTML;
 
-$extraJS = <<<'HTML'
+$wcJs = htmlspecialchars($wizardContext, ENT_QUOTES, 'UTF-8');
+$rdJs = htmlspecialchars($submitRedirect, ENT_QUOTES, 'UTF-8');
+$btnJs = htmlspecialchars($step7SubmitText, ENT_QUOTES, 'UTF-8');
+$extraJS = <<<HTML
+<script>
+window._mciSubmitContext  = '{$wcJs}';
+window._mciSubmitRedirect = '{$rdJs}';
+window._mciSubmitBtnText  = '{$btnJs}';
+</script>
 <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
 <script src="/assets/js/subscriber-list-business.js"></script>
 HTML;

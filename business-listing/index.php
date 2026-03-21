@@ -8,6 +8,33 @@ $extraHead = <<<'HTML'
 <script src="/assets/js/listings-view.js" defer></script>
 HTML;
 
+$extraJS = <<<'HTML'
+<script>
+(function () {
+  var btn = document.getElementById('mciFilterToggle');
+  var panel = document.getElementById('mciFiltersPanel');
+  if (!btn || !panel) return;
+  // On mobile: hide filters panel by default
+  function applyMobileState() {
+    if (window.innerWidth < 992) {
+      if (btn.getAttribute('aria-expanded') !== 'true') {
+        panel.style.display = 'none';
+      }
+    } else {
+      panel.style.display = '';
+    }
+  }
+  applyMobileState();
+  window.addEventListener('resize', applyMobileState);
+  btn.addEventListener('click', function () {
+    var expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    panel.style.display = expanded ? 'none' : '';
+  });
+})();
+</script>
+HTML;
+
 $what = trim((string)($_GET['what'] ?? ''));
 $where = trim((string)($_GET['where'] ?? ''));
 $category = trim((string)($_GET['category'] ?? ''));
@@ -79,8 +106,7 @@ $filteredListings = array_filter($allListings, function ($l) use ($what, $where,
       $ok = $ok && mci_listing_has_tag($l, $tag);
   }
   if ($priceRange !== '') {
-    // No price data yet. Keep it as UI placeholder.
-    $ok = $ok && true;
+    $ok = $ok && (($l['price_range'] ?? '') === $priceRange);
   }
   return $ok;
 });
@@ -88,6 +114,9 @@ $filteredListings = array_filter($allListings, function ($l) use ($what, $where,
 ob_start();
 ?>
 
+<?php
+$activeFilterCount = ($what !== '' ? 1 : 0) + ($where !== '' ? 1 : 0) + ($category !== '' ? 1 : 0) + ($tag !== '' ? 1 : 0) + ($priceRange !== '' ? 1 : 0);
+?>
 <div class="row g-4">
   <div class="col-12">
     <div class="d-flex align-items-end justify-content-between gap-3 flex-wrap">
@@ -114,11 +143,16 @@ ob_start();
           <?php endif; ?>
         </div>
       </div>
-      <a class="btn btn-sm btn-dark" href="/submit-business-listing/">List your business</a>
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-sm btn-outline-dark d-lg-none" type="button" id="mciFilterToggle" aria-expanded="false" aria-controls="mciFiltersPanel">
+          <i class="bi bi-sliders me-1" aria-hidden="true"></i>Filters<?php if ($activeFilterCount > 0): ?> <span class="badge text-bg-dark ms-1"><?= $activeFilterCount ?></span><?php endif; ?>
+        </button>
+        <a class="btn btn-sm btn-dark" href="/submit-business-listing/">List your business</a>
+      </div>
     </div>
   </div>
 
-  <div class="col-12 col-lg-4">
+  <div class="col-12 col-lg-4" id="mciFiltersPanel">
     <div class="card border-0 shadow-sm bg-white">
       <div class="card-body">
         <div class="fw-semibold mb-3">Filters</div>
@@ -129,7 +163,7 @@ ob_start();
           </div>
           <div class="mb-3">
             <label class="form-label">Where</label>
-            <input class="form-control" type="text" name="where" value="<?= htmlspecialchars($where) ?>" placeholder="City or area" />
+            <input class="form-control" type="text" id="mciListingWhere" name="where" value="<?= htmlspecialchars($where) ?>" placeholder="City or area" />
           </div>
 
           <div class="mb-3">
@@ -151,7 +185,7 @@ ob_start();
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Price range (UI placeholder)</label>
+            <label class="form-label">Price range</label>
             <select class="form-select" name="price_range">
               <option value="">Any</option>
               <option value="free" <?= $priceRange === 'free' ? 'selected' : '' ?>>₹ (Inexpensive)</option>
@@ -194,29 +228,38 @@ ob_start();
               <i class="bi bi-list-ul" aria-hidden="true"></i>
             </button>
           </div>
-          <div class="text-muted small"><?= count($filteredListings) ?> results (demo)</div>
+          <div class="text-muted small">Showing <?= count($filteredListings) ?> of <?= count($allListings) ?> listings</div>
         </div>
       </div>
 
-      <div id="listingsGridView" class="row g-3">
-        <?php foreach ($filteredListings as $listing): ?>
-          <?php $size = 'md'; include __DIR__ . '/../views/components/listing-card.php'; ?>
-        <?php endforeach; ?>
-      </div>
+      <?php if (count($filteredListings) === 0): ?>
+        <div class="text-center py-5">
+          <div class="mb-3" style="font-size:3rem;" aria-hidden="true">🔍</div>
+          <div class="fw-semibold mb-1">No businesses found</div>
+          <div class="text-muted small mb-3">Try adjusting or clearing your filters to see more results.</div>
+          <a href="/business-listing/" class="btn btn-sm btn-dark">Clear all filters</a>
+        </div>
+      <?php else: ?>
+        <div id="listingsGridView" class="row g-3">
+          <?php foreach ($filteredListings as $listing): ?>
+            <?php $size = 'md'; include __DIR__ . '/../views/components/listing-card.php'; ?>
+          <?php endforeach; ?>
+        </div>
 
-      <div id="listingsListView" class="row g-3 d-none">
-        <?php foreach ($filteredListings as $listing): ?>
-          <?php include __DIR__ . '/../views/components/listing-row.php'; ?>
-        <?php endforeach; ?>
-      </div>
+        <div id="listingsListView" class="row g-3 d-none">
+          <?php foreach ($filteredListings as $listing): ?>
+            <?php include __DIR__ . '/../views/components/listing-row.php'; ?>
+          <?php endforeach; ?>
+        </div>
 
-      <div class="mt-4 d-flex align-items-center justify-content-center gap-2">
-        <a class="btn btn-sm btn-outline-secondary disabled" href="#">Prev</a>
-        <div class="btn btn-sm btn-outline-dark disabled">1</div>
-        <a class="btn btn-sm btn-outline-secondary disabled" href="#">2</a>
-        <a class="btn btn-sm btn-outline-secondary disabled" href="#">Next</a>
-      </div>
-      <div class="text-muted small text-center mt-2">Pagination wiring will be added when backend is integrated.</div>
+        <?php if (count($filteredListings) < count($allListings)): ?>
+          <div class="mt-4 text-center">
+            <button type="button" class="btn btn-outline-dark btn-sm px-4" disabled>
+              Load more <span class="text-muted ms-1">(<?= count($filteredListings) ?> of <?= count($allListings) ?> shown)</span>
+            </button>
+          </div>
+        <?php endif; ?>
+      <?php endif; ?>
     </div>
   </div>
 </div>

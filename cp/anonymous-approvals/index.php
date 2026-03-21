@@ -1,7 +1,7 @@
 <?php
 $pageTitle = 'Anonymous Approvals - My City Info';
 $activePage = '';
-$cpActive = 'anonymous';
+$cpActive = 'anonymous-approvals';
 $hideCta = true;
 $appArea = 'cp';
 
@@ -254,7 +254,7 @@ ob_start();
             <div class="fw-semibold">Approve Anonymous Listings</div>
             <div class="text-muted small">Approve items submitted anonymously and optionally mark them as open for claim.</div>
           </div>
-          <div class="text-muted small">UI demo</div>
+          <div class="text-muted small">Anonymous submissions queue</div>
         </div>
 
         <div class="table-responsive">

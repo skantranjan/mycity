@@ -1,71 +1,60 @@
 /**
- * 7-step listing wizard for /subscriber/list-business/
+ * 7-step listing wizard
  * (loads after jQuery, Bootstrap, Cropper.js)
+ *
+ * Relies on window._mciSubmitContext, window._mciSubmitRedirect, window._mciSubmitBtnText
+ * injected by each entry-point page.
  */
 $(function () {
-  var TOTAL_STEPS = 7;
+  var TOTAL_STEPS = 8;
   var currentStep = 1;
+  var submitContext = (window._mciSubmitContext || 'guest').toString();
+  var submitRedirect = (window._mciSubmitRedirect || '/').toString();
 
-  // If CP manages categories via localStorage, mirror them into the subscriber wizard.
-  try {
-    var cpCatsRaw = localStorage.getItem('mci_cp_categories');
-    var cpCats = cpCatsRaw ? JSON.parse(cpCatsRaw) : [];
-    if (Array.isArray(cpCats) && cpCats.length && $('#category').length) {
-      var currentVal = $('#category').val();
-      $('#category').empty();
-      $('#category').append('<option value="">Choose a category…</option>');
-      cpCats.forEach(function (c) {
-        var name = (typeof c === 'string') ? c : (c && (c.name || c.title) ? (c.name || c.title) : '');
-        name = (name || '').toString().trim();
-        if (!name) return;
-        $('#category').append('<option value="' + $('<div>').text(name).html() + '">' + $('<div>').text(name).html() + '</option>');
-      });
-      $('#category').append('<option value="__request_new__">Request a new category…</option>');
-      if (currentVal) {
-        $('#category').val(currentVal);
-      }
-    }
-  } catch (e0) {}
+  // ── Context banner (Step 7) ──────────────────────────────────────
+  var BANNER_CFG = {
+    cp_admin:   { cls: 'alert-primary',  icon: 'bi-lightning-charge-fill', text: 'Goes live immediately — this listing will be visible to all users right away.' },
+    subscriber: { cls: 'alert-light border', icon: 'bi-person-check-fill', text: 'Your listing will be submitted for review — our team will check it before it goes live.' },
+    guest:      { cls: 'alert-warning',  icon: 'bi-info-circle-fill',      text: 'Your listing will be reviewed before going live. <a href="/login/">Log in</a> or <a href="/register/">create an account</a> to manage it later.' }
+  };
+  function renderContextBanner() {
+    var $b = $('#mciContextBanner');
+    if (!$b.length) return;
+    var cfg = BANNER_CFG[submitContext] || BANNER_CFG['guest'];
+    $b.removeClass('d-none alert-primary alert-light border alert-warning')
+      .addClass('alert ' + cfg.cls)
+      .html('<i class="bi ' + cfg.icon + ' me-2" aria-hidden="true"></i>' + cfg.text);
+  }
+  renderContextBanner();
 
+  // ── Step navigation ──────────────────────────────────────────────
   function goTo(n) {
     if (n < 1 || n > TOTAL_STEPS) return;
-
     if (n > currentStep) {
       $('[data-step="' + currentStep + '"]').filter('.mci-step-btn').addClass('is-done');
     }
-
     $('.mci-step[data-step="' + currentStep + '"]').removeClass('is-active').addClass('is-leaving');
     setTimeout(function () {
       $('.mci-step.is-leaving').hide().removeClass('is-leaving');
       $('.mci-step[data-step="' + n + '"]').show().addClass('is-active');
     }, 180);
-
     currentStep = n;
-
     $('.mci-step-btn').each(function () {
       var s = parseInt($(this).data('step'));
-      $(this)
-        .toggleClass('is-active', s === n)
-        .toggleClass('is-done', s < n);
+      $(this).toggleClass('is-active', s === n).toggleClass('is-done', s < n);
       $(this).attr('aria-current', s === n ? 'step' : 'false');
     });
-
     var pct = Math.round((n / TOTAL_STEPS) * 100);
     $('#stepProgressFill').css('width', pct + '%');
     $('#mciSubmitWrap').attr('aria-valuenow', pct);
-
     if (n > 1) { $('#prevStep').show(); } else { $('#prevStep').hide(); }
     if (n < TOTAL_STEPS) { $('#nextStep').show(); } else { $('#nextStep').hide(); }
     $('#stepCounter').text('Step ' + n + ' of ' + TOTAL_STEPS);
-
     var top = $('.mci-steps-nav').offset().top - 80;
     $('html,body').animate({ scrollTop: top }, 220, 'swing');
-
-    if (n === TOTAL_STEPS) {
-      updateSummary();
-      // Refresh preview card contents once it becomes visible on Publish step.
-      updatePreview();
-    }
+    if (n === TOTAL_STEPS) { updateSummary(); updatePreview(); }
+    // Close tag suggestions when navigating
+    $('#tagSuggestions').addClass('d-none');
   }
 
   $('.mci-step').hide().removeClass('is-active');
@@ -78,68 +67,244 @@ $(function () {
 
   $('#nextStep').on('click', function () { goTo(currentStep + 1); });
   $('#prevStep').on('click', function () { goTo(currentStep - 1); });
-
   $(document).on('click', '.mci-step-btn.is-done, .mci-step-btn.is-active', function () {
     goTo(parseInt($(this).data('step')));
   });
 
+  // ── API: load categories & tags ──────────────────────────────────
+  var categoryTree = [];
+  function mciLoadCategories() {
+    fetch('/api/v1/public/categories', { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.json() : { categories: [] }; })
+      .then(function (data) {
+        categoryTree = data.categories || [];
+        var $sel = $('#category');
+        $sel.empty().append('<option value="">Choose a category\u2026</option>');
+        categoryTree.forEach(function (c) {
+          $sel.append('<option value="' + c.id + '">' + $('<div>').text(c.name).html() + '</option>');
+        });
+        $sel.append('<option value="__request_new__">Request a new category\u2026</option>');
+      })
+      .catch(function () {
+        // Leave placeholder option in place on error
+      });
+  }
+
+  function mciRenderSubcategories(categoryId) {
+    var $cont = $('#subcategoryContainer');
+    $cont.empty().addClass('d-none');
+    if (!categoryId) return;
+    var parent = categoryTree.find(function (c) { return c.id === categoryId; });
+    if (!parent || !parent.children || !parent.children.length) return;
+    $cont.append('<div class="form-text mb-2">Subcategories <span class="text-muted fw-normal">(optional)</span></div>');
+    $cont.append('<div class="d-flex flex-wrap gap-2" id="subcategoryCheckboxes"></div>');
+    var $boxes = $cont.find('#subcategoryCheckboxes');
+    parent.children.forEach(function (child) {
+      var safeId = 'subcat_' + child.id;
+      var label = $('<div>').text(child.name).html();
+      $boxes.append(
+        '<div class="form-check form-check-inline me-0">' +
+        '<input class="form-check-input mci-subcat-check" type="checkbox" id="' + safeId + '" value="' + child.id + '" />' +
+        '<label class="form-check-label" for="' + safeId + '">' + label + '</label>' +
+        '</div>'
+      );
+    });
+    $cont.removeClass('d-none');
+  }
+
+  // ── Tag typeahead ─────────────────────────────────────────────────
+  var allTags = [];        // [{id, name, slug}] from API — id=null for new tags
+  var selectedTags = [];   // [{id, name}] — id may be null for free-form new tags
+
+  function mciLoadTags() {
+    fetch('/api/v1/public/tags', { credentials: 'include' })
+      .then(function (r) { return r.ok ? r.json() : { tags: [] }; })
+      .then(function (data) { allTags = data.tags || []; })
+      .catch(function () {});
+  }
+
+  function mciTagIdsPayload() {
+    return selectedTags.map(function (t) { return t.id; }).filter(function (id) { return id !== null; });
+  }
+
+  function mciTagNamesPayload() {
+    return selectedTags.map(function (t) { return t.name; });
+  }
+
+  function mciRenderTagChips() {
+    // Remove all existing chips (leave input in place)
+    $('#tagSelectedArea .mci-tag-chip-selected').remove();
+    var $input = $('#tagTypeahead');
+    selectedTags.forEach(function (t, i) {
+      var $chip = $('<span class="mci-tag-chip-selected badge bg-dark d-inline-flex align-items-center gap-1 me-1"></span>')
+        .text(t.name)
+        .attr('data-tag-idx', i);
+      var $x = $('<button type="button" class="btn-close btn-close-white mci-tag-remove-btn" aria-label="Remove tag" style="font-size:0.6rem"></button>')
+        .attr('data-tag-idx', i);
+      $chip.append($x);
+      $chip.insertBefore($input);
+    });
+    $('#tagIdsHidden').val(JSON.stringify(mciTagIdsPayload()));
+  }
+
+  function mciAddTag(name, id) {
+    name = (name || '').trim();
+    if (!name) return;
+    // Prevent duplicates (case-insensitive)
+    var lower = name.toLowerCase();
+    for (var k = 0; k < selectedTags.length; k++) {
+      if (selectedTags[k].name.toLowerCase() === lower) return;
+    }
+    selectedTags.push({ id: id || null, name: name });
+    mciRenderTagChips();
+  }
+
+  function mciShowTagSuggestions(query) {
+    var $ul = $('#tagSuggestions');
+    $ul.empty();
+    if (!query) { $ul.addClass('d-none'); return; }
+    var lower = query.toLowerCase();
+    var matches = allTags.filter(function (t) {
+      return t.name.toLowerCase().indexOf(lower) !== -1;
+    }).slice(0, 8);
+
+    if (matches.length === 0) {
+      $ul.addClass('d-none');
+      return;
+    }
+    matches.forEach(function (t) {
+      var $li = $('<li class="px-3 py-1" style="cursor:pointer;"></li>').text(t.name)
+        .attr('data-tag-id', t.id)
+        .attr('data-tag-name', t.name)
+        .on('mousedown', function (e) {
+          e.preventDefault(); // prevent blur from hiding suggestions first
+          mciAddTag(t.name, t.id);
+          $('#tagTypeahead').val('').focus();
+          $ul.addClass('d-none');
+        });
+      $ul.append($li);
+    });
+    $ul.removeClass('d-none');
+  }
+
+  $('#tagSelectedArea').on('click', function () { $('#tagTypeahead').focus(); });
+
+  $('#tagTypeahead').on('input', function () {
+    mciShowTagSuggestions($(this).val().trim());
+  });
+
+  $('#tagTypeahead').on('keydown', function (e) {
+    var val = $(this).val();
+    // Comma, semicolon, or Enter → add tag
+    if (e.key === ',' || e.key === ';' || e.key === 'Enter') {
+      e.preventDefault();
+      var trimmed = val.replace(/[,;]$/, '').trim();
+      if (trimmed) {
+        // Check if it matches an existing tag
+        var match = allTags.find(function (t) { return t.name.toLowerCase() === trimmed.toLowerCase(); });
+        mciAddTag(trimmed, match ? match.id : null);
+      }
+      $(this).val('');
+      $('#tagSuggestions').addClass('d-none');
+      return;
+    }
+    // Backspace on empty input removes last tag
+    if (e.key === 'Backspace' && !val) {
+      if (selectedTags.length) {
+        selectedTags.pop();
+        mciRenderTagChips();
+      }
+    }
+  });
+
+  $('#tagTypeahead').on('blur', function () {
+    // Small delay to allow mousedown on suggestions
+    setTimeout(function () { $('#tagSuggestions').addClass('d-none'); }, 150);
+  });
+
+  $(document).on('click', '.mci-tag-remove-btn', function (e) {
+    e.stopPropagation();
+    var idx = parseInt($(this).attr('data-tag-idx'));
+    selectedTags.splice(idx, 1);
+    mciRenderTagChips();
+  });
+
+  mciLoadCategories();
+  mciLoadTags();
+
+  // ── Category → update category_id hidden + subcategories ────────
+  $('#category').on('change input', function () {
+    var val = $(this).val();
+    var isReq = val === '__request_new__';
+    $('#is_category_request').val(isReq ? '1' : '0');
+    $('#categoryRequestFields').toggleClass('d-none', !isReq);
+    $('#requested_category_name').prop('required', !!isReq);
+    $('#category_request_reason').prop('required', !!isReq);
+
+    var catId = !isReq && val !== '' ? parseInt(val) : null;
+    $('#categoryIdHidden').val(catId || '');
+    mciRenderSubcategories(catId);
+    updatePreview();
+    if (currentStep === TOTAL_STEPS) updateSummary();
+  });
+  $('#requested_category_name').on('input change', function () {
+    updatePreview();
+    if (currentStep === TOTAL_STEPS) updateSummary();
+  });
+
+  // ── Preview + summary ────────────────────────────────────────────
+  function getCategoryLabel() {
+    var val = $('#category').val() || '';
+    if (val === '__request_new__') {
+      return ($('#requested_category_name').val() || '').trim() || 'Requested category';
+    }
+    var $opt = $('#category option:selected');
+    return $opt.length ? $opt.text() : (val || 'Category');
+  }
+
   function updatePreview() {
     var name = $('#listing_title').val().trim() || 'Your business name';
-    var cat  = $('#category').val() || 'Category';
-    if (cat === '__request_new__') {
-      var req = ($('#requested_category_name').val() || '').trim();
-      cat = req || 'Requested category';
-    }
+    var cat  = getCategoryLabel();
     var tag  = $('#tagline').val().trim();
     var desc = $('#description').val().trim();
-    var city = $('#city').val().trim();
-    var ph   = $('#phone').val().trim();
-    var web  = $('#website').val().trim();
-
+    var city = $('input[name="city[]"]').first().val().trim();
+    var ph   = $('input[name="phone[]"]').first().val().trim();
+    var web  = $('input[name="website[]"]').first().val().trim();
     $('#previewName').text(name);
     $('#previewCategory').text(cat);
     $('#previewTagline').text(tag || '').toggle(tag.length > 0);
-
     var descShort = desc.length > 140 ? desc.substring(0, 140) + '\u2026' : desc;
-    $('#previewDesc').text(descShort || 'Your description will appear here, showing customers a quick summary of what you offer.');
-
+    $('#previewDesc').text(descShort || 'Your description will appear here.');
     $('#previewCity').find('span').text(city || '\u2014');
     $('#previewPhone').find('span').text(ph || '\u2014');
     $('#previewWebsite').find('span').text(web || '\u2014');
   }
 
-  function syncCategoryRequestUI() {
-    var isReq = $('#category').val() === '__request_new__';
-    $('#is_category_request').val(isReq ? '1' : '0');
-    $('#categoryRequestFields').toggleClass('d-none', !isReq);
-    $('#requested_category_name').prop('required', !!isReq);
-    $('#category_request_reason').prop('required', !!isReq);
+  function updateSummary() {
+    $('#summBizName').text($('#listing_title').val().trim() || '\u2014');
+    $('#summCategory').text(getCategoryLabel() || 'No category');
+    $('#summCity').text($('input[name="city[]"]').first().val().trim() || 'No city');
   }
 
-  $('#category').on('change input', function () {
-    syncCategoryRequestUI();
-    updatePreview();
-    if (currentStep === 7) updateSummary();
-  });
-
-  // Keep summary/preview synced when the requested name changes.
-  $('#requested_category_name').on('input change', function () {
-    updatePreview();
-    if (currentStep === 7) updateSummary();
-  });
-
-  $('#listing_title, #category, #tagline, #description, #city, #phone, #website').on('input change', updatePreview);
+  $('#listing_title, #tagline, #description').on('input change', updatePreview);
+  $(document).on('input change', 'input[name="city[]"], input[name="phone[]"], input[name="website[]"]', updatePreview);
   updatePreview();
-  syncCategoryRequestUI();
 
-  // ── URL slug (listing_slug + city for full path) ─────────────────
+  // ── Description counter ──────────────────────────────────────────
+  (function () {
+    var $d = $('#description'), $c = $('#descCount');
+    $d.on('input', function () { $c.text($d.val().length + ' / 1200'); });
+    $c.text($d.val().length + ' / 1200');
+  }());
+
+  // ── URL slug ─────────────────────────────────────────────────────
   var existingSlugs = [];
   try {
     var slugJsonEl = document.getElementById('mciExistingSlugs');
     if (slugJsonEl && slugJsonEl.textContent) {
       existingSlugs = JSON.parse(slugJsonEl.textContent);
     }
-  } catch (eSl) { existingSlugs = []; }
+  } catch (eSl) {}
 
   var slugAutoFromName = true;
 
@@ -149,43 +314,33 @@ $(function () {
   }
 
   function mciFullListingSlug(baseSlug, cityVal) {
-    var b = mciSlugify(baseSlug);
-    var c = mciSlugify(cityVal || '');
+    var b = mciSlugify(baseSlug), c = mciSlugify(cityVal || '');
     if (!b) return '';
-    if (!c) return b;
-    return b + '-' + c;
+    return c ? b + '-' + c : b;
   }
 
   function mciUpdateBusinessUrlPreview() {
-    if (!$('#listing_slug').length) return;
-    var base = $('#listing_slug').val().trim();
-    var city = $('#city').val().trim();
+    var base = ($('#listing_slug').val() || '').trim();
+    var city = ($('input[name="city[]"]').first().val() || '').trim();
     var full = mciFullListingSlug(base, city);
     var $wrap = $('#mciBusinessUrlPreview');
     if (!$wrap.length) return;
-    var origin = ($wrap.data('origin') || '').toString().replace(/\/$/, '') || window.location.origin.replace(/\/$/, '') || 'https://mycityinfo.com';
-    var $txt = $('#mciBusinessUrlPreviewText');
-    if (!full) {
-      $txt.text('\u2014');
-      return;
-    }
-    $txt.text(origin + '/business/' + full + '/');
+    var origin = ($wrap.data('origin') || window.location.origin || 'https://mycityinfo.com').toString().replace(/\/$/, '');
+    $('#mciBusinessUrlPreviewText').text(full ? origin + '/business/' + full + '/' : '\u2014');
   }
 
   function mciSuggestFreeBaseSlug(baseName) {
     var b = mciSlugify(baseName);
-    var city = $('#city').val().trim();
-    if (!b) return '';
+    var city = ($('input[name="city[]"]').first().val() || '').trim();
     for (var i = 0; i < 100; i++) {
-      var trialBase = i === 0 ? b : (b + '-' + (i + 1));
-      var full = mciFullListingSlug(trialBase, city);
-      if (full && existingSlugs.indexOf(full) === -1) return trialBase;
+      var trial = i === 0 ? b : (b + '-' + (i + 1));
+      var full = mciFullListingSlug(trial, city);
+      if (full && existingSlugs.indexOf(full) === -1) return trial;
     }
     return b + '-' + Date.now();
   }
 
   $('#listing_title').on('input', function () {
-    if (!$('#listing_slug').length) return;
     if (!slugAutoFromName) return;
     var s = mciSlugify($(this).val());
     $('#listing_slug').val(s);
@@ -193,16 +348,16 @@ $(function () {
   });
 
   $('#listing_slug').on('input', function () {
-    if (!$(this).length) return;
     var manual = mciSlugify($(this).val());
     $(this).val(manual);
-    var auto = mciSlugify($('#listing_title').val());
-    slugAutoFromName = !manual || manual === auto;
+    slugAutoFromName = !manual || manual === mciSlugify($('#listing_title').val());
     mciUpdateBusinessUrlPreview();
   });
 
-  $('#city').on('input change', function () {
-    mciUpdateBusinessUrlPreview();
+  $(document).on('input change', 'input[name="city[]"]', function () {
+    if ($(this).closest('.mci-branch-block').data('branch-index') === 0) {
+      mciUpdateBusinessUrlPreview();
+    }
   });
 
   $(document).on('click', '#mciApplySuggestedSlug', function () {
@@ -211,41 +366,29 @@ $(function () {
     $('#listing_slug').val(String(sug));
     slugAutoFromName = false;
     mciUpdateBusinessUrlPreview();
-    $('#mciSlugStatus').html('<span class="text-success"><i class="bi bi-check-circle me-1" aria-hidden="true"></i>Slug updated. Use \u201cCheck availability\u201d again to confirm.</span>');
+    $('#mciSlugStatus').html('<span class="text-success"><i class="bi bi-check-circle me-1"></i>Slug updated.</span>');
   });
 
   $('#mciCheckSlugBtn').on('click', function () {
-    if (!$('#listing_slug').length) return;
-    var base = $('#listing_slug').val().trim();
-    var city = $('#city').val().trim();
+    var base = ($('#listing_slug').val() || '').trim();
+    var city = ($('input[name="city[]"]').first().val() || '').trim();
     var full = mciFullListingSlug(base, city);
     var $st = $('#mciSlugStatus');
-    if (!$st.length) return;
     $st.empty();
-    if (!mciSlugify(base)) {
-      $st.html('<span class="text-danger">Enter a business name or slug first.</span>');
-      return;
-    }
-    if (!full) {
-      $st.html('<span class="text-danger">Could not build a URL slug.</span>');
-      return;
-    }
+    if (!mciSlugify(base)) { $st.html('<span class="text-danger">Enter a slug first.</span>'); return; }
     var taken = existingSlugs.indexOf(full) !== -1;
-    if (!taken) {
-      $st.html('<span class="text-success"><i class="bi bi-check-circle me-1" aria-hidden="true"></i>This URL is available.</span>');
-      return;
-    }
+    if (!taken) { $st.html('<span class="text-success"><i class="bi bi-check-circle me-1"></i>Available.</span>'); return; }
     var suggested = mciSuggestFreeBaseSlug(base);
-    var msg = '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>That URL is already taken.</span>';
+    var msg = '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>URL already taken.</span>';
     if (suggested) {
-      msg += ' Suggested base slug: <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="mciApplySuggestedSlug" data-suggested-base="' + String(suggested).replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + suggested + '</button>';
+      msg += ' Try: <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="mciApplySuggestedSlug" data-suggested-base="' + String(suggested).replace(/"/g, '&quot;') + '">' + suggested + '</button>';
     }
     $st.html(msg);
   });
 
   mciUpdateBusinessUrlPreview();
 
-  // ── Public publish step: posting type + account fields ───────────
+  // ── Public posting type + account fields ─────────────────────────
   function syncPostingType() {
     if (!$('.mci-posting-card').length) return;
     var val = $('input[name="posting_type"]:checked').val();
@@ -263,38 +406,33 @@ $(function () {
   $('input[name="posting_type"]').on('change', syncPostingType);
   syncPostingType();
 
-  (function () {
-    var $desc = $('#description');
-    var $cnt  = $('#descCount');
-    $desc.on('input', function () {
-      $cnt.text($desc.val().length + ' / 1200');
-    });
-    $cnt.text($desc.val().length + ' / 1200');
-  }());
+  // ── Products: add / remove ────────────────────────────────────────
+  var prodTmpl = document.getElementById('productItemTemplate');
+  $('#addProductBtn').on('click', function () {
+    if (!prodTmpl || !prodTmpl.content) return;
+    var clone = prodTmpl.content.firstElementChild.cloneNode(true);
+    clone.setAttribute('data-item-index', $('#productItems .mci-item-row').length);
+    clone.querySelectorAll('input:not([type=hidden]), textarea').forEach(function (el) { el.value = ''; });
+    $('#productItems').append(clone);
+  });
+  $(document).on('click', '.removeProductBtn', function () {
+    $(this).closest('.mci-item-row').remove();
+  });
 
-  function updateSummary() {
-    $('#summBizName').text($('#listing_title').val().trim() || '\u2014');
-    var cat = $('#category').val() || 'No category';
-    if (cat === '__request_new__') {
-      var req = ($('#requested_category_name').val() || '').trim();
-      cat = req || 'Requested category';
-    }
-    $('#summCategory').text(cat);
-    $('#summCity').text($('#city').val().trim() || 'No city');
-  }
-
+  // ── Services: add / remove ────────────────────────────────────────
   var svcTmpl = document.getElementById('serviceItemTemplate');
   $('#addServiceBtn').on('click', function () {
     if (!svcTmpl || !svcTmpl.content) return;
     var clone = svcTmpl.content.firstElementChild.cloneNode(true);
-    clone.setAttribute('data-svc-index', $('#serviceItems .mci-faq-item').length);
-    clone.querySelectorAll('input, textarea').forEach(function (el) { el.value = ''; });
+    clone.setAttribute('data-item-index', $('#serviceItems .mci-item-row').length);
+    clone.querySelectorAll('input:not([type=hidden]), textarea').forEach(function (el) { el.value = ''; });
     $('#serviceItems').append(clone);
   });
-  $(document).on('click', '.removeSvcBtn', function () {
-    $(this).closest('.mci-faq-item').remove();
+  $(document).on('click', '.removeServiceBtn', function () {
+    $(this).closest('.mci-item-row').remove();
   });
 
+  // ── FAQs: add / remove ────────────────────────────────────────────
   var faqTmpl = document.getElementById('faqItemTemplate');
   $('#addFaqBtn').on('click', function () {
     if (!faqTmpl || !faqTmpl.content) return;
@@ -307,6 +445,7 @@ $(function () {
     $(this).closest('.mci-faq-item').remove();
   });
 
+  // ── Cropper (logo / profile / banner) ────────────────────────────
   var cropperInstance = null;
   var cropTarget      = null;
   var cropModal       = new bootstrap.Modal(document.getElementById('cropModal'), {});
@@ -319,23 +458,16 @@ $(function () {
   $(document).on('change', '.mci-img-file-input', function () {
     var file = this.files[0];
     if (!file || !file.type.startsWith('image/')) return;
-
-    var $tile   = $(this).closest('.mci-img-upload-tile');
-    var type    = $tile.data('type');
-    var aspect  = parseFloat($tile.data('aspect')) || 1;
-
-    var labels  = { logo: 'Crop logo', profile: 'Crop profile photo', banner: 'Crop banner image' };
+    var $tile  = $(this).closest('.mci-img-upload-tile');
+    var type   = $tile.data('type');
+    var aspect = parseFloat($tile.data('aspect')) || 1;
+    var labels = { logo: 'Crop logo', profile: 'Crop profile photo', banner: 'Crop banner image' };
     $('#cropModalTitle').text(labels[type] || 'Crop image');
-
-    cropTarget = { $tile: $tile, hiddenInput: $tile.find('input[type="hidden"]')[0], isLogo: type === 'logo', aspect: aspect };
-
+    cropTarget = { $tile: $tile, hiddenInput: $tile.find('input[type="hidden"]')[0], type: type, isLogo: type === 'logo', aspect: aspect };
     var reader = new FileReader();
-    reader.onload = function (e) {
-      var img = document.getElementById('cropModalImage');
-      img.src = e.target.result;
-
+    reader.onload = function (ev) {
+      document.getElementById('cropModalImage').src = ev.target.result;
       if (cropperInstance) { cropperInstance.destroy(); cropperInstance = null; }
-
       cropModal.show();
     };
     reader.readAsDataURL(file);
@@ -344,16 +476,9 @@ $(function () {
 
   document.getElementById('cropModal').addEventListener('shown.bs.modal', function () {
     if (cropperInstance) { cropperInstance.destroy(); }
-    var img    = document.getElementById('cropModalImage');
-    var aspect = cropTarget ? cropTarget.aspect : 1;
-    cropperInstance = new Cropper(img, {
-      aspectRatio:  aspect,
-      viewMode:     1,
-      autoCropArea: 0.9,
-      responsive:   true,
-      background:   false,
-      guides:       true,
-      center:       true,
+    cropperInstance = new Cropper(document.getElementById('cropModalImage'), {
+      aspectRatio: cropTarget ? cropTarget.aspect : 1,
+      viewMode: 1, autoCropArea: 0.9, responsive: true, background: false, guides: true, center: true
     });
   });
 
@@ -363,244 +488,357 @@ $(function () {
 
   $('#applyCropBtn').on('click', function () {
     if (!cropperInstance || !cropTarget) return;
-
     var isSquare = cropTarget.aspect === 1;
     var outW = isSquare ? 600 : 1280;
     var outH = isSquare ? 600 : Math.round(1280 / cropTarget.aspect);
-
     var canvas = cropperInstance.getCroppedCanvas({ width: outW, height: outH, imageSmoothingQuality: 'high' });
-    var dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    var type = cropTarget.type || 'logo';
 
-    cropTarget.hiddenInput.value = dataUrl;
-
-    var $preview = cropTarget.$tile.find('.mci-img-upload-tile__preview, .mci-img-upload-tile__preview--banner').first();
-    $preview.find('.mci-img-upload-tile__placeholder').hide();
-    $preview.find('.mci-img-tile-result').remove();
-    $('<img class="mci-img-tile-result" alt="preview" />').attr('src', dataUrl).appendTo($preview);
-
-    cropTarget.$tile.addClass('has-image');
-
-    if (cropTarget.isLogo) {
-      $('#previewPhotoImg').attr('src', dataUrl).removeClass('d-none');
-      $('#previewPhotoPlaceholder').addClass('d-none');
-    }
-
+    // Upload to API and store returned path
+    canvas.toBlob(function (blob) {
+      var fd = new FormData();
+      fd.append('type', type);
+      fd.append('file', blob, type + '.jpg');
+      fetch('/api/v1/upload/image', { method: 'POST', credentials: 'include', body: fd })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+        .then(function (data) {
+          if (data.path) {
+            cropTarget.hiddenInput.value = data.path;
+            // Show preview thumbnail
+            var dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+            var $preview = cropTarget.$tile.find('.mci-img-upload-tile__preview').first();
+            $preview.find('.mci-img-upload-tile__placeholder').hide();
+            $preview.find('.mci-img-tile-result').remove();
+            $('<img class="mci-img-tile-result" alt="preview" />').attr('src', dataUrl).appendTo($preview);
+            cropTarget.$tile.addClass('has-image');
+            if (cropTarget.isLogo) {
+              $('#previewPhotoImg').attr('src', dataUrl).removeClass('d-none');
+              $('#previewPhotoPlaceholder').addClass('d-none');
+            }
+          }
+        })
+        .catch(function () {
+          alert('Image upload failed. Please try again.');
+        });
+    }, 'image/jpeg', 0.88);
     cropModal.hide();
   });
 
+  // ── Item image upload (products / services) ──────────────────────
+  $(document).on('click', '.mci-item-img-btn', function () {
+    $(this).closest('.mci-item-row').find('.mci-item-file-input').trigger('click');
+  });
+
+  $(document).on('change', '.mci-item-file-input', function () {
+    var file = this.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    var $row   = $(this).closest('.mci-item-row');
+    var $input = $row.find('input[name$="_image_path[]"]');
+    var $label = $row.find('.mci-item-img-name');
+    var fd = new FormData();
+    fd.append('type', 'item_image');
+    fd.append('file', file);
+    $label.text('Uploading\u2026');
+    fetch('/api/v1/upload/image', { method: 'POST', credentials: 'include', body: fd })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+      .then(function (data) {
+        $input.val(data.path || '');
+        $label.text(file.name);
+      })
+      .catch(function () {
+        $label.text('Upload failed');
+        $input.val('');
+      });
+    this.value = '';
+  });
+
+  // ── Gallery drop zone ─────────────────────────────────────────────
   var dropArea  = document.getElementById('dropFiles');
   var fileInput = document.getElementById('fileInputImages');
   var preview   = document.getElementById('imagePreview');
 
-  function renderPreviews(files) {
-    preview.innerHTML = '';
-    $('#previewPhotoImg').addClass('d-none');
-    $('#previewPhotoPlaceholder').removeClass('d-none');
+  function uploadGalleryFiles(files) {
     if (!files || !files.length) return;
-    var first = true;
+    var paths = [];
+    var pending = 0;
+    preview.innerHTML = '';
     for (var i = 0; i < Math.min(files.length, 12); i++) {
-      var f = files[i];
-      if (!f.type || !f.type.startsWith('image/')) continue;
-      var url = URL.createObjectURL(f);
-      if (first) {
-        first = false;
-        $('#previewPhotoImg').attr('src', url).attr('alt', f.name).removeClass('d-none');
-        $('#previewPhotoPlaceholder').addClass('d-none');
-      }
-      var wrap = document.createElement('div');
-      wrap.className = 'mci-photo-thumb';
-      var img = document.createElement('img');
-      img.src = url; img.alt = f.name;
-      wrap.appendChild(img);
-      preview.appendChild(wrap);
+      (function (f, idx) {
+        if (!f.type || !f.type.startsWith('image/')) return;
+        pending++;
+        // Show local preview immediately
+        var url = URL.createObjectURL(f);
+        var wrap = document.createElement('div');
+        wrap.className = 'mci-photo-thumb mci-photo-thumb--uploading';
+        var img = document.createElement('img');
+        img.src = url; img.alt = f.name;
+        wrap.appendChild(img);
+        preview.appendChild(wrap);
+        if (idx === 0) {
+          $('#previewPhotoImg').attr('src', url).attr('alt', f.name).removeClass('d-none');
+          $('#previewPhotoPlaceholder').addClass('d-none');
+        }
+        var fd = new FormData();
+        fd.append('type', 'gallery');
+        fd.append('file', f);
+        fetch('/api/v1/upload/image', { method: 'POST', credentials: 'include', body: fd })
+          .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+          .then(function (data) {
+            if (data.path) paths.push(data.path);
+            wrap.classList.remove('mci-photo-thumb--uploading');
+          })
+          .catch(function () {
+            wrap.classList.add('mci-photo-thumb--error');
+          })
+          .finally(function () {
+            pending--;
+            if (pending <= 0) {
+              $('#galleryPathsHidden').val(JSON.stringify(paths));
+            }
+          });
+      })(files[i], i);
     }
   }
 
   if (dropArea && fileInput) {
     dropArea.addEventListener('click', function () { fileInput.click(); });
     dropArea.addEventListener('keydown', function (e) {
-      // Make the upload tile keyboard accessible (Enter / Space).
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        fileInput.click();
-      }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
     });
     ['dragover','dragenter'].forEach(function (ev) {
-      dropArea.addEventListener(ev, function (e) {
-        e.preventDefault(); e.stopPropagation();
-        dropArea.classList.add('is-over');
-      });
+      dropArea.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); dropArea.classList.add('is-over'); });
     });
     ['dragleave','drop'].forEach(function (ev) {
-      dropArea.addEventListener(ev, function (e) {
-        e.preventDefault(); e.stopPropagation();
-        dropArea.classList.remove('is-over');
-      });
+      dropArea.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); dropArea.classList.remove('is-over'); });
     });
     dropArea.addEventListener('drop', function (e) {
       e.preventDefault();
       var dt = new DataTransfer();
       Array.from(e.dataTransfer.files).forEach(function (f) { dt.items.add(f); });
       fileInput.files = dt.files;
-      renderPreviews(fileInput.files);
+      uploadGalleryFiles(fileInput.files);
     });
-    fileInput.addEventListener('change', function () { renderPreviews(fileInput.files); });
+    fileInput.addEventListener('change', function () { uploadGalleryFiles(fileInput.files); });
   }
 
+  // ── Multi-branch: add / remove ────────────────────────────────────
+  var branchTmpl = document.getElementById('branchTemplate');
+  $('#addBranchBtn').on('click', function () {
+    if (!branchTmpl || !branchTmpl.content) return;
+    var idx = $('#branchList .mci-branch-block').length;
+    var clone = branchTmpl.content.firstElementChild.cloneNode(true);
+    clone.setAttribute('data-branch-index', idx);
+    clone.innerHTML = clone.innerHTML.replace(/__INDEX__/g, idx).replace(/__NUM__/g, idx + 1);
+    $('#branchList').append(clone);
+  });
+  $(document).on('click', '.mci-remove-branch-btn', function () {
+    $(this).closest('.mci-branch-block').remove();
+    // Renumber remaining branch headers
+    $('#branchList .mci-branch-block').each(function (i) {
+      var label = i === 0 ? 'Primary location' : 'Branch ' + (i + 1);
+      $(this).find('.fw-semibold.small').first().text(label);
+      $(this).attr('data-branch-index', i);
+    });
+  });
+
+  // ── Map pin modal ─────────────────────────────────────────────────
+  var mapPinBranchIndex = 0;
+  $(document).on('click', '.mci-map-pin-btn', function () {
+    mapPinBranchIndex = parseInt($(this).data('branch-index')) || 0;
+  });
   $('#applyPinBtn').on('click', function () {
-    $('input[name="latitude"]').val($('#modalLatitude').val());
-    $('input[name="longitude"]').val($('#modalLongitude').val());
-  });
-
-  $(document).on('click', '.mci-social-login-btn', function () {
-    var provider = $(this).data('provider');
-    alert(provider + ' sign-in will be connected when OAuth is configured. Your listing data is safe.');
-  });
-
-  var LS_KEY = 'mci_listing_preview';
-
-  function collectFormData() {
-    var data = {};
-
-    $('#mciSubmitForm').find('input:not([type=file]):not([type=radio]):not([type=checkbox]), textarea, select').each(function () {
-      if (this.name) data[this.name] = this.value;
-    });
-
-    $('#mciSubmitForm').find('input[type=radio]:checked').each(function () {
-      data[this.name] = this.value;
-    });
-
-    var svcs = [];
-    $('#serviceItems .mci-faq-item').each(function () {
-      svcs.push({
-        name: $(this).find('input[name="service_name[]"]').val() || '',
-        desc: $(this).find('textarea[name="service_desc[]"]').val() || ''
-      });
-    });
-    data._services = svcs;
-
-    var faqs = [];
-    $('#faqItems .mci-faq-item').each(function () {
-      faqs.push({
-        q: $(this).find('input[name="faq_question[]"]').val() || '',
-        a: $(this).find('textarea[name="faq_answer[]"]').val() || ''
-      });
-    });
-    data._faqs = faqs;
-
-    ['img_logo','img_profile','img_banner'].forEach(function (n) {
-      var v = $('input[name="' + n + '"]').val();
-      if (v) data[n] = v;
-    });
-
-    // If user requested a new category, ensure listing payload uses the requested name.
-    var isReq = ($('#is_category_request').val() === '1') || ($('#category').val() === '__request_new__');
-    if (isReq) {
-      var requestedName = ($('#requested_category_name').val() || '').trim();
-      if (requestedName) data['category'] = requestedName;
+    var $block = $('#branchList .mci-branch-block[data-branch-index="' + mapPinBranchIndex + '"]');
+    if ($block.length) {
+      $block.find('input[name="latitude[]"]').val($('#modalLatitude').val());
+      $block.find('input[name="longitude[]"]').val($('#modalLongitude').val());
+    } else {
+      // fallback
+      $('input[name="latitude[]"]').first().val($('#modalLatitude').val());
+      $('input[name="longitude[]"]').first().val($('#modalLongitude').val());
     }
-
-    return data;
-  }
-
-  function savePreview() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(collectFormData())); } catch(e) {}
-  }
-
-  var saveTimer;
-  $('#mciSubmitForm').on('input change', function () {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(savePreview, 600);
   });
 
+  // ── Social login placeholder ──────────────────────────────────────
+  $(document).on('click', '.mci-social-login-btn', function () {
+    alert($(this).data('provider') + ' sign-in will be connected when OAuth is configured.');
+  });
+
+  // ── Preview listing button ────────────────────────────────────────
   $('#previewListingBtn').on('click', function () {
-    savePreview();
-    // Prevent tabnabbing when opening preview in a new tab.
     window.open('/listing-preview/', '_blank', 'noopener,noreferrer');
   });
 
+  // ── Build hours object ────────────────────────────────────────────
+  function buildHoursObject() {
+    var days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+    var obj = {};
+    days.forEach(function (day) {
+      var open = $('input[name="hours[open][' + day + ']"]').is(':checked');
+      obj[day] = {
+        open:        open,
+        slot1_start: $('select[name="hours[slot1_start][' + day + ']"]').val() || '',
+        slot1_end:   $('select[name="hours[slot1_end][' + day + ']"]').val()   || '',
+        slot2_start: $('select[name="hours[slot2_start][' + day + ']"]').val() || '',
+        slot2_end:   $('select[name="hours[slot2_end][' + day + ']"]').val()   || '',
+      };
+    });
+    return obj;
+  }
+
+  // ── Build submit payload ──────────────────────────────────────────
+  function buildPayload() {
+    var products = [];
+    $('#productItems .mci-item-row').each(function () {
+      var name = $(this).find('input[name="product_name[]"]').val().trim();
+      if (!name) return;
+      products.push({
+        name:        name,
+        description: $(this).find('textarea[name="product_desc[]"]').val().trim() || '',
+        price_min:   $(this).find('input[name="product_price_min[]"]').val() || null,
+        price_max:   $(this).find('input[name="product_price_max[]"]').val() || null,
+        price_unit:  'INR',
+        image_path:  $(this).find('input[name="product_image_path[]"]').val() || ''
+      });
+    });
+
+    var services = [];
+    $('#serviceItems .mci-item-row').each(function () {
+      var name = $(this).find('input[name="service_name[]"]').val().trim();
+      if (!name) return;
+      services.push({
+        name:        name,
+        description: $(this).find('textarea[name="service_desc[]"]').val().trim() || '',
+        price_min:   $(this).find('input[name="service_price_min[]"]').val() || null,
+        price_max:   $(this).find('input[name="service_price_max[]"]').val() || null,
+        price_unit:  'INR',
+        image_path:  $(this).find('input[name="service_image_path[]"]').val() || ''
+      });
+    });
+
+    var faqs = [];
+    $('#faqItems .mci-faq-item').each(function () {
+      var q = $(this).find('input[name="faq_question[]"]').val().trim();
+      if (!q) return;
+      faqs.push({ question: q, answer: $(this).find('textarea[name="faq_answer[]"]').val().trim() || '' });
+    });
+
+    var subcategoryIds = [];
+    $('#subcategoryContainer .mci-subcat-check:checked').each(function () {
+      subcategoryIds.push(parseInt($(this).val()));
+    });
+
+    var galleryPaths = [];
+    try { galleryPaths = JSON.parse($('#galleryPathsHidden').val() || '[]'); } catch (e) {}
+
+    var tagIds = mciTagIdsPayload();
+
+    // Collect all branches
+    var branches = [];
+    $('#branchList .mci-branch-block').each(function () {
+      var $b = $(this);
+      branches.push({
+        branch_label:    $b.find('input[name="branch_label[]"]').val().trim(),
+        full_address:    $b.find('input[name="full_address[]"]').val().trim(),
+        address_line2:   $b.find('input[name="address_line2[]"]').val().trim(),
+        city:            $b.find('input[name="city[]"]').val().trim(),
+        state:           $b.find('input[name="state[]"]').val().trim(),
+        pincode:         $b.find('input[name="pincode[]"]').val().trim(),
+        latitude:        $b.find('input[name="latitude[]"]').val().trim(),
+        longitude:       $b.find('input[name="longitude[]"]').val().trim(),
+        phone:           $b.find('input[name="phone[]"]').val().trim(),
+        phone_secondary: $b.find('input[name="phone_secondary[]"]').val().trim(),
+        whatsapp:        $b.find('input[name="whatsapp[]"]').val().trim(),
+        email_contact:   $b.find('input[name="email_contact[]"]').val().trim(),
+        website:         $b.find('input[name="website[]"]').val().trim()
+      });
+    });
+    // Primary branch carries social links + hours
+    var primaryBranch = branches[0] || {};
+    primaryBranch.social_links = {
+      facebook:         $('#social_facebook').val().trim(),
+      instagram:        $('#social_instagram').val().trim(),
+      x:                $('#social_x').val().trim(),
+      youtube:          $('#social_youtube').val().trim(),
+      linkedin:         $('#social_linkedin').val().trim(),
+      tiktok:           $('#social_tiktok').val().trim(),
+      pinterest:        $('#social_pinterest').val().trim(),
+      telegram:         $('#social_telegram').val().trim(),
+      threads:          $('#social_threads').val().trim(),
+      snapchat:         $('#social_snapchat').val().trim(),
+      whatsapp_channel: $('#social_whatsapp_channel').val().trim()
+    };
+    primaryBranch.hours = buildHoursObject();
+
+    var payload = {
+      context:  submitContext,
+      group: {
+        name:             $('#listing_title').val().trim(),
+        slug:             $('#listing_slug').val().trim(),
+        tagline:          $('#tagline').val().trim(),
+        description:      $('#description').val().trim(),
+        established_year: $('#established_year').val() ? parseInt($('#established_year').val()) : null,
+        category_id:      parseInt($('#categoryIdHidden').val()) || 0,
+        subcategory_ids:  subcategoryIds,
+        tag_ids:          tagIds,
+        tag_names:        mciTagNamesPayload(),
+        price_range:      $('#price_range').val() || '',
+        video_url:        $('#video_url').val().trim(),
+        logo_path:        $('input[name="img_logo"]').val()    || '',
+        profile_path:     $('input[name="img_profile"]').val() || '',
+        banner_path:      $('input[name="img_banner"]').val()  || ''
+      },
+      branch:   primaryBranch,
+      branches: branches,
+      products:      products,
+      services:      services,
+      faqs:          faqs,
+      gallery_paths: galleryPaths
+    };
+
+    // Guest with account
+    var postingType = $('input[name="posting_type"]:checked').val() || $('input[name="posting_type"]').val() || 'registered';
+    payload.posting_type = postingType;
+    if (submitContext === 'guest' && postingType === 'registered') {
+      payload.account = {
+        email:    $('#email').val().trim(),
+        password: $('#password').val()
+      };
+    }
+
+    return payload;
+  }
+
+  // ── Form submit ───────────────────────────────────────────────────
   $('#mciSubmitForm').on('submit', function (e) {
-    // Ensure the latest form state is captured before any queue/save logic.
-    try { savePreview(); } catch(e0) {}
+    e.preventDefault();
 
-    // If user chose "Request a new category...", create the CP category request via API.
-    try {
-      var isReq = ($('#is_category_request').val() === '1') || ($('#category').val() === '__request_new__');
-      var requestedName = ($('#requested_category_name').val() || '').trim();
-      var reason = ($('#category_request_reason').val() || '').trim();
-      if (isReq && !requestedName) {
-        alert('Please enter the requested category name.');
-        return false;
-      }
+    var $btn = $('#submitBtn');
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Submitting\u2026');
 
-      if (isReq && requestedName) {
-        // Create CP queue entry via API first.
-        // If API auth isn't wired yet, fall back to localStorage queue (demo behavior).
-        e.preventDefault();
+    var payload = buildPayload();
 
-        var payload = {
-          requested_category_name: requestedName,
-          category_request_reason: reason
-        };
-
-        var fallbackToLocalStorage = function () {
-          var reqKey = 'mci_cp_category_requests';
-          var arr = [];
-          try { arr = JSON.parse(localStorage.getItem(reqKey) || '[]'); } catch (e2) { arr = []; }
-          if (!Array.isArray(arr)) arr = [];
-
-          var requester = ($('#mciRequesterLabel').val() || 'Subscriber').trim() || 'Subscriber';
-          arr.push({
-            requester: requester,
-            category: requestedName,
-            reason: reason,
-            createdAt: new Date().toISOString(),
-            status: 'pending'
-          });
-
-          localStorage.setItem(reqKey, JSON.stringify(arr));
-        };
-
-        try {
-          fetch('/api/v1/subscriber/category-requests', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(payload)
-          })
-            .then(function (res) {
-              if (!res.ok) {
-                fallbackToLocalStorage();
-                alert('Category request saved. (API auth not ready yet)');
-              }
-              return res.json().catch(function () { return {}; });
-            })
-            .then(function () {
-              // Go show the super-admin request list.
-              window.location.href = '/cp/categories/';
-            })
-            .catch(function () {
-              fallbackToLocalStorage();
-              alert('Category request saved. (Offline/demo fallback)');
-              window.location.href = '/cp/categories/';
-            });
-        } catch (fetchErr) {
-          fallbackToLocalStorage();
-          alert('Category request saved. (Demo fallback)');
-          window.location.href = '/cp/categories/';
+    fetch('/api/v1/businesses', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.data.ok) {
+          var msg = (res.data && res.data.error) ? res.data.error : 'Submission failed. Please try again.';
+          alert(msg);
+          $btn.prop('disabled', false).html('<i class="bi bi-check2-circle me-2" aria-hidden="true"></i>' + (window._mciSubmitBtnText || 'Submit'));
+          return;
         }
-
-        return false;
-      }
-    } catch (e) {}
-
-    // Clear saved preview only for real subscriber submissions.
-    // CP super-admin anonymous submission needs LS_KEY to remain available.
-    try {
-      var postingType = ($('input[name="posting_type"]:checked').val() || $('input[name="posting_type"]').val() || 'registered').toString();
-      if (postingType === 'registered') {
-        localStorage.removeItem(LS_KEY);
-      }
-    } catch (e3) {}
+        // If account was created, cookie is already set by API response header.
+        // Clear localStorage draft
+        try { localStorage.removeItem('mci_listing_preview'); } catch (e2) {}
+        window.location.href = submitRedirect;
+      })
+      .catch(function () {
+        alert('Network error. Please check your connection and try again.');
+        $btn.prop('disabled', false).html('<i class="bi bi-check2-circle me-2" aria-hidden="true"></i>' + (window._mciSubmitBtnText || 'Submit'));
+      });
   });
 });

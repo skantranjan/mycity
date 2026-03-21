@@ -7,6 +7,21 @@ function navActive(string $key, string $activePage): string
 {
     return $key === $activePage ? 'active' : '';
 }
+
+// On public pages ($appArea === ''), detect any active logged-in session
+// so we can show the correct header controls instead of Register/Login.
+if ($appArea === '') {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start(['cookie_httponly' => true, 'cookie_samesite' => 'Lax']);
+    }
+    if (!empty($_SESSION['mci_cp_logged_in']) && !empty($_SESSION['mci_cp_user_id'])) {
+        $appArea = 'cp';
+        require_once __DIR__ . '/../../includes/mci_app_profile.php';
+    } elseif (!empty($_SESSION['mci_logged_in']) && (($_SESSION['mci_role'] ?? '') === 'subscriber')) {
+        $appArea = 'subscriber';
+        require_once __DIR__ . '/../../includes/mci_app_profile.php';
+    }
+}
 ?>
 <header class="site-header sticky-top">
   <nav class="navbar navbar-expand-lg navbar-dark py-2" aria-label="Main navigation">
@@ -50,6 +65,36 @@ function navActive(string $key, string $activePage): string
           <li class="nav-item">
             <a class="nav-link rounded px-3 <?= navActive('submit', $activePage) ?>" href="<?= $appArea === 'subscriber' ? '/subscriber/list-business/' : '/submit-business-listing/' ?>">Add Business</a>
           </li>
+          <!-- City picker pill -->
+          <li class="nav-item position-relative d-flex align-items-center ms-lg-1">
+            <button
+              type="button"
+              id="mciCityPickerBtn"
+              class="mci-city-pill"
+              aria-label="Change city"
+              title="Change city"
+            >
+              <i class="bi bi-geo-alt-fill" aria-hidden="true"></i>
+              <span id="mciActiveCityLabel">your city</span>
+              <i class="bi bi-pencil-fill mci-city-pill__edit" aria-hidden="true"></i>
+            </button>
+            <!-- Popover -->
+            <div id="mciCityPickerPopover" class="mci-city-popover" hidden>
+              <div class="mci-city-popover__label">Change your city</div>
+              <div class="d-flex gap-2">
+                <input
+                  type="text"
+                  id="mciCityPickerInput"
+                  class="form-control form-control-sm"
+                  placeholder="Enter city name…"
+                  autocomplete="address-level2"
+                  maxlength="80"
+                />
+                <button type="button" id="mciCityPickerSave" class="btn btn-sm btn-dark text-nowrap">Save</button>
+              </div>
+              <div class="mci-city-popover__hint">Press Enter or click Save</div>
+            </div>
+          </li>
         </ul>
 
         <?php if ($appArea === 'subscriber'): ?>
@@ -77,21 +122,41 @@ function navActive(string $key, string $activePage): string
                 <span class="mci-header-user__avatar mci-header-user__avatar--placeholder" aria-hidden="true"><i class="bi bi-person-fill"></i></span>
               <?php endif; ?>
             </button>
-            <div class="dropdown-menu dropdown-menu-end mci-header-user__menu shadow border-0">
-              <div class="mci-header-user__card">
-                <div class="mci-header-user__label text-uppercase">Subscriber</div>
-                <div class="mci-header-user__name"><?= htmlspecialchars($mciHdrName, ENT_QUOTES, 'UTF-8') ?></div>
-                <div class="d-grid gap-2 mt-3">
-                  <a class="btn btn-sm btn-outline-dark text-start" href="/subscriber/profile/">
-                    <i class="bi bi-person-badge me-2" aria-hidden="true"></i>Update profile
-                  </a>
-                  <a class="btn btn-sm btn-outline-dark text-start" href="/subscriber/change-password/">
-                    <i class="bi bi-key me-2" aria-hidden="true"></i>Change password
-                  </a>
-                  <a class="btn btn-sm btn-dark text-start" href="/subscriber/logout/?perform=1">
-                    <i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Logout
-                  </a>
+            <div class="dropdown-menu dropdown-menu-end mci-header-user__menu shadow-lg border-0">
+              <!-- Identity panel -->
+              <div class="mci-hud__identity">
+                <div class="mci-hud__avatar-wrap">
+                  <?php if ($mciHdrAvatar !== null): ?>
+                    <img src="<?= htmlspecialchars($mciHdrAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" class="mci-hud__avatar" width="44" height="44" decoding="async" />
+                  <?php else: ?>
+                    <span class="mci-hud__avatar mci-hud__avatar--placeholder" aria-hidden="true"><i class="bi bi-person-fill"></i></span>
+                  <?php endif; ?>
                 </div>
+                <div class="mci-hud__identity-text">
+                  <div class="mci-hud__role-pill">Subscriber</div>
+                  <div class="mci-hud__name"><?= htmlspecialchars($mciHdrName, ENT_QUOTES, 'UTF-8') ?></div>
+                </div>
+              </div>
+              <!-- Nav links -->
+              <div class="mci-hud__nav">
+                <a class="mci-hud__item" href="/subscriber/dashboard/">
+                  <span class="mci-hud__item-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
+                  <span>Dashboard</span>
+                </a>
+                <a class="mci-hud__item" href="/subscriber/profile/">
+                  <span class="mci-hud__item-icon"><i class="bi bi-person-badge" aria-hidden="true"></i></span>
+                  <span>Update profile</span>
+                </a>
+                <a class="mci-hud__item" href="/subscriber/change-password/">
+                  <span class="mci-hud__item-icon"><i class="bi bi-key" aria-hidden="true"></i></span>
+                  <span>Change password</span>
+                </a>
+              </div>
+              <div class="mci-hud__footer">
+                <a class="mci-hud__logout" href="/subscriber/logout/?perform=1">
+                  <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+                  <span>Sign out</span>
+                </a>
               </div>
             </div>
             </div>
@@ -121,21 +186,41 @@ function navActive(string $key, string $activePage): string
                 <span class="mci-header-user__avatar mci-header-user__avatar--placeholder" aria-hidden="true"><i class="bi bi-shield-lock-fill"></i></span>
               <?php endif; ?>
             </button>
-            <div class="dropdown-menu dropdown-menu-end mci-header-user__menu shadow border-0">
-              <div class="mci-header-user__card">
-                <div class="mci-header-user__label text-uppercase">Super admin</div>
-                <div class="mci-header-user__name"><?= htmlspecialchars($mciHdrName, ENT_QUOTES, 'UTF-8') ?></div>
-                <div class="d-grid gap-2 mt-3">
-                  <a class="btn btn-sm btn-outline-dark text-start" href="/cp/profile/">
-                    <i class="bi bi-person-vcard-fill me-2" aria-hidden="true"></i>Update profile
-                  </a>
-                  <a class="btn btn-sm btn-outline-dark text-start" href="/cp/change-password/">
-                    <i class="bi bi-shield-lock me-2" aria-hidden="true"></i>Change password
-                  </a>
-                  <a class="btn btn-sm btn-dark text-start" href="/cp/logout/?perform=1">
-                    <i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Logout
-                  </a>
+            <div class="dropdown-menu dropdown-menu-end mci-header-user__menu shadow-lg border-0">
+              <!-- Identity panel -->
+              <div class="mci-hud__identity mci-hud__identity--cp">
+                <div class="mci-hud__avatar-wrap">
+                  <?php if ($mciHdrAvatar !== null): ?>
+                    <img src="<?= htmlspecialchars($mciHdrAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" class="mci-hud__avatar" width="44" height="44" decoding="async" />
+                  <?php else: ?>
+                    <span class="mci-hud__avatar mci-hud__avatar--placeholder mci-hud__avatar--cp" aria-hidden="true"><i class="bi bi-shield-lock-fill"></i></span>
+                  <?php endif; ?>
                 </div>
+                <div class="mci-hud__identity-text">
+                  <div class="mci-hud__role-pill mci-hud__role-pill--cp">Super admin</div>
+                  <div class="mci-hud__name"><?= htmlspecialchars($mciHdrName, ENT_QUOTES, 'UTF-8') ?></div>
+                </div>
+              </div>
+              <!-- Nav links -->
+              <div class="mci-hud__nav">
+                <a class="mci-hud__item" href="/cp/dashboard/">
+                  <span class="mci-hud__item-icon"><i class="bi bi-grid-1x2" aria-hidden="true"></i></span>
+                  <span>Control panel</span>
+                </a>
+                <a class="mci-hud__item" href="/cp/profile/">
+                  <span class="mci-hud__item-icon"><i class="bi bi-person-vcard-fill" aria-hidden="true"></i></span>
+                  <span>Update profile</span>
+                </a>
+                <a class="mci-hud__item" href="/cp/change-password/">
+                  <span class="mci-hud__item-icon"><i class="bi bi-shield-lock" aria-hidden="true"></i></span>
+                  <span>Change password</span>
+                </a>
+              </div>
+              <div class="mci-hud__footer">
+                <a class="mci-hud__logout" href="/cp/logout/?perform=1">
+                  <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+                  <span>Sign out</span>
+                </a>
               </div>
             </div>
             </div>

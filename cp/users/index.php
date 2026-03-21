@@ -9,7 +9,7 @@ mci_require_super_admin_session();
 
 $pageTitle = 'Users - My City Info';
 $activePage = '';
-$cpActive = 'users';
+$cpActive = 'subscribers';
 $hideCta = true;
 $appArea = 'cp';
 
@@ -101,32 +101,36 @@ $extraJS = <<<'HTML'
       if (u.deleted_at) tr.classList.add('table-secondary');
 
       tr.innerHTML =
-        '<td class="fw-semibold">' + escapeHtml(u.display_name || '—') + '</td>' +
-        '<td class="small">' + escapeHtml(u.email || '') + '</td>' +
+        '<td class="small text-muted">' + escapeHtml(u.display_name || '—') + '</td>' +
+        '<td class="small text-muted">' + escapeHtml(u.email || '') + '</td>' +
         '<td><span class="badge text-bg-light border">' + escapeHtml(u.role || '') + '</span></td>' +
         '<td><span class="badge text-bg-light border">' + escapeHtml(u.status || '') + '</span></td>' +
         '<td class="small text-muted">' + escapeHtml(u.phone || '—') + '</td>' +
-        '<td class="small text-muted">' + fmtDate(u.created_at) + '</td>' +
+        '<td class="small text-muted text-nowrap">' + fmtDate(u.created_at) + '</td>' +
         '<td class="text-end"></td>';
 
       var tdAct = tr.querySelector('td:last-child');
       var btnEdit = document.createElement('button');
       btnEdit.type = 'button';
-      btnEdit.className = 'btn btn-sm btn-outline-dark me-1';
-      btnEdit.textContent = 'Edit';
+      btnEdit.className = 'btn btn-sm btn-outline-secondary mci-icon-btn';
+      btnEdit.title = 'Edit';
+      btnEdit.innerHTML = '<i class="bi bi-pencil" aria-hidden="true"></i>';
       btnEdit.disabled = !!u.deleted_at;
       btnEdit.addEventListener('click', function () { openPanel('edit', u); });
 
       var btnDel = document.createElement('button');
       btnDel.type = 'button';
-      btnDel.className = 'btn btn-sm btn-outline-danger';
-      btnDel.textContent = 'Delete';
+      btnDel.className = 'btn btn-sm btn-outline-danger mci-icon-btn';
+      btnDel.title = (u.id === currentUserId) ? 'Cannot delete your own account' : 'Delete';
+      btnDel.innerHTML = '<i class="bi bi-trash" aria-hidden="true"></i>';
       btnDel.disabled = !!u.deleted_at || (u.id === currentUserId);
-      btnDel.title = (u.id === currentUserId) ? 'Cannot delete your own account' : '';
       btnDel.addEventListener('click', function () { confirmDelete(u); });
 
-      tdAct.appendChild(btnEdit);
-      tdAct.appendChild(btnDel);
+      var wrap = document.createElement('div');
+      wrap.className = 'd-flex gap-1 justify-content-end';
+      wrap.appendChild(btnEdit);
+      wrap.appendChild(btnDel);
+      tdAct.appendChild(wrap);
       tbody.appendChild(tr);
     });
   }
@@ -140,7 +144,9 @@ $extraJS = <<<'HTML'
   function fmtDate(x) {
     if (!x) return '—';
     var d = new Date(x);
-    return isNaN(d.getTime()) ? String(x) : d.toLocaleString();
+    if (isNaN(d.getTime())) return String(x);
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) +
+      ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
   }
 
   function openPanel(mode, u) {
@@ -316,13 +322,13 @@ ob_start();
           <table class="table table-sm table-bordered align-middle bg-white">
             <thead class="table-light">
               <tr>
-                <th>Display name</th>
+                <th style="min-width:140px;">Display name</th>
                 <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Phone</th>
-                <th>Created</th>
-                <th class="text-end" style="min-width:140px">Actions</th>
+                <th style="width:110px;">Role</th>
+                <th style="width:80px;">Status</th>
+                <th style="width:120px;">Phone</th>
+                <th style="min-width:200px;">Created</th>
+                <th class="text-end" style="width:80px;">Actions</th>
               </tr>
             </thead>
             <tbody id="mciCpUsersBody">

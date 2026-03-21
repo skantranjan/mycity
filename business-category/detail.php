@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/mci_directory_listings.php';
+require_once __DIR__ . '/../includes/mci_category_icons.php';
 
 $slug = trim((string) ($_GET['slug'] ?? ''));
 $slug = strtolower($slug);
@@ -17,23 +18,6 @@ $activePage = 'categories';
 $extraHead = <<<'HTML'
 <link rel="stylesheet" href="/assets/css/home.css" />
 HTML;
-
-$categoryIcons = [
-    'real-estate' => '🏠',
-    'furniture-store' => '🛋️',
-    'painter' => '🎨',
-    'restaurant' => '🍽️',
-    'health' => '⚕️',
-    'automotive' => '🚗',
-    'hotels' => '🏨',
-    'gym' => '💪',
-    'bakery' => '🥐',
-    'electrician' => '⚡',
-    'park' => '🌳',
-    'cafe' => '☕',
-    'dentist' => '🦷',
-    'spa' => '🧖',
-];
 
 $listingStats = [
     'property-852' => ['rating' => 4.8, 'reviews' => 68, 'popular_score' => 96, 'added_on' => '2026-03-16'],
@@ -168,7 +152,7 @@ ob_start();
       <?php if ($selectedCategoryName !== ''): ?>
         <div class="text-muted small">
           <div class="d-flex align-items-center gap-2 flex-wrap">
-            <span class="fs-4" aria-hidden="true"><?= htmlspecialchars((string) ($categoryIcons[$slug] ?? '📁')) ?></span>
+            <?= mci_render_category_icon(mci_category_icon($slug), 'fs-4') ?>
             <?php if ($selectedLocation !== ''): ?>
               <?= count($enrichedRows) ?> business<?= count($enrichedRows) === 1 ? '' : 'es' ?> in <strong><?= htmlspecialchars((string) $selectedLocation) ?></strong>.
             <?php else: ?>
@@ -204,31 +188,33 @@ ob_start();
     <div class="card border-0 shadow-sm bg-white mb-4">
       <div class="card-body">
         <div class="d-flex align-items-end justify-content-between gap-3 flex-wrap">
-          <form method="get" action="" class="d-flex align-items-end gap-3 flex-wrap" aria-label="Category filters">
-            <div class="d-flex flex-column">
-              <label class="form-label small mb-1" for="categoryLocationDetail">Location</label>
-              <select id="categoryLocationDetail" name="location" class="form-select form-select-sm" aria-label="Filter by location">
-                <option value="" <?= $selectedLocation === '' ? 'selected' : '' ?>>All locations</option>
-                <?php foreach ($locations as $loc): ?>
-                  <option value="<?= htmlspecialchars($loc, ENT_QUOTES, 'UTF-8') ?>" <?= $selectedLocation === $loc ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($loc, ENT_QUOTES, 'UTF-8') ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
+          <form method="get" action="" aria-label="Category filters" class="w-100 w-md-auto">
+            <div class="row g-2 align-items-end">
+              <div class="col-6 col-md-auto">
+                <label class="form-label small mb-1" for="categoryLocationDetail">Location</label>
+                <select id="categoryLocationDetail" name="location" class="form-select form-select-sm" aria-label="Filter by location">
+                  <option value="" <?= $selectedLocation === '' ? 'selected' : '' ?>>All locations</option>
+                  <?php foreach ($locations as $loc): ?>
+                    <option value="<?= htmlspecialchars($loc, ENT_QUOTES, 'UTF-8') ?>" <?= $selectedLocation === $loc ? 'selected' : '' ?>>
+                      <?= htmlspecialchars($loc, ENT_QUOTES, 'UTF-8') ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div class="col-6 col-md-auto">
+                <label class="form-label small mb-1" for="categorySortDetail">Sort by</label>
+                <select id="categorySortDetail" name="sort" class="form-select form-select-sm" aria-label="Sort listings">
+                  <option value="popular" <?= $sort === 'popular' ? 'selected' : '' ?>>Popular first</option>
+                  <option value="rating" <?= $sort === 'rating' ? 'selected' : '' ?>>Top rated</option>
+                  <option value="newest" <?= $sort === 'newest' ? 'selected' : '' ?>>Newly added</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-auto">
+                <button type="submit" class="btn btn-sm btn-dark w-100 w-md-auto">
+                  <i class="bi bi-sliders me-1" aria-hidden="true"></i>Apply
+                </button>
+              </div>
             </div>
-
-            <div class="d-flex flex-column">
-              <label class="form-label small mb-1" for="categorySortDetail">Sort by</label>
-              <select id="categorySortDetail" name="sort" class="form-select form-select-sm" aria-label="Sort listings">
-                <option value="popular" <?= $sort === 'popular' ? 'selected' : '' ?>>Popular first</option>
-                <option value="rating" <?= $sort === 'rating' ? 'selected' : '' ?>>Top rated</option>
-                <option value="newest" <?= $sort === 'newest' ? 'selected' : '' ?>>Newly added</option>
-              </select>
-            </div>
-
-            <button type="submit" class="btn btn-sm btn-dark">
-              <i class="bi bi-sliders me-1" aria-hidden="true"></i>Apply
-            </button>
           </form>
 
           <div class="text-muted small">
@@ -238,11 +224,20 @@ ob_start();
       </div>
     </div>
 
-    <div class="row g-3 g-lg-4">
-      <?php foreach ($enrichedRows as $listing): ?>
-        <?php $variant = 'home'; include __DIR__ . '/../views/components/listing-card.php'; ?>
-      <?php endforeach; ?>
-    </div>
+    <?php if (count($enrichedRows) === 0): ?>
+      <div class="text-center py-5">
+        <div class="mb-3" style="font-size:3rem;" aria-hidden="true">🏙️</div>
+        <div class="fw-semibold mb-1">No businesses found</div>
+        <div class="text-muted small mb-3">Try a different location or clear the filters.</div>
+        <a href="/business-category/<?= urlencode($slug) ?>" class="btn btn-sm btn-dark">Clear filters</a>
+      </div>
+    <?php else: ?>
+      <div class="row g-3 g-lg-4">
+        <?php foreach ($enrichedRows as $listing): ?>
+          <?php $variant = 'home'; include __DIR__ . '/../views/components/listing-card.php'; ?>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
   <?php endif; ?>
 </div>
 

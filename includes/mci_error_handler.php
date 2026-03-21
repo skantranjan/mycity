@@ -24,16 +24,62 @@ if (!isset($GLOBALS['mci_error_handler_installed'])) {
 
         $userId = '';
         try {
-            // If sessions are available, prefer the user id for easier debugging.
-            $userId = (string) ($_SESSION['mci_user_id'] ?? '');
+            // Prefer CP user id, fall back to subscriber user id.
+            $userId = (string) ($_SESSION['mci_cp_user_id'] ?? $_SESSION['mci_user_id'] ?? '');
         } catch (Throwable $e) {
             $userId = '';
         }
 
+        $ip = '';
+        try {
+            $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+        } catch (Throwable $e) {
+            $ip = '';
+        }
+
         return [
-            'uri' => $uri,
+            'uri'    => $uri,
             'userId' => $userId,
+            'ip'     => $ip,
         ];
+    };
+
+    /**
+     * Write one row to mci_error_log. Silently falls back to error_log() on failure.
+     */
+    $writeToDb = static function (
+        string $level,
+        string $message,
+        string $file,
+        int    $line,
+        string $uri,
+        string $userId,
+        string $ip,
+        ?array $extra = null
+    ): void {
+        try {
+            // Only attempt DB write if our db helper is already loaded (avoids recursive bootstrap issues).
+            if (!function_exists('api_db')) {
+                return;
+            }
+            $pdo = api_db();
+            $stmt = $pdo->prepare(
+                'INSERT INTO mci_error_log (level, message, file, line, uri, user_id, ip, context)
+                 VALUES (:level, :message, :file, :line, :uri, :user_id, :ip, :context)'
+            );
+            $stmt->execute([
+                ':level'   => $level,
+                ':message' => $message,
+                ':file'    => $file ?: null,
+                ':line'    => $line ?: null,
+                ':uri'     => $uri ?: null,
+                ':user_id' => $userId !== '' ? $userId : null,
+                ':ip'      => $ip ?: null,
+                ':context' => $extra !== null ? json_encode($extra, JSON_UNESCAPED_UNICODE) : null,
+            ]);
+        } catch (Throwable $ignored) {
+            // DB unavailable — already logged via error_log() by caller; swallow silently.
+        }
     };
 
     $renderFriendly = static function (string $title, string $message, ?int $statusCode = null): void {
@@ -91,15 +137,28 @@ if (!isset($GLOBALS['mci_error_handler_installed'])) {
 HTML;
     };
 
-    $logThrowable = static function (Throwable $e): void {
-        $ctx = $logContext();
-        $line = (string) ($e->getLine() ?? '');
+    $logThrowable = static function (Throwable $e) use ($writeToDb): void {
+        $ctx  = $logContext();
+        $line = (int) ($e->getLine() ?? 0);
         $file = (string) ($e->getFile() ?? '');
-        $msg = (string) $e->getMessage();
+        $msg  = (string) $e->getMessage();
         $class = get_class($e);
 
+        // Always write to PHP error log as fallback.
         $detail = $class . ': ' . $msg . ' | file=' . $file . ' | line=' . $line . ' | uri=' . $ctx['uri'] . ' | userId=' . $ctx['userId'];
         error_log('[MyCityInfo] ' . $detail);
+
+        // Write structured row to DB.
+        $writeToDb(
+            'exception',
+            $class . ': ' . $msg,
+            $file,
+            $line,
+            $ctx['uri'],
+            $ctx['userId'],
+            $ctx['ip'],
+            ['trace' => mb_substr($e->getTraceAsString(), 0, 2048)]
+        );
     };
 
     set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
@@ -111,7 +170,7 @@ HTML;
         throw new ErrorException($message, 0, $severity, $file, $line);
     });
 
-    set_exception_handler(static function (Throwable $e): void {
+    set_exception_handler(static function (Throwable $e) use ($logThrowable, $renderFriendly): void {
         try {
             $logThrowable($e);
         } catch (Throwable $ignored) {
@@ -121,7 +180,7 @@ HTML;
         exit;
     });
 
-    register_shutdown_function(static function (): void {
+    register_shutdown_function(static function () use ($writeToDb, $renderFriendly): void {
         $err = error_get_last();
         if (!$err) {
             return;
@@ -134,12 +193,14 @@ HTML;
 
         // Log the fatal error.
         try {
-            $ctx = $logContext();
-            $msg = (string) ($err['message'] ?? '');
+            $ctx  = $logContext();
+            $msg  = (string) ($err['message'] ?? '');
             $file = (string) ($err['file'] ?? '');
-            $line = (string) ($err['line'] ?? '');
+            $line = (int) ($err['line'] ?? 0);
             $detail = 'Fatal: ' . $msg . ' | file=' . $file . ' | line=' . $line . ' | uri=' . $ctx['uri'] . ' | userId=' . $ctx['userId'];
             error_log('[MyCityInfo] ' . $detail);
+
+            $writeToDb('fatal', 'Fatal: ' . $msg, $file, $line, $ctx['uri'], $ctx['userId'], $ctx['ip']);
         } catch (Throwable $ignored) {
             // ignore
         }

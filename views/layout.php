@@ -23,7 +23,7 @@ if ($appArea !== '') {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="description" content="Explore local business, services and places in your city." />
+    <meta name="description" content="<?= htmlspecialchars($metaDescription ?? 'Explore local business, services and places in your city.', ENT_QUOTES, 'UTF-8') ?>" />
     <title><?= htmlspecialchars($pageTitle ?? 'My City Info') ?></title>
     <script>
 (function () {
@@ -78,7 +78,30 @@ if ($appArea !== '') {
     <script
       src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
     ></script>
+    <!-- Sitewide city detection & persistence -->
+    <script src="/assets/js/mci-city.js" defer></script>
     <?php if (!empty($extraJS)) echo $extraJS; ?>
+    <script>
+(function () {
+  // Close Bootstrap navbar on outside click
+  var nav = document.getElementById('mciMainNav');
+  if (!nav) return;
+  document.addEventListener('click', function (e) {
+    if (!nav.classList.contains('show')) return;
+    var toggler = document.querySelector('[data-bs-target="#mciMainNav"]');
+    if (nav.contains(e.target) || (toggler && toggler.contains(e.target))) return;
+    var bsNav = bootstrap.Collapse.getInstance(nav);
+    if (bsNav) bsNav.hide();
+  });
+  // Close on nav link click (mobile)
+  nav.querySelectorAll('.nav-link').forEach(function (link) {
+    link.addEventListener('click', function () {
+      var bsNav = bootstrap.Collapse.getInstance(nav);
+      if (bsNav && nav.classList.contains('show')) bsNav.hide();
+    });
+  });
+}());
+    </script>
   </body>
 </html>
 

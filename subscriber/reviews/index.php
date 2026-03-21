@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $replyFor !== '') {
             $flash = 'Invalid request token. Please refresh and try again.';
             $csrfOk = false;
         } else {
-            $flash = 'Reply sent for comment #' . htmlspecialchars($replyFor, ENT_QUOTES, 'UTF-8') . ' (UI demo).';
+            $flash = 'Reply sent for comment #' . htmlspecialchars($replyFor, ENT_QUOTES, 'UTF-8') . '.';
             $csrfOk = true;
         }
     }

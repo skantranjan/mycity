@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $removeSlug !== '') {
     $rows = array_values(array_filter($rows, static function (array $r) use ($removeSlug): bool {
         return (string) ($r['slug'] ?? '') !== $removeSlug;
     }));
-    $flash = 'Listing removed from favourites (UI demo).';
+    $flash = 'Listing removed from favourites.';
     }
 }
 
@@ -44,7 +44,7 @@ ob_start();
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
           <div>
             <div class="fw-semibold">Favourite listings</div>
-            <div class="text-muted small">Manage businesses you have saved as favourite (UI demo).</div>
+            <div class="text-muted small">Manage businesses you have saved as favourite.</div>
           </div>
           <span class="badge text-bg-light border px-3 py-2">Saved: <?= count($rows) ?></span>
         </div>

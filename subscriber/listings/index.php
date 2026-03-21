@@ -5,6 +5,21 @@ $subActive = 'listings';
 $hideCta = true;
 $appArea = 'subscriber';
 
+require_once __DIR__ . '/../../includes/mci_session.php';
+
+$userId = (string)($_SESSION['mci_user_id'] ?? '');
+
+$rows = [];
+if ($userId !== '') {
+    require_once __DIR__ . '/../../api/v1/lib/db.php';
+    require_once __DIR__ . '/../../api/v1/lib/business_service.php';
+    try {
+        $rows = api_business_list_owner(api_db(), $userId)['businesses'] ?? [];
+    } catch (Throwable $e) {
+        $rows = [];
+    }
+}
+
 ob_start();
 ?>
 
@@ -18,15 +33,18 @@ ob_start();
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
           <div>
             <div class="fw-semibold">My Listings</div>
-            <div class="text-muted small">See and modify your submitted listings (UI demo).</div>
+            <div class="text-muted small">See and modify your submitted listings.</div>
           </div>
-          <a class="btn btn-sm btn-dark" href="/subscriber/list-business/">List your business</a>
+          <a class="btn btn-sm btn-dark" href="/subscriber/list-business/">
+            <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Add new listing
+          </a>
         </div>
 
         <div class="table-responsive">
           <table class="table table-bordered align-middle bg-white">
             <thead class="table-light">
               <tr>
+                <th style="width:56px;"></th>
                 <th>Business</th>
                 <th>Category</th>
                 <th>Status</th>
@@ -34,34 +52,47 @@ ob_start();
               </tr>
             </thead>
             <tbody>
-              <?php
-              $rows = [
-                ['slug' => 'property-852', 'title' => 'Property 852', 'address' => '12 Orchard Lane, Downtown', 'category' => 'Real Estate', 'status' => 'Live'],
-                ['slug' => 'locker-shop-uk', 'title' => 'Locker Shop UK Ltd', 'address' => '88 Market Street, Central District', 'category' => 'Furniture Store', 'status' => 'Pending'],
-                ['slug' => 'jxf-painting', 'title' => 'JXF Painting Service', 'address' => '4 Riverside Avenue, West End', 'category' => 'Painter', 'status' => 'Live'],
-                ['slug' => 'hunter-hill-physio', 'title' => 'Hunter Hill Physiotherapy', 'address' => '19 Hillcrest Road, Northside', 'category' => 'Health', 'status' => 'Rejected'],
-              ];
-              foreach ($rows as $r):
+              <?php if (empty($rows)): ?>
+                <tr><td colspan="5" class="text-center text-muted small py-4">You haven't submitted any listings yet. <a href="/subscriber/list-business/">Add your first listing</a>.</td></tr>
+              <?php endif; ?>
+              <?php foreach ($rows as $r):
+                $rowSlug   = (string)($r['slug']          ?? '');
+                $rowName   = (string)($r['name']          ?? '');
+                $rowCat    = (string)($r['category_name'] ?? '');
+                $rowStatus = strtolower((string)($r['status'] ?? ''));
               ?>
                 <tr>
                   <td>
-                    <div class="fw-semibold"><?= htmlspecialchars($r['title']) ?></div>
-                    <div class="text-muted small"><?= htmlspecialchars($r['address']) ?></div>
+                    <?php if (!empty($r['logo_path'])): ?>
+                      <img src="<?= htmlspecialchars((string)$r['logo_path'], ENT_QUOTES, 'UTF-8') ?>"
+                        alt="" width="48" height="48" class="rounded-2" style="object-fit:cover;" loading="lazy" decoding="async" />
+                    <?php else: ?>
+                      <div class="rounded-2 bg-light d-flex align-items-center justify-content-center" style="width:48px;height:48px;">
+                        <i class="bi bi-building text-muted" aria-hidden="true"></i>
+                      </div>
+                    <?php endif; ?>
                   </td>
-                  <td class="text-muted small"><?= htmlspecialchars($r['category']) ?></td>
                   <td>
-                    <span class="badge text-bg-light border"><?= htmlspecialchars($r['status']) ?></span>
+                    <div class="fw-semibold small"><?= htmlspecialchars($rowName) ?></div>
+                    <div class="text-muted" style="font-size:var(--mci-text-xs)"><?= htmlspecialchars($rowCat) ?></div>
+                  </td>
+                  <td class="text-muted small"><?= htmlspecialchars($rowCat) ?></td>
+                  <td>
+                    <?php
+                    $statusBadge = match($rowStatus) {
+                        'live'      => 'text-bg-success',
+                        'draft'     => 'text-bg-warning',
+                        'rejected'  => 'text-bg-danger',
+                        'suspended' => 'text-bg-secondary',
+                        default     => 'text-bg-light border',
+                    };
+                    ?>
+                    <span class="badge <?= $statusBadge ?>"><?= htmlspecialchars(ucfirst($rowStatus)) ?></span>
                   </td>
                   <td>
                     <div class="d-flex gap-2 flex-wrap">
-                      <a class="btn btn-sm btn-outline-dark" href="/business/?slug=<?= urlencode((string) $r['slug']) ?>" target="_blank" rel="noopener noreferrer" title="Open business page in a new window">
-                        <i class="bi bi-eye me-1" aria-hidden="true"></i>View <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
-                      </a>
-                      <a class="btn btn-sm btn-outline-secondary" href="/subscriber/list-business/?edit=1&slug=<?= urlencode((string) $r['slug']) ?>">
-                        <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit
-                      </a>
-                      <a class="btn btn-sm btn-outline-danger" href="/subscriber/listing-delete/?slug=<?= urlencode((string) $r['slug']) ?>&title=<?= urlencode((string) $r['title']) ?>">
-                        <i class="bi bi-trash-fill me-1" aria-hidden="true"></i>Delete
+                      <a class="btn btn-sm btn-outline-dark" href="/business/<?= urlencode($rowSlug) ?>/" target="_blank" rel="noopener noreferrer" title="View listing">
+                        <i class="bi bi-eye me-1" aria-hidden="true"></i>View
                       </a>
                     </div>
                   </td>
@@ -71,12 +102,9 @@ ob_start();
           </table>
         </div>
 
-        <div class="mt-3 d-flex align-items-center justify-content-center gap-2">
-          <a class="btn btn-sm btn-outline-secondary disabled" href="#">Prev</a>
-          <div class="btn btn-sm btn-outline-dark disabled">1</div>
-          <a class="btn btn-sm btn-outline-secondary disabled" href="#">Next</a>
-        </div>
-        <div class="text-muted small text-center mt-2">Pagination will be wired later.</div>
+        <?php if (count($rows) > 0): ?>
+        <div class="mt-3 text-muted small text-end">Showing <?= count($rows) ?> listing<?= count($rows) !== 1 ? 's' : '' ?></div>
+        <?php endif; ?>
       </div>
     </div>
   </div>

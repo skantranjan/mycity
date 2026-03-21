@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $replyFor !== '') {
             $replyFlash = 'Invalid request token. Please refresh and try again.';
             $csrfOk = false;
         } else {
-            $replyFlash = 'Reply sent for enquiry #' . htmlspecialchars($replyFor, ENT_QUOTES, 'UTF-8') . ' (UI demo).';
+            $replyFlash = 'Reply sent for enquiry #' . htmlspecialchars($replyFor, ENT_QUOTES, 'UTF-8') . '.';
             $csrfOk = true;
         }
     }
@@ -122,7 +122,7 @@ ob_start();
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
           <div>
             <div class="fw-semibold">Enquiries</div>
-            <div class="text-muted small">View incoming enquiries and reply to each one from here (UI demo).</div>
+            <div class="text-muted small">View incoming enquiries and reply to each one from here.</div>
           </div>
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
@@ -155,7 +155,27 @@ ob_start();
                   <div class="fw-semibold"><?= htmlspecialchars($q['from']) ?> <span class="text-muted fw-normal">· <?= htmlspecialchars($q['email']) ?></span></div>
                   <div class="text-muted small">For <?= htmlspecialchars($q['listing']) ?> · <?= htmlspecialchars($q['when']) ?></div>
                 </div>
-                <span class="badge text-bg-light border"><?= htmlspecialchars($q['status']) ?></span>
+                <div class="d-flex align-items-center gap-2">
+                  <?php
+                  $enqBadgeClass = match($q['status']) {
+                      'New'          => 'text-bg-primary',
+                      'Waiting reply'=> 'text-bg-warning',
+                      'Replied'      => 'text-bg-success',
+                      default        => 'text-bg-light border',
+                  };
+                  ?>
+                  <span class="badge <?= $enqBadgeClass ?>"><?= htmlspecialchars($q['status']) ?></span>
+                  <?php if ($q['status'] === 'New'): ?>
+                    <form method="post" action="" class="d-inline">
+                      <input type="hidden" name="enquiry_id" value="<?= htmlspecialchars($q['id']) ?>" />
+                      <input type="hidden" name="reply_text" value="(marked as read)" />
+                      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>" />
+                      <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Mark as read" style="font-size:var(--mci-text-xs)">
+                        <i class="bi bi-check2-all" aria-hidden="true"></i> Mark read
+                      </button>
+                    </form>
+                  <?php endif; ?>
+                </div>
               </div>
               <p class="small mb-3"><?= htmlspecialchars($q['message']) ?></p>
 

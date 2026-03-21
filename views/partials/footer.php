@@ -4,7 +4,8 @@
 <footer class="site-footer mt-0">
   <div class="container px-3 px-sm-4 py-5 py-md-5">
     <div class="row g-4 align-items-start">
-      <div class="col-12 col-md-4">
+      <!-- Logo: full-width on mobile (order-1), left column on md+ -->
+      <div class="col-12 col-md-4 order-1 order-md-1">
         <a href="/" class="d-inline-block mb-2" title="My City Info">
           <img
             src="https://www.mycityinfo.com/wp-content/uploads/2017/04/my-city-info-logo-t-3.png"
@@ -19,15 +20,8 @@
         </div>
       </div>
 
-      <div class="col-6 col-md-2">
-        <div class="mci-footer__title">Company</div>
-        <ul class="mci-footer__links" aria-label="Company links">
-          <li><a class="mci-footer__link" href="/about/">About</a></li>
-          <li><a class="mci-footer__link" href="/contact/">Contact</a></li>
-        </ul>
-      </div>
-
-      <div class="col-6 col-md-3">
+      <!-- Legal: order-2 on mobile (most useful), order-3 on md+ -->
+      <div class="col-6 col-md-3 order-2 order-md-3">
         <div class="mci-footer__title">Legal</div>
         <ul class="mci-footer__links" aria-label="Legal links">
           <li><a class="mci-footer__link" href="/privacy-policy/">Privacy Policy</a></li>
@@ -37,7 +31,8 @@
         </ul>
       </div>
 
-      <div class="col-12 col-md-3">
+      <!-- Help CTA: order-3 on mobile, order-4 on md+ -->
+      <div class="col-6 col-md-3 order-3 order-md-4">
         <div class="mci-footer__title">Need help?</div>
         <div class="text-muted small mci-footer__help">
           Have a question or need assistance? We are here to help.
@@ -47,6 +42,15 @@
             <i class="bi bi-envelope-fill me-2" aria-hidden="true"></i>Contact us
           </a>
         </div>
+      </div>
+
+      <!-- Company: order-4 on mobile (last), order-2 on md+ -->
+      <div class="col-6 col-md-2 order-4 order-md-2">
+        <div class="mci-footer__title">Company</div>
+        <ul class="mci-footer__links" aria-label="Company links">
+          <li><a class="mci-footer__link" href="/about/">About</a></li>
+          <li><a class="mci-footer__link" href="/contact/">Contact</a></li>
+        </ul>
       </div>
     </div>
 
