@@ -218,7 +218,13 @@ $defaultListing = [
   ],
 ];
 
+// UI demo: claim status per listing (unclaimed by default)
+$claimedSlugs = ['jxf-painting'];
+$pendingClaimSlugs = [];
+
 $listing = array_merge($defaultListing, $catalog[$slug] ?? []);
+$listingIsClaimed     = in_array($slug, $claimedSlugs,     true);
+$listingClaimPending  = in_array($slug, $pendingClaimSlugs, true);
 
 $listingFaqs = $listing['faqs'] ?? [];
 $listingFaqs = is_array($listingFaqs) ? $listingFaqs : [];
@@ -287,6 +293,46 @@ $extraHead = <<<'HTML'
 <script src="/assets/js/business-reviews.js" defer></script>
 HTML;
 
+$extraJS = <<<'HTML'
+<script>
+(function () {
+  // Gallery lightbox
+  var overlay = document.getElementById('mciLightbox');
+  var imgEl   = document.getElementById('mciLightboxImg');
+  if (!overlay || !imgEl) return;
+
+  var images = Array.prototype.slice.call(document.querySelectorAll('#mciGalleryGrid .mci-gallery-open img'));
+  var current = 0;
+
+  function show(index) {
+    current = (index + images.length) % images.length;
+    imgEl.src = images[current].dataset.full || images[current].src;
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+  function hide() {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  document.querySelectorAll('.mci-gallery-open').forEach(function (btn) {
+    btn.addEventListener('click', function () { show(parseInt(this.dataset.index, 10)); });
+  });
+  document.getElementById('mciLightboxClose').addEventListener('click', hide);
+  document.getElementById('mciLightboxPrev').addEventListener('click', function (e) { e.stopPropagation(); show(current - 1); });
+  document.getElementById('mciLightboxNext').addEventListener('click', function (e) { e.stopPropagation(); show(current + 1); });
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) hide(); });
+  document.addEventListener('keydown', function (e) {
+    if (overlay.style.display === 'flex') {
+      if (e.key === 'Escape') hide();
+      if (e.key === 'ArrowLeft')  show(current - 1);
+      if (e.key === 'ArrowRight') show(current + 1);
+    }
+  });
+})();
+</script>
+HTML;
+
 ob_start();
 ?>
 
@@ -326,11 +372,39 @@ ob_start();
         <div class="mci-business-title-block mb-3 pb-lg-1">
           <div class="mci-business-cat text-uppercase small mb-1"><?= htmlspecialchars($listing['category']) ?></div>
           <h2 class="mci-business-name mb-2"><?= htmlspecialchars($listing['title']) ?></h2>
+          <?php if ($reviewSummary['count'] > 0): ?>
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill" style="background:var(--mci-color-primary-soft);font-size:var(--mci-text-sm)">
+                <span style="color:#f59e0b;" aria-hidden="true">★</span>
+                <span class="fw-bold"><?= number_format((float)$reviewSummary['avg'], 1) ?></span>
+                <span class="text-muted">&nbsp;·&nbsp;<?= (int)$reviewSummary['count'] ?> review<?= (int)$reviewSummary['count'] === 1 ? '' : 's' ?></span>
+              </span>
+            </div>
+          <?php endif; ?>
           <p class="text-muted mb-2"><?= htmlspecialchars($listing['tagline']) ?></p>
           <?php
           $bizTags = $listing['tags'] ?? [];
           $bizTags = is_array($bizTags) ? $bizTags : [];
           ?>
+          <!-- Mobile quick-contact buttons (hidden on lg+ where sidebar is visible) -->
+          <div class="d-flex gap-2 flex-wrap mb-3 d-lg-none">
+            <?php if ($listing['phone'] !== ''): ?>
+              <a href="tel:<?= htmlspecialchars(preg_replace('/\s+/', '', $listing['phone'])) ?>" class="btn btn-sm btn-outline-dark flex-grow-1">
+                <i class="bi bi-telephone me-1" aria-hidden="true"></i>Call
+              </a>
+            <?php endif; ?>
+            <?php if ($whatsappUrl !== ''): ?>
+              <a href="<?= htmlspecialchars($whatsappUrl) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-success flex-grow-1">
+                <i class="bi bi-whatsapp me-1" aria-hidden="true"></i>WhatsApp
+              </a>
+            <?php endif; ?>
+            <?php if (!empty($listing['website'])): ?>
+              <a href="<?= htmlspecialchars($listing['website']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-secondary flex-grow-1">
+                <i class="bi bi-globe2 me-1" aria-hidden="true"></i>Website
+              </a>
+            <?php endif; ?>
+          </div>
+
           <?php if (count($bizTags) > 0): ?>
             <div class="mci-business-tags" aria-label="Business tags">
               <span class="mci-business-tags__label text-muted small fw-semibold me-2 align-middle">Tags</span>
@@ -397,17 +471,28 @@ ob_start();
               <i class="bi bi-images" aria-hidden="true"></i>
               Gallery <span class="text-muted fw-normal fs-6">(demo photos)</span>
             </div>
-            <div class="row g-3">
-              <?php foreach ($listing['gallery_seeds'] as $seed): ?>
+            <div class="row g-3" id="mciGalleryGrid">
+              <?php foreach ($listing['gallery_seeds'] as $i => $seed): ?>
                 <div class="col-6 col-md-4">
-                  <img
-                    class="mci-business-gallery-img"
-                    src="https://picsum.photos/seed/<?= htmlspecialchars($seed) ?>/640/480"
-                    alt=""
-                    loading="lazy"
-                  />
+                  <button type="button" class="btn p-0 border-0 w-100 mci-gallery-open" data-index="<?= $i ?>" aria-label="View photo <?= $i + 1 ?>">
+                    <img
+                      class="mci-business-gallery-img"
+                      src="https://picsum.photos/seed/<?= htmlspecialchars($seed) ?>/640/480"
+                      data-full="https://picsum.photos/seed/<?= htmlspecialchars($seed) ?>/1280/960"
+                      alt="Gallery photo <?= $i + 1 ?>"
+                      loading="lazy"
+                    />
+                  </button>
                 </div>
               <?php endforeach; ?>
+            </div>
+
+            <!-- Lightbox overlay -->
+            <div id="mciLightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;cursor:zoom-out;align-items:center;justify-content:center;" role="dialog" aria-modal="true" aria-label="Photo lightbox">
+              <button type="button" id="mciLightboxClose" aria-label="Close" style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.15);border:none;border-radius:50%;width:2.5rem;height:2.5rem;color:#fff;font-size:var(--mci-text-lg);cursor:pointer;z-index:10;">✕</button>
+              <button type="button" id="mciLightboxPrev" aria-label="Previous photo" style="position:absolute;left:1rem;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.15);border:none;border-radius:50%;width:2.5rem;height:2.5rem;color:#fff;font-size:var(--mci-text-lg);cursor:pointer;">‹</button>
+              <img id="mciLightboxImg" src="" alt="Full size photo" style="max-width:90vw;max-height:88vh;object-fit:contain;border-radius:0.5rem;box-shadow:0 24px 64px rgba(0,0,0,0.6);" />
+              <button type="button" id="mciLightboxNext" aria-label="Next photo" style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.15);border:none;border-radius:50%;width:2.5rem;height:2.5rem;color:#fff;font-size:var(--mci-text-lg);cursor:pointer;">›</button>
             </div>
 
             <?php if (count($listingFaqs) > 0): ?>
@@ -648,23 +733,96 @@ ob_start();
           </div>
           </div>
 
-          <div class="mci-business-side-actions d-flex flex-column gap-2">
-            <?php if ($isLoggedIn): ?>
-              <button class="btn btn-dark w-100" type="button" data-bs-toggle="modal" data-bs-target="#claimModal">
-                Claim this listing
-              </button>
-              <div class="text-muted small text-center">You are logged in (demo).</div>
+          <!-- Enquiry form -->
+          <div class="mci-business-side-actions">
+            <?php if ($listingIsClaimed): ?>
+              <div class="mb-3">
+                <div class="fw-semibold small mb-2">
+                  <i class="bi bi-envelope-fill me-1" aria-hidden="true"></i>Send an enquiry
+                </div>
+                <?php if ($isLoggedIn): ?>
+                  <form method="post" action="" id="mciEnquiryForm" novalidate>
+                    <input type="hidden" name="mci_enquiry_submit" value="1" />
+                    <input type="hidden" name="business_slug" value="<?= htmlspecialchars($slug, ENT_QUOTES, 'UTF-8') ?>" />
+                    <div id="mciEnquirySuccess" class="alert alert-success py-2 small mb-2" style="display:none;" role="status">
+                      Thank you! Your enquiry has been sent.
+                    </div>
+                    <div class="mb-2">
+                      <input type="text" class="form-control form-control-sm" name="enquiry_name"
+                        placeholder="Your name *" required aria-label="Your name" />
+                    </div>
+                    <div class="mb-2">
+                      <input type="tel" class="form-control form-control-sm" name="enquiry_phone"
+                        placeholder="Phone number *" required aria-label="Phone number"
+                        pattern="[\+\d\s\-\(\)]{7,}" />
+                    </div>
+                    <div class="mb-2">
+                      <input type="email" class="form-control form-control-sm" name="enquiry_email"
+                        placeholder="Email (optional)" aria-label="Email address" />
+                    </div>
+                    <div class="mb-2">
+                      <textarea class="form-control form-control-sm" name="enquiry_message"
+                        rows="3" placeholder="Your message *" required minlength="10"
+                        aria-label="Message"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-dark btn-sm w-100">
+                      <i class="bi bi-send me-1" aria-hidden="true"></i>Send enquiry
+                    </button>
+                  </form>
+                  <script>
+                  (function () {
+                    var form = document.getElementById('mciEnquiryForm');
+                    if (!form) return;
+                    form.addEventListener('submit', function (e) {
+                      if (!form.checkValidity()) { form.reportValidity(); e.preventDefault(); return; }
+                      e.preventDefault();
+                      form.style.display = 'none';
+                      document.getElementById('mciEnquirySuccess').style.display = '';
+                    });
+                  }());
+                  </script>
+                <?php else: ?>
+                  <div class="border rounded-3 p-3 text-center small">
+                    <a class="btn btn-dark btn-sm w-100 mb-2" href="/login/?return=<?= rawurlencode($businessPageUrl) ?>">Login to send an enquiry</a>
+                    <span class="text-muted">or <a href="/register/?return=<?= rawurlencode($businessPageUrl) ?>">register</a></span>
+                  </div>
+                <?php endif; ?>
+              </div>
             <?php else: ?>
-              <button class="btn btn-dark w-100" type="button" data-bs-toggle="modal" data-bs-target="#claimModal">
-                Claim this listing
-              </button>
-              <div class="text-muted small text-center">Login or register to claim.</div>
+              <div class="mb-3 border rounded-3 p-3 text-center small text-muted">
+                <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                This listing hasn't been claimed yet. Enquiries are not available.
+              </div>
             <?php endif; ?>
-            <a class="btn btn-outline-dark w-100" href="/contact/">Send enquiry</a>
-            <button class="btn btn-outline-secondary w-100" type="button" disabled title="Demo">Save to favourites</button>
-            <p class="text-muted small mb-0">
-              Claiming requires registration. Anonymous listings are reviewed by admin first.
-            </p>
+
+            <!-- Claim / dispute -->
+            <div class="d-flex flex-column gap-2">
+              <?php if ($listingClaimPending): ?>
+                <div class="text-muted small text-center py-1">
+                  <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>Claim under review
+                </div>
+              <?php elseif ($listingIsClaimed): ?>
+                <div class="text-muted small text-center py-1">
+                  <i class="bi bi-shield-check text-success me-1" aria-hidden="true"></i>
+                  <span class="text-success fw-semibold">Claimed</span>
+                  &middot;
+                  <a class="small" href="/business/dispute/?slug=<?= urlencode($slug) ?>">Dispute ownership</a>
+                </div>
+              <?php elseif ($isLoggedIn): ?>
+                <a class="btn btn-dark btn-sm w-100" href="/business/claim/?slug=<?= urlencode($slug) ?>">
+                  <i class="bi bi-person-check me-1" aria-hidden="true"></i>Claim this business
+                </a>
+              <?php else: ?>
+                <a class="btn btn-outline-dark btn-sm w-100"
+                  href="/login/?return=<?= rawurlencode('/business/claim/?slug=' . urlencode($slug)) ?>">
+                  <i class="bi bi-person-check me-1" aria-hidden="true"></i>Login to claim this business
+                </a>
+              <?php endif; ?>
+
+              <button class="btn btn-outline-secondary btn-sm w-100" type="button" disabled title="Demo">
+                <i class="bi bi-heart me-1" aria-hidden="true"></i>Save to favourites
+              </button>
+            </div>
           </div>
         </div>
 
@@ -715,37 +873,6 @@ ob_start();
           </div>
         </div>
         <?php endif; ?>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Claim modal -->
-<div class="modal fade" id="claimModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <div class="fw-semibold">Claim this listing</div>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <?php if ($isLoggedIn): ?>
-          <div class="alert alert-info mb-0">
-            You’re logged in. In the backend phase, you’ll be able to request a claim and manage the listing.
-          </div>
-        <?php else: ?>
-          <div class="alert alert-warning mb-0">
-            Registration/login is required to claim this listing.
-            <div class="mt-2">
-              <a href="/login/?return=<?= rawurlencode($businessPageUrl) ?>" class="btn btn-sm btn-dark me-2">Login</a>
-              <a href="/register/?return=<?= rawurlencode($businessPageUrl) ?>" class="btn btn-sm btn-outline-dark">Register</a>
-            </div>
-          </div>
-        <?php endif; ?>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-dark" disabled>Submit claim (backend later)</button>
       </div>
     </div>
   </div>

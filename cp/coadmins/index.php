@@ -69,23 +69,28 @@ $extraJS = <<<'HTML'
     list.forEach(function (u) {
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td class="fw-semibold">' + escapeHtml(u.display_name || '—') + '</td>' +
-        '<td class="small">' + escapeHtml(u.email || '') + '</td>' +
-        '<td class="small text-muted">' + fmtDate(u.created_at) + '</td>' +
+        '<td class="small text-muted">' + escapeHtml(u.display_name || '—') + '</td>' +
+        '<td class="small text-muted">' + escapeHtml(u.email || '') + '</td>' +
+        '<td class="small text-muted text-nowrap">' + fmtDate(u.created_at) + '</td>' +
         '<td class="text-end"></td>';
       var td = tr.querySelector('td:last-child');
       var bEdit = document.createElement('button');
       bEdit.type = 'button';
-      bEdit.className = 'btn btn-sm btn-outline-dark me-1';
-      bEdit.textContent = 'Edit';
+      bEdit.className = 'btn btn-sm btn-outline-secondary mci-icon-btn';
+      bEdit.title = 'Edit';
+      bEdit.innerHTML = '<i class="bi bi-pencil" aria-hidden="true"></i>';
       bEdit.addEventListener('click', function () { openPanel(u); });
       var bRev = document.createElement('button');
       bRev.type = 'button';
-      bRev.className = 'btn btn-sm btn-outline-danger';
-      bRev.textContent = 'Revoke';
+      bRev.className = 'btn btn-sm btn-outline-danger mci-icon-btn';
+      bRev.title = 'Revoke access';
+      bRev.innerHTML = '<i class="bi bi-shield-x" aria-hidden="true"></i>';
       bRev.addEventListener('click', function () { revoke(u); });
-      td.appendChild(bEdit);
-      td.appendChild(bRev);
+      var wrap = document.createElement('div');
+      wrap.className = 'd-flex gap-1 justify-content-end';
+      wrap.appendChild(bEdit);
+      wrap.appendChild(bRev);
+      td.appendChild(wrap);
       tbody.appendChild(tr);
     });
   }
@@ -99,7 +104,9 @@ $extraJS = <<<'HTML'
   function fmtDate(x) {
     if (!x) return '—';
     var d = new Date(x);
-    return isNaN(d.getTime()) ? String(x) : d.toLocaleString();
+    if (isNaN(d.getTime())) return String(x);
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) +
+      ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
   }
 
   function openPanel(u) {
@@ -227,10 +234,10 @@ ob_start();
           <table class="table table-sm table-bordered align-middle bg-white mb-0">
             <thead class="table-light">
               <tr>
-                <th>Name</th>
+                <th style="min-width:140px;">Name</th>
                 <th>Email</th>
-                <th>Added</th>
-                <th class="text-end" style="width:180px">Actions</th>
+                <th style="min-width:200px;">Added</th>
+                <th class="text-end" style="width:80px;">Actions</th>
               </tr>
             </thead>
             <tbody id="mciCpCoadminsBody">

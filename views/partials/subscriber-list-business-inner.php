@@ -26,7 +26,7 @@ $mciPublicSiteOrigin = $mciPublicSiteOrigin ?? 'https://mycityinfo.com';
 // Caller can override these labels/behavior via variables.
 $submitKicker = $submitKicker ?? 'Subscriber';
 $submitTitle = $submitTitle ?? 'List your business';
-$submitLead = $submitLead ?? 'Seven guided steps — save anytime; preview before you publish.';
+$submitLead = $submitLead ?? 'Eight guided steps — save anytime; preview before you publish.';
 
 $formOrigin = $formOrigin ?? 'ui_subscriber_listing';
 $postingType = $postingType ?? 'registered';
@@ -48,10 +48,11 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
         <p class="mci-submit-hero__lead"><?= htmlspecialchars((string) $submitLead, ENT_QUOTES, 'UTF-8') ?></p>
       </div>
 
-      <div class="mci-steps-nav mci-steps-nav--7 mb-4" aria-label="Form progress">
+      <div class="mci-steps-nav mci-steps-nav--9 mb-4" aria-label="Form progress">
         <?php
         $stepDefs = [
             ['icon' => 'bi-building', 'label' => 'Business'],
+            ['icon' => 'bi-box-seam', 'label' => 'Products'],
             ['icon' => 'bi-stars', 'label' => 'Services'],
             ['icon' => 'bi-geo-alt', 'label' => 'Location'],
             ['icon' => 'bi-clock', 'label' => 'Hours'],
@@ -78,7 +79,7 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
         <?php endforeach; ?>
       </div>
 
-      <div class="mci-progress-bar mb-4" role="progressbar" aria-valuenow="14" aria-valuemin="0" aria-valuemax="100">
+      <div class="mci-progress-bar mb-4" role="progressbar" aria-valuenow="11" aria-valuemin="0" aria-valuemax="100">
         <div class="mci-progress-bar__fill" id="stepProgressFill" style="width:14%"></div>
       </div>
 
@@ -136,20 +137,22 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
               <label class="form-label mci-field-label" for="tagline">Tagline</label>
               <input class="form-control" id="tagline" type="text" name="tagline" placeholder="One punchy line customers will remember" />
             </div>
+            <div class="col-12">
+              <label class="form-label mci-field-label" for="description">Description <span class="text-danger">*</span></label>
+              <textarea class="form-control" id="description" name="description" rows="4" maxlength="1200" placeholder="Tell customers what makes your business worth visiting…" required></textarea>
+              <div class="d-flex justify-content-end mt-1"><span class="form-text" id="descCount">0 / 1200</span></div>
+            </div>
             <div class="col-12 col-sm-7">
               <label class="form-label mci-field-label" for="category">Category <span class="text-danger">*</span></label>
               <select class="form-select" id="category" name="category" required>
-                <option value="">Choose a category…</option>
-                <?php foreach ($categories as $c): ?>
-                  <option value="<?= htmlspecialchars($c) ?>"><?= htmlspecialchars($c) ?></option>
-                <?php endforeach; ?>
-                <option value="__request_new__">Request a new category…</option>
+                <option value="">Loading categories…</option>
               </select>
+              <input type="hidden" id="categoryIdHidden" name="category_id" />
 
               <input type="hidden" id="is_category_request" value="0" />
 
               <div id="categoryRequestFields" class="d-none mt-3">
-                <div class="mci-submit-label mb-1" style="font-size: 0.9rem;">Category request</div>
+                <div class="mci-submit-label mb-1" style="font-size:var(--mci-text-sm);">Category request</div>
 
                 <label class="form-label small mb-1" for="requested_category_name">Requested category name</label>
                 <input
@@ -169,60 +172,102 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
                   rows="3"
                   placeholder="Tell us what you want customers to find..."
                 ></textarea>
-                <div class="form-text">Saved to CP queue (demo/localStorage).</div>
               </div>
             </div>
             <div class="col-12">
-              <label class="form-label mci-field-label" for="description">Description <span class="text-danger">*</span></label>
-              <textarea class="form-control" id="description" name="description" rows="4" maxlength="1200" placeholder="Tell customers what makes your business worth visiting…" required></textarea>
-              <div class="d-flex justify-content-end mt-1"><span class="form-text" id="descCount">0 / 1200</span></div>
+              <div id="subcategoryContainer" class="d-none"></div>
             </div>
             <div class="col-12">
-              <label class="form-label mci-field-label" for="tags">Tags</label>
-              <input class="form-control" id="tags" type="text" name="tags" placeholder="vegan, delivery, 24/7, parking, family-friendly…" />
-              <div class="form-text">Comma-separated — helps search and filters on your listing.</div>
+              <label class="form-label mci-field-label">Tags</label>
+              <div class="mci-tag-input-wrap position-relative">
+                <div class="mci-tag-selected d-flex flex-wrap gap-1 align-items-center p-2 border rounded-2 bg-white" id="tagSelectedArea" style="min-height:38px;cursor:text;">
+                  <input
+                    type="text"
+                    class="mci-tag-typeahead border-0 outline-0 flex-grow-1 p-0"
+                    id="tagTypeahead"
+                    autocomplete="off"
+                    placeholder="Type a tag and press comma or Enter…"
+                    style="min-width:150px;outline:none;box-shadow:none;"
+                  />
+                </div>
+                <ul class="mci-tag-suggestions list-unstyled position-absolute bg-white border rounded-2 shadow-sm mb-0 py-1 d-none" id="tagSuggestions" style="z-index:200;width:100%;max-height:180px;overflow-y:auto;top:100%;left:0;"></ul>
+              </div>
+              <input type="hidden" id="tagIdsHidden" name="tag_ids" value="[]" />
+              <div class="form-text mt-1">Type to search existing tags. Press <kbd>,</kbd> or <kbd>Enter</kbd> to add a chip. New tags will be created if not found.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label mci-field-label" for="established_year">Year established</label>
+              <input class="form-control" id="established_year" type="number" name="established_year" placeholder="e.g. 2010" min="1800" max="2099" style="max-width:160px;" />
             </div>
           </div>
         </div>
 
-        <!-- STEP 2 — Products & services + pricing -->
+        <!-- STEP 2 — Products -->
         <div class="mci-step" data-step="2">
           <div class="mci-step-header">
-            <div class="mci-step-header__icon mci-step-header__icon--2" aria-hidden="true"><i class="bi bi-stars"></i></div>
+            <div class="mci-step-header__icon mci-step-header__icon--2" aria-hidden="true"><i class="bi bi-box-seam"></i></div>
             <div>
-              <div class="mci-step-header__title">Products &amp; services</div>
-              <div class="mci-step-header__desc">Highlight what you sell or do, and optional price expectations.</div>
+              <div class="mci-step-header__title">Products</div>
+              <div class="mci-step-header__desc">Add the products you sell, with optional pricing and photos.</div>
             </div>
           </div>
-          <div class="mci-submit-label mb-1">Services &amp; products <span class="fw-normal text-muted text-lowercase">(optional)</span></div>
-          <p class="text-muted small mb-3">Add each offer with a short description.</p>
-          <div id="serviceItems" class="mb-2">
-            <div class="mci-faq-item" data-svc-index="0">
+
+          <!-- Products -->
+          <div class="mci-submit-label mb-1">Products <span class="fw-normal text-muted text-lowercase">(optional)</span></div>
+          <p class="text-muted small mb-3">Add each product with a description, price range, and optional photo.</p>
+          <div id="productItems" class="mb-2">
+            <div class="mci-faq-item mci-item-row" data-item-index="0">
               <div class="mci-faq-item__handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></div>
               <div class="flex-grow-1">
-                <input class="form-control form-control-sm mb-2" type="text" name="service_name[]" placeholder="Name, e.g. Interior Painting" aria-label="Service name" />
-                <textarea class="form-control form-control-sm" name="service_desc[]" rows="2" placeholder="Short description — what's included, turnaround…" aria-label="Service description"></textarea>
+                <input class="form-control form-control-sm mb-2" type="text" name="product_name[]" placeholder="Product name, e.g. Oil Change" aria-label="Product name" />
+                <textarea class="form-control form-control-sm mb-2" name="product_desc[]" rows="2" placeholder="Short description…" aria-label="Product description"></textarea>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                  <input class="form-control form-control-sm" style="width:110px" type="number" name="product_price_min[]" placeholder="Min price" min="0" step="0.01" aria-label="Min price" />
+                  <span class="text-muted small">–</span>
+                  <input class="form-control form-control-sm" style="width:110px" type="number" name="product_price_max[]" placeholder="Max price" min="0" step="0.01" aria-label="Max price" />
+                  <input type="hidden" name="product_price_unit[]" value="INR" />
+                  <button type="button" class="btn btn-sm btn-outline-secondary mci-item-img-btn" aria-label="Upload product image">
+                    <i class="bi bi-image me-1"></i>Photo
+                  </button>
+                  <input type="file" class="d-none mci-item-file-input" accept="image/*" />
+                  <input type="hidden" name="product_image_path[]" />
+                  <span class="mci-item-img-name text-muted small"></span>
+                </div>
               </div>
-              <button type="button" class="btn btn-sm removeSvcBtn mci-faq-item__remove" aria-label="Remove"><i class="bi bi-x-lg"></i></button>
+              <button type="button" class="btn btn-sm removeProductBtn mci-faq-item__remove" aria-label="Remove product"><i class="bi bi-x-lg"></i></button>
             </div>
           </div>
-          <button type="button" id="addServiceBtn" class="btn btn-sm btn-outline-dark mb-4">
-            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add service
+          <button type="button" id="addProductBtn" class="btn btn-sm btn-outline-dark mb-4">
+            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add product
           </button>
-          <template id="serviceItemTemplate">
-            <div class="mci-faq-item" data-svc-index="__INDEX__">
+          <template id="productItemTemplate">
+            <div class="mci-faq-item mci-item-row" data-item-index="__INDEX__">
               <div class="mci-faq-item__handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></div>
               <div class="flex-grow-1">
-                <input class="form-control form-control-sm mb-2" type="text" name="service_name[]" placeholder="Name, e.g. Interior Painting" aria-label="Service name" />
-                <textarea class="form-control form-control-sm" name="service_desc[]" rows="2" placeholder="Short description…" aria-label="Service description"></textarea>
+                <input class="form-control form-control-sm mb-2" type="text" name="product_name[]" placeholder="Product name" aria-label="Product name" />
+                <textarea class="form-control form-control-sm mb-2" name="product_desc[]" rows="2" placeholder="Short description…" aria-label="Product description"></textarea>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                  <input class="form-control form-control-sm" style="width:110px" type="number" name="product_price_min[]" placeholder="Min price" min="0" step="0.01" aria-label="Min price" />
+                  <span class="text-muted small">–</span>
+                  <input class="form-control form-control-sm" style="width:110px" type="number" name="product_price_max[]" placeholder="Max price" min="0" step="0.01" aria-label="Max price" />
+                  <input type="hidden" name="product_price_unit[]" value="INR" />
+                  <button type="button" class="btn btn-sm btn-outline-secondary mci-item-img-btn" aria-label="Upload product image">
+                    <i class="bi bi-image me-1"></i>Photo
+                  </button>
+                  <input type="file" class="d-none mci-item-file-input" accept="image/*" />
+                  <input type="hidden" name="product_image_path[]" />
+                  <span class="mci-item-img-name text-muted small"></span>
+                </div>
               </div>
-              <button type="button" class="btn btn-sm removeSvcBtn mci-faq-item__remove" aria-label="Remove"><i class="bi bi-x-lg"></i></button>
+              <button type="button" class="btn btn-sm removeProductBtn mci-faq-item__remove" aria-label="Remove product"><i class="bi bi-x-lg"></i></button>
             </div>
           </template>
 
-          <div class="mci-submit-label">Pricing <span class="fw-normal text-muted text-lowercase">(optional)</span></div>
-          <div class="row g-3">
-            <div class="col-12 col-md-4">
+          <hr class="mci-inner-divider" />
+
+          <div class="mci-submit-label">Overall price range <span class="fw-normal text-muted text-lowercase">(optional)</span></div>
+          <div class="row g-3 mt-1">
+            <div class="col-12 col-md-5">
               <label class="form-label mci-field-label" for="price_range">Price range</label>
               <select class="form-select" id="price_range" name="price_range">
                 <option value="">Not specified</option>
@@ -232,81 +277,256 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
                 <option value="ultra">$$$$ Ultra high</option>
               </select>
             </div>
-            <div class="col-6 col-md-4">
-              <label class="form-label mci-field-label" for="price_from">Min price</label>
-              <input class="form-control" id="price_from" type="text" name="price_from" placeholder="e.g. 10" />
-            </div>
-            <div class="col-6 col-md-4">
-              <label class="form-label mci-field-label" for="price_to">Max price</label>
-              <input class="form-control" id="price_to" type="text" name="price_to" placeholder="e.g. 200" />
-            </div>
           </div>
         </div>
 
-        <!-- STEP 3 — Location & contact -->
+        <!-- STEP 3 — Services -->
         <div class="mci-step" data-step="3">
           <div class="mci-step-header">
-            <div class="mci-step-header__icon mci-step-header__icon--3" aria-hidden="true"><i class="bi bi-geo-alt"></i></div>
+            <div class="mci-step-header__icon mci-step-header__icon--3" aria-hidden="true"><i class="bi bi-stars"></i></div>
             <div>
-              <div class="mci-step-header__title">Location &amp; contact</div>
-              <div class="mci-step-header__desc">Address, channels to reach you, and social profiles.</div>
+              <div class="mci-step-header__title">Services</div>
+              <div class="mci-step-header__desc">Highlight the services you offer, with optional pricing and photos.</div>
             </div>
           </div>
+
+          <!-- Services -->
+          <div class="mci-submit-label mb-1">Services <span class="fw-normal text-muted text-lowercase">(optional)</span></div>
+          <p class="text-muted small mb-3">Add each service with a description, price range, and optional photo.</p>
+          <div id="serviceItems" class="mb-2">
+            <div class="mci-faq-item mci-item-row" data-item-index="0">
+              <div class="mci-faq-item__handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></div>
+              <div class="flex-grow-1">
+                <input class="form-control form-control-sm mb-2" type="text" name="service_name[]" placeholder="Service name, e.g. Interior Painting" aria-label="Service name" />
+                <textarea class="form-control form-control-sm mb-2" name="service_desc[]" rows="2" placeholder="Short description — what's included, turnaround…" aria-label="Service description"></textarea>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                  <input class="form-control form-control-sm" style="width:110px" type="number" name="service_price_min[]" placeholder="Min price" min="0" step="0.01" aria-label="Min price" />
+                  <span class="text-muted small">–</span>
+                  <input class="form-control form-control-sm" style="width:110px" type="number" name="service_price_max[]" placeholder="Max price" min="0" step="0.01" aria-label="Max price" />
+                  <input type="hidden" name="service_price_unit[]" value="INR" />
+                  <button type="button" class="btn btn-sm btn-outline-secondary mci-item-img-btn" aria-label="Upload service image">
+                    <i class="bi bi-image me-1"></i>Photo
+                  </button>
+                  <input type="file" class="d-none mci-item-file-input" accept="image/*" />
+                  <input type="hidden" name="service_image_path[]" />
+                  <span class="mci-item-img-name text-muted small"></span>
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm removeServiceBtn mci-faq-item__remove" aria-label="Remove service"><i class="bi bi-x-lg"></i></button>
+            </div>
+          </div>
+          <button type="button" id="addServiceBtn" class="btn btn-sm btn-outline-dark mb-4">
+            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add service
+          </button>
+          <template id="serviceItemTemplate">
+            <div class="mci-faq-item mci-item-row" data-item-index="__INDEX__">
+              <div class="mci-faq-item__handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></div>
+              <div class="flex-grow-1">
+                <input class="form-control form-control-sm mb-2" type="text" name="service_name[]" placeholder="Service name" aria-label="Service name" />
+                <textarea class="form-control form-control-sm mb-2" name="service_desc[]" rows="2" placeholder="Short description…" aria-label="Service description"></textarea>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                  <input class="form-control form-control-sm" style="width:110px" type="number" name="service_price_min[]" placeholder="Min price" min="0" step="0.01" aria-label="Min price" />
+                  <span class="text-muted small">–</span>
+                  <input class="form-control form-control-sm" style="width:110px" type="number" name="service_price_max[]" placeholder="Max price" min="0" step="0.01" aria-label="Max price" />
+                  <input type="hidden" name="service_price_unit[]" value="INR" />
+                  <button type="button" class="btn btn-sm btn-outline-secondary mci-item-img-btn" aria-label="Upload service image">
+                    <i class="bi bi-image me-1"></i>Photo
+                  </button>
+                  <input type="file" class="d-none mci-item-file-input" accept="image/*" />
+                  <input type="hidden" name="service_image_path[]" />
+                  <span class="mci-item-img-name text-muted small"></span>
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm removeServiceBtn mci-faq-item__remove" aria-label="Remove service"><i class="bi bi-x-lg"></i></button>
+            </div>
+          </template>
+        </div>
+
+        <!-- STEP 4 — Location & contact -->
+        <div class="mci-step" data-step="4">
+          <div class="mci-step-header">
+            <div class="mci-step-header__icon mci-step-header__icon--4" aria-hidden="true"><i class="bi bi-geo-alt"></i></div>
+            <div>
+              <div class="mci-step-header__title">Location &amp; contact</div>
+              <div class="mci-step-header__desc">Address, contact channels, social profiles, and additional branches.</div>
+            </div>
+          </div>
+
+          <!-- Primary branch -->
+          <div id="branchList">
+            <div class="mci-branch-block border rounded-3 p-3 mb-3 position-relative" data-branch-index="0">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="fw-semibold small">Primary location</div>
+              </div>
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <label class="form-label mci-field-label" for="branch_label_0">Branch name / label</label>
+                  <input class="form-control" id="branch_label_0" type="text" name="branch_label[]" placeholder="e.g. Main branch, Koramangala" />
+                </div>
+                <div class="col-12">
+                  <label class="form-label mci-field-label" for="full_address">Address line 1</label>
+                  <input class="form-control" id="full_address" type="text" name="full_address[]" placeholder="Street, building, area" />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label mci-field-label" for="address_line2_0">Address line 2</label>
+                  <input class="form-control" id="address_line2_0" type="text" name="address_line2[]" placeholder="Landmark, floor, etc." />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label mci-field-label" for="city">City <span class="text-danger">*</span></label>
+                  <input class="form-control" id="city" type="text" name="city[]" placeholder="City name" required />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label mci-field-label" for="state_0">State / Province</label>
+                  <input class="form-control" id="state_0" type="text" name="state[]" placeholder="e.g. Maharashtra" />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label mci-field-label" for="pincode_0">Pincode / ZIP</label>
+                  <input class="form-control" id="pincode_0" type="text" name="pincode[]" placeholder="e.g. 400001" />
+                </div>
+                <div class="col-6 col-md-4">
+                  <label class="form-label mci-field-label" for="latitude">Latitude</label>
+                  <input class="form-control" id="latitude" type="text" name="latitude[]" placeholder="e.g. 28.6139" />
+                </div>
+                <div class="col-6 col-md-4">
+                  <label class="form-label mci-field-label" for="longitude">Longitude</label>
+                  <input class="form-control" id="longitude" type="text" name="longitude[]" placeholder="e.g. 77.2090" />
+                </div>
+                <div class="col-12">
+                  <button type="button" class="btn btn-sm btn-outline-dark mci-map-pin-btn" data-branch-index="0" data-bs-toggle="modal" data-bs-target="#mapModal">
+                    <i class="bi bi-pin-map me-1" aria-hidden="true"></i>Set map pin manually
+                  </button>
+                </div>
+                <div class="col-12"><hr class="mci-inner-divider" /></div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label mci-field-label" for="phone">Phone</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-telephone" aria-hidden="true"></i></span>
+                    <input class="form-control" id="phone" type="tel" name="phone[]" placeholder="+1 555 000 0000" />
+                  </div>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label mci-field-label" for="phone_secondary_0">Phone 2</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-telephone" aria-hidden="true"></i></span>
+                    <input class="form-control" id="phone_secondary_0" type="tel" name="phone_secondary[]" placeholder="+1 555 000 0001" />
+                  </div>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label mci-field-label" for="whatsapp">WhatsApp</label>
+                  <div class="input-group">
+                    <span class="input-group-text text-success"><i class="bi bi-whatsapp" aria-hidden="true"></i></span>
+                    <input class="form-control" id="whatsapp" type="tel" name="whatsapp[]" placeholder="+1 555 000 0000" />
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label mci-field-label" for="email_contact">Email</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-envelope" aria-hidden="true"></i></span>
+                    <input class="form-control" id="email_contact" type="email" name="email_contact[]" placeholder="hello@yourbusiness.com" />
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label mci-field-label" for="website">Website</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-globe2" aria-hidden="true"></i></span>
+                    <input class="form-control" id="website" type="url" name="website[]" placeholder="https://…" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" id="addBranchBtn" class="btn btn-sm btn-outline-dark mb-4">
+            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add another branch
+          </button>
+
+          <template id="branchTemplate">
+            <div class="mci-branch-block border rounded-3 p-3 mb-3 position-relative" data-branch-index="__INDEX__">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="fw-semibold small">Branch __NUM__</div>
+                <button type="button" class="btn btn-sm btn-outline-danger mci-remove-branch-btn" aria-label="Remove branch">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <label class="form-label mci-field-label">Branch name / label</label>
+                  <input class="form-control" type="text" name="branch_label[]" placeholder="e.g. North branch" />
+                </div>
+                <div class="col-12">
+                  <label class="form-label mci-field-label">Address line 1</label>
+                  <input class="form-control" type="text" name="full_address[]" placeholder="Street, building, area" />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label mci-field-label">Address line 2</label>
+                  <input class="form-control" type="text" name="address_line2[]" placeholder="Landmark, floor, etc." />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label mci-field-label">City</label>
+                  <input class="form-control" type="text" name="city[]" placeholder="City name" />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label mci-field-label">State / Province</label>
+                  <input class="form-control" type="text" name="state[]" placeholder="e.g. Maharashtra" />
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label mci-field-label">Pincode / ZIP</label>
+                  <input class="form-control" type="text" name="pincode[]" placeholder="e.g. 400001" />
+                </div>
+                <div class="col-6 col-md-4">
+                  <label class="form-label mci-field-label">Latitude</label>
+                  <input class="form-control" type="text" name="latitude[]" placeholder="e.g. 28.6139" />
+                </div>
+                <div class="col-6 col-md-4">
+                  <label class="form-label mci-field-label">Longitude</label>
+                  <input class="form-control" type="text" name="longitude[]" placeholder="e.g. 77.2090" />
+                </div>
+                <div class="col-12"><hr class="mci-inner-divider" /></div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label mci-field-label">Phone</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-telephone" aria-hidden="true"></i></span>
+                    <input class="form-control" type="tel" name="phone[]" placeholder="+1 555 000 0000" />
+                  </div>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label mci-field-label">Phone 2</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-telephone" aria-hidden="true"></i></span>
+                    <input class="form-control" type="tel" name="phone_secondary[]" placeholder="+1 555 000 0001" />
+                  </div>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label mci-field-label">WhatsApp</label>
+                  <div class="input-group">
+                    <span class="input-group-text text-success"><i class="bi bi-whatsapp" aria-hidden="true"></i></span>
+                    <input class="form-control" type="tel" name="whatsapp[]" placeholder="+1 555 000 0000" />
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label mci-field-label">Email</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-envelope" aria-hidden="true"></i></span>
+                    <input class="form-control" type="email" name="email_contact[]" placeholder="hello@yourbusiness.com" />
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label mci-field-label">Website</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-globe2" aria-hidden="true"></i></span>
+                    <input class="form-control" type="url" name="website[]" placeholder="https://…" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <hr class="mci-inner-divider" />
+
           <div class="row g-3">
             <div class="col-12">
-              <label class="form-label mci-field-label" for="full_address">Full address</label>
-              <input class="form-control" id="full_address" type="text" name="full_address" placeholder="Street, area, postal code" />
-            </div>
-            <div class="col-12 col-md-5">
-              <label class="form-label mci-field-label" for="city">City <span class="text-danger">*</span></label>
-              <input class="form-control" id="city" type="text" name="city" placeholder="City name" required />
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label mci-field-label" for="latitude">Latitude</label>
-              <input class="form-control" id="latitude" type="text" name="latitude" placeholder="e.g. 28.6139" />
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label mci-field-label" for="longitude">Longitude</label>
-              <input class="form-control" id="longitude" type="text" name="longitude" placeholder="e.g. 77.2090" />
-            </div>
-            <div class="col-12">
-              <button type="button" class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#mapModal">
-                <i class="bi bi-pin-map me-1" aria-hidden="true"></i>Set map pin manually
-              </button>
-            </div>
-            <div class="col-12"><hr class="mci-inner-divider" /></div>
-            <div class="col-12 col-md-4">
-              <label class="form-label mci-field-label" for="phone">Phone</label>
-              <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-telephone" aria-hidden="true"></i></span>
-                <input class="form-control" id="phone" type="tel" name="phone" placeholder="+1 555 000 0000" />
-              </div>
-            </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label mci-field-label" for="whatsapp">WhatsApp</label>
-              <div class="input-group">
-                <span class="input-group-text text-success"><i class="bi bi-whatsapp" aria-hidden="true"></i></span>
-                <input class="form-control" id="whatsapp" type="tel" name="whatsapp" placeholder="+1 555 000 0000" />
-              </div>
-            </div>
-            <div class="col-12 col-md-4">
-              <label class="form-label mci-field-label" for="email_contact">Email</label>
-              <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-envelope" aria-hidden="true"></i></span>
-                <input class="form-control" id="email_contact" type="email" name="email_contact" placeholder="hello@yourbusiness.com" />
-              </div>
-            </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label mci-field-label" for="website">Website</label>
-              <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-globe2" aria-hidden="true"></i></span>
-                <input class="form-control" id="website" type="url" name="website" placeholder="https://…" />
-              </div>
-            </div>
-            <div class="col-12"><hr class="mci-inner-divider" /></div>
-            <div class="col-12">
-              <div class="mci-submit-label mb-1">Social media <span class="fw-normal text-muted text-lowercase">(optional)</span></div>
-              <p class="text-muted small mb-0">Pages or @handles — all optional.</p>
+              <div class="mci-submit-label mb-1">Social media &amp; links <span class="fw-normal text-muted text-lowercase">(optional)</span></div>
+              <p class="text-muted small mb-0">Pages, @handles, and your video channel — all optional.</p>
             </div>
             <div class="col-12 col-sm-6">
               <label class="form-label mci-field-label" for="social_facebook">Facebook</label>
@@ -350,13 +570,55 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
                 <input class="form-control" id="social_tiktok" type="text" name="social_tiktok" placeholder="@yourhandle" />
               </div>
             </div>
+            <div class="col-12 col-sm-6">
+              <label class="form-label mci-field-label" for="social_pinterest">Pinterest</label>
+              <div class="input-group">
+                <span class="input-group-text" style="color:#e60023"><i class="bi bi-pinterest" aria-hidden="true"></i></span>
+                <input class="form-control" id="social_pinterest" type="text" name="social_pinterest" placeholder="pinterest.com/yourpage" />
+              </div>
+            </div>
+            <div class="col-12 col-sm-6">
+              <label class="form-label mci-field-label" for="social_telegram">Telegram</label>
+              <div class="input-group">
+                <span class="input-group-text" style="color:#2aabee"><i class="bi bi-telegram" aria-hidden="true"></i></span>
+                <input class="form-control" id="social_telegram" type="text" name="social_telegram" placeholder="t.me/yourchannel" />
+              </div>
+            </div>
+            <div class="col-12 col-sm-6">
+              <label class="form-label mci-field-label" for="social_threads">Threads</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-at" aria-hidden="true"></i></span>
+                <input class="form-control" id="social_threads" type="text" name="social_threads" placeholder="threads.net/@yourhandle" />
+              </div>
+            </div>
+            <div class="col-12 col-sm-6">
+              <label class="form-label mci-field-label" for="social_snapchat">Snapchat</label>
+              <div class="input-group">
+                <span class="input-group-text" style="color:#fffc00;background:#222;"><i class="bi bi-snapchat" aria-hidden="true"></i></span>
+                <input class="form-control" id="social_snapchat" type="text" name="social_snapchat" placeholder="@yourhandle" />
+              </div>
+            </div>
+            <div class="col-12 col-sm-6">
+              <label class="form-label mci-field-label" for="social_whatsapp_channel">WhatsApp Channel</label>
+              <div class="input-group">
+                <span class="input-group-text text-success"><i class="bi bi-whatsapp" aria-hidden="true"></i></span>
+                <input class="form-control" id="social_whatsapp_channel" type="text" name="social_whatsapp_channel" placeholder="whatsapp.com/channel/…" />
+              </div>
+            </div>
+            <div class="col-12 col-sm-6">
+              <label class="form-label mci-field-label" for="video_url">Video URL</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-play-circle" aria-hidden="true"></i></span>
+                <input class="form-control" id="video_url" type="url" name="video_url" placeholder="YouTube or Vimeo link" />
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- STEP 4 — Hours only -->
-        <div class="mci-step" data-step="4">
+        <!-- STEP 5 — Hours only -->
+        <div class="mci-step" data-step="5">
           <div class="mci-step-header">
-            <div class="mci-step-header__icon mci-step-header__icon--4" aria-hidden="true"><i class="bi bi-clock"></i></div>
+            <div class="mci-step-header__icon mci-step-header__icon--5" aria-hidden="true"><i class="bi bi-clock"></i></div>
             <div>
               <div class="mci-step-header__title">Business hours</div>
               <div class="mci-step-header__desc">When can customers visit or call?</div>
@@ -426,13 +688,13 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
           </div>
         </div>
 
-        <!-- STEP 5 — Photos -->
-        <div class="mci-step" data-step="5">
+        <!-- STEP 6 — Photos -->
+        <div class="mci-step" data-step="6">
           <div class="mci-step-header">
-            <div class="mci-step-header__icon mci-step-header__icon--5" aria-hidden="true"><i class="bi bi-images"></i></div>
+            <div class="mci-step-header__icon mci-step-header__icon--6" aria-hidden="true"><i class="bi bi-images"></i></div>
             <div>
               <div class="mci-step-header__title">Photos &amp; media</div>
-              <div class="mci-step-header__desc">Logo, profile, banner, gallery, and an optional video link.</div>
+              <div class="mci-step-header__desc">Logo, profile, banner, and gallery images.</div>
             </div>
           </div>
           <div class="mci-submit-label">Logo, profile &amp; banner</div>
@@ -484,21 +746,13 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
             </div>
           </div>
           <div class="mci-photo-preview d-flex flex-wrap gap-2 mt-3" id="imagePreview"></div>
-          <div class="row g-3 mt-1 mb-2">
-            <div class="col-12 col-md-6">
-              <label class="form-label mci-field-label" for="video_url">Video URL</label>
-              <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-play-circle" aria-hidden="true"></i></span>
-                <input class="form-control" id="video_url" type="url" name="video_url" placeholder="YouTube or Vimeo link" />
-              </div>
-            </div>
-          </div>
+          <input type="hidden" id="galleryPathsHidden" name="gallery_paths" value="[]" />
         </div>
 
-        <!-- STEP 6 — FAQs -->
-        <div class="mci-step" data-step="6">
+        <!-- STEP 7 — FAQs -->
+        <div class="mci-step" data-step="7">
           <div class="mci-step-header">
-            <div class="mci-step-header__icon mci-step-header__icon--6" aria-hidden="true"><i class="bi bi-question-circle"></i></div>
+            <div class="mci-step-header__icon mci-step-header__icon--7" aria-hidden="true"><i class="bi bi-question-circle"></i></div>
             <div>
               <div class="mci-step-header__title">FAQs</div>
               <div class="mci-step-header__desc">Answer common questions before customers ask.</div>
@@ -530,25 +784,19 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
           </template>
         </div>
 
-        <!-- STEP 7 — Review & publish -->
-        <div class="mci-step" data-step="7">
+        <!-- STEP 8 — Review & publish -->
+        <div class="mci-step" data-step="8">
           <div class="mci-step-header">
-            <div class="mci-step-header__icon mci-step-header__icon--7" aria-hidden="true"><i class="bi bi-send"></i></div>
+            <div class="mci-step-header__icon mci-step-header__icon--8" aria-hidden="true"><i class="bi bi-send"></i></div>
             <div>
               <div class="mci-step-header__title">Review &amp; publish</div>
               <div class="mci-step-header__desc"><?= htmlspecialchars((string) $step7HeaderDesc, ENT_QUOTES, 'UTF-8') ?></div>
             </div>
           </div>
+          <!-- Context banner — filled by JS from window._mciSubmitContext -->
+          <div id="mciContextBanner" class="alert mb-4 d-none"></div>
+
           <?php if (!$submitPublicGuest): ?>
-          <div class="alert alert-light border mb-4 py-3">
-            <div class="fw-semibold small mb-1">
-              <i class="bi bi-person-check-fill me-1 text-primary" aria-hidden="true"></i>
-                <?= htmlspecialchars((string) $step7AlertTitle, ENT_QUOTES, 'UTF-8') ?>
-            </div>
-            <p class="text-muted small mb-0">
-              <?= htmlspecialchars((string) $step7AlertBody, ENT_QUOTES, 'UTF-8') ?>
-            </p>
-          </div>
           <?php else: ?>
           <p class="text-muted small mb-3"><?= htmlspecialchars((string) $step7AlertBody, ENT_QUOTES, 'UTF-8') ?></p>
           <div class="mci-posting-cards mb-4">
@@ -663,7 +911,6 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
           <button class="btn btn-dark btn-lg px-5 w-100" type="submit" id="submitBtn">
             <i class="bi bi-check2-circle me-2" aria-hidden="true"></i><?= htmlspecialchars((string) $step7SubmitText, ENT_QUOTES, 'UTF-8') ?>
           </button>
-          <p class="text-muted small text-center mt-3 mb-0">UI-only — backend save and moderation will connect when ready.</p>
         </div>
 
         <div class="mci-step-footer d-flex align-items-center gap-3 mt-4">
@@ -673,7 +920,7 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
           <button type="button" class="btn btn-dark px-4" id="nextStep">
             Continue <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
           </button>
-          <span class="text-muted small ms-auto" id="stepCounter">Step 1 of 7</span>
+          <span class="text-muted small ms-auto" id="stepCounter">Step 1 of 8</span>
         </div>
       </form>
     </div>

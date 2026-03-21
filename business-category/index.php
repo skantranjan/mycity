@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/mci_directory_listings.php';
+require_once __DIR__ . '/../includes/mci_category_icons.php';
 
 $pageTitle = 'All Categories - My City Info';
 $activePage = 'categories';
@@ -14,23 +15,6 @@ $slugify = static function (string $value): string {
     $value = preg_replace('/[^a-z0-9]+/', '-', $value) ?? '';
     return trim($value, '-');
 };
-
-$categoryIcons = [
-    'real-estate' => '🏠',
-    'furniture-store' => '🛋️',
-    'painter' => '🎨',
-    'restaurant' => '🍽️',
-    'health' => '⚕️',
-    'automotive' => '🚗',
-    'hotels' => '🏨',
-    'gym' => '💪',
-    'bakery' => '🥐',
-    'electrician' => '⚡',
-    'park' => '🌳',
-    'cafe' => '☕',
-    'dentist' => '🦷',
-    'spa' => '🧖',
-];
 
 $listingStats = [
     'property-852' => ['rating' => 4.8, 'reviews' => 68, 'popular_score' => 96, 'added_on' => '2026-03-16'],
@@ -88,7 +72,7 @@ foreach ($locationScopedListings as $row) {
             'name' => $name,
             'slug' => $slug,
             'count' => 0,
-            'icon' => $categoryIcons[$slug] ?? '📁',
+            'icon' => mci_category_icon($slug),
         ];
     }
     $categories[$slug]['count']++;
@@ -252,7 +236,7 @@ ob_start();
           <div class="card border-0 shadow-sm bg-white h-100">
             <div class="card-body d-flex align-items-center justify-content-between">
               <div class="d-flex align-items-center gap-3">
-                <span class="fs-4" aria-hidden="true"><?= htmlspecialchars((string) $cat['icon']) ?></span>
+                <?= mci_render_category_icon((string) $cat['icon'], 'fs-4') ?>
                 <div>
                 <div class="fw-semibold"><?= htmlspecialchars((string) $cat['name']) ?></div>
                 <div class="text-muted small"><?= (int) $cat['count'] ?> business<?= (int) $cat['count'] === 1 ? '' : 'es' ?></div>
@@ -267,10 +251,11 @@ ob_start();
   </div>
 
   <section class="mt-5">
-    <div class="d-flex align-items-center justify-content-between gap-2 mb-3 flex-wrap">
-      <h2 class="h5 mb-0">Most rated business</h2>
-      <a class="small text-decoration-none" href="/business-listing/">See all</a>
+    <div class="d-flex align-items-center justify-content-between gap-2 mb-1 flex-wrap">
+      <h2 class="h5 mb-0 home-section-title">Most rated</h2>
+      <a class="small text-decoration-none fw-semibold" href="/business-listing/?sort=rating">See all <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
     </div>
+    <div class="home-section-accent mb-3"></div>
     <div class="row g-3">
       <?php foreach ($mostRated as $row): ?>
         <?php $listing = $row; $variant = 'home'; include __DIR__ . '/../views/components/listing-card.php'; ?>
@@ -278,11 +263,12 @@ ob_start();
     </div>
   </section>
 
-  <section class="mt-4">
-    <div class="d-flex align-items-center justify-content-between gap-2 mb-3 flex-wrap">
-      <h2 class="h5 mb-0">Popular business</h2>
-      <a class="small text-decoration-none" href="/business-listing/">See all</a>
+  <section class="mt-5">
+    <div class="d-flex align-items-center justify-content-between gap-2 mb-1 flex-wrap">
+      <h2 class="h5 mb-0 home-section-title">Popular</h2>
+      <a class="small text-decoration-none fw-semibold" href="/business-listing/?sort=popular">See all <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
     </div>
+    <div class="home-section-accent mb-3"></div>
     <div class="row g-3">
       <?php foreach ($popular as $row): ?>
         <?php $listing = $row; $variant = 'home'; include __DIR__ . '/../views/components/listing-card.php'; ?>
@@ -290,11 +276,12 @@ ob_start();
     </div>
   </section>
 
-  <section class="mt-4">
-    <div class="d-flex align-items-center justify-content-between gap-2 mb-3 flex-wrap">
-      <h2 class="h5 mb-0">Newly added business</h2>
-      <a class="small text-decoration-none" href="/business-listing/">See all</a>
+  <section class="mt-5">
+    <div class="d-flex align-items-center justify-content-between gap-2 mb-1 flex-wrap">
+      <h2 class="h5 mb-0 home-section-title">Newly added</h2>
+      <a class="small text-decoration-none fw-semibold" href="/business-listing/?sort=newest">See all <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
     </div>
+    <div class="home-section-accent mb-3"></div>
     <div class="row g-3">
       <?php foreach ($newlyAdded as $row): ?>
         <?php $listing = $row; $variant = 'home'; include __DIR__ . '/../views/components/listing-card.php'; ?>

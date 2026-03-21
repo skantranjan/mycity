@@ -1,10 +1,65 @@
 <?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/includes/mci_category_icons.php';
+require_once __DIR__ . '/api/v1/lib/db.php';
+
 $pageTitle = 'Explore Your City - My City Info';
 $activePage = 'home';
+$metaDescription = 'Discover local businesses, services, restaurants, and hidden gems in your city. My City Info is your local discovery platform.';
+
+$slugify = static function (string $value): string {
+    $value = strtolower(trim($value));
+    $value = preg_replace('/[^a-z0-9]+/', '-', $value) ?? '';
+    return trim($value, '-');
+};
+
+// ── Load categories from DB ───────────────────────────────
+$categories = [];          // top-level only — for the grid
+$categoryTree = [];        // [ {parent, children:[]} ] — for the accordion
+
+try {
+    $pdo = api_db();
+
+    $stmt = $pdo->query(
+        "SELECT id, parent_id, name, slug, icon, sort_order
+         FROM mci_categories
+         ORDER BY COALESCE(parent_id, 0), sort_order, name"
+    );
+    $allCats = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+
+    // Index by id for quick lookup
+    $byId = [];
+    foreach ($allCats as $c) {
+        $byId[$c['id']] = $c + ['children' => []];
+    }
+
+    // Build tree and top-level list
+    foreach ($byId as $id => $c) {
+        if ($c['parent_id'] === null) {
+            $categoryTree[] = &$byId[$id];
+        } else {
+            if (isset($byId[$c['parent_id']])) {
+                $byId[$c['parent_id']]['children'][] = &$byId[$id];
+            }
+        }
+    }
+    unset($c, $id);
+
+    // Top-level only for the grid
+    foreach ($categoryTree as $c) {
+        $categories[] = [
+            'name' => $c['name'],
+            'slug' => $c['slug'],
+            'icon' => $c['icon'] ?: mci_category_icon($c['slug']),
+        ];
+    }
+} catch (Throwable $ignored) {
+    // DB not ready — fall back to static list
+}
 
 $extraHead = <<<'HTML'
 <link rel="stylesheet" href="/assets/css/home.css" />
-<script src="/assets/js/home-city.js" defer></script>
 HTML;
 
 $recentListings = [
@@ -29,18 +84,6 @@ $popularListings = [
   ['title' => 'Sunrise Co-working', 'category' => 'Real Estate', 'location' => 'Singapore', 'address' => '1 Raffles Place, #40-02, Singapore 048616', 'slug' => 'sunrise-coworking', 'image' => 'https://picsum.photos/seed/mci-pop-cowork/800/520'],
 ];
 
-$categories = [
-  ['name' => 'Real Estate', 'emoji' => '🏠'],
-  ['name' => 'Furniture Store', 'emoji' => '🛋️'],
-  ['name' => 'Painter', 'emoji' => '🎨'],
-  ['name' => 'Restaurant', 'emoji' => '🍽️'],
-  ['name' => 'Health', 'emoji' => '⚕️'],
-  ['name' => 'Automotive', 'emoji' => '🚗'],
-  ['name' => 'Hotels', 'emoji' => '🏨'],
-  ['name' => 'Gym', 'emoji' => '💪'],
-  ['name' => 'Bakery', 'emoji' => '🥐'],
-  ['name' => 'Electrician', 'emoji' => '⚡'],
-];
 
 ob_start();
 ?>
@@ -157,15 +200,21 @@ ob_start();
       </div>
     </div>
 
-    <div class="row g-3">
-      <?php foreach ($categories as $cat): ?>
-        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
-          <a class="home-category-tile w-100" href="/business-listing/?category=<?= urlencode($cat['name']) ?>">
-            <span class="home-category-icon" aria-hidden="true"><?= htmlspecialchars($cat['emoji']) ?></span>
-            <span><?= htmlspecialchars($cat['name']) ?></span>
-          </a>
+    <div class="row g-2 g-md-3">
+      <?php if (empty($categories)): ?>
+        <div class="col-12">
+          <p class="text-muted small">Categories are being set up — <a href="/cp/categories/">add some in the control panel</a>.</p>
         </div>
-      <?php endforeach; ?>
+      <?php else: ?>
+        <?php foreach ($categories as $cat): ?>
+          <div class="col-6 col-md-4 col-lg-3">
+            <a class="home-category-tile w-100" href="/business-category/<?= urlencode($cat['slug']) ?>/">
+              <span class="home-category-icon"><?= mci_render_category_icon((string) $cat['icon'], '') ?></span>
+              <span><?= htmlspecialchars($cat['name']) ?></span>
+            </a>
+          </div>
+        <?php endforeach; ?>
+      <?php endif; ?>
     </div>
   </section>
 
@@ -207,6 +256,129 @@ ob_start();
       <?php endforeach; ?>
     </div>
   </section>
+</div>
+
+<?php
+// ── Site index accordion — built from DB category tree ─────────────────────
+
+$siteIndexLocations = [
+  'India'         => ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 'Jaipur', 'Lucknow', 'Bhopal', 'Patna', 'Surat', 'Indore', 'Nagpur', 'Vadodara', 'Agra', 'Varanasi', 'Guwahati', 'Chandigarh'],
+  'UK'            => ['London', 'Manchester', 'Birmingham', 'Leeds', 'Sheffield', 'Bristol', 'Liverpool', 'Glasgow', 'Edinburgh', 'Chester', 'Cardiff', 'Leicester', 'Nottingham', 'Southampton', 'Oxford', 'Cambridge', 'Bath', 'York', 'Brighton', 'Newcastle'],
+  'Australia'     => ['Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adelaide', 'Gold Coast', 'Canberra', 'Darwin', 'Hobart', 'Newcastle NSW', 'Wollongong', 'Geelong', 'Townsville', 'Cairns', 'Toowoomba', 'Ballarat', 'Bendigo', 'Albury', 'Launceston', 'Mackay'],
+  'Canada'        => ['Toronto', 'Vancouver', 'Montreal', 'Calgary', 'Ottawa', 'Edmonton', 'Winnipeg', 'Quebec City', 'Hamilton', 'Kitchener', 'London ON', 'Halifax', 'Victoria BC', 'Saskatoon', 'Regina', 'Windsor', 'Oshawa', 'Barrie', 'Kelowna', 'Abbotsford'],
+  'USA'           => ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia', 'San Antonio', 'San Diego', 'Dallas', 'Austin', 'San Jose', 'Jacksonville', 'Fort Worth', 'Columbus', 'Charlotte', 'Indianapolis', 'Seattle', 'Denver', 'Boston', 'Miami'],
+  'Asia Pacific'  => ['Singapore', 'Hong Kong', 'Kuala Lumpur', 'Bangkok', 'Jakarta', 'Manila', 'Tokyo', 'Seoul', 'Shanghai', 'Beijing', 'Dubai', 'Abu Dhabi', 'Doha', 'Colombo', 'Dhaka', 'Kathmandu', 'Karachi', 'Lahore', 'Nairobi', 'Cape Town'],
+];
+?>
+
+<div class="container px-3 px-sm-4 py-4 py-md-5" id="mciSiteIndex">
+  <div class="accordion accordion-flush border rounded-3 overflow-hidden shadow-sm" id="mciSiteIndexAccordion">
+
+    <!-- Categories accordion item -->
+    <div class="accordion-item border-0">
+      <h2 class="accordion-header" id="mciSiteIndexCatHead">
+        <button
+          class="accordion-button collapsed fw-semibold"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#mciSiteIndexCatBody"
+          aria-expanded="false"
+          aria-controls="mciSiteIndexCatBody"
+          style="background:var(--mci-color-primary-soft);color:var(--mci-color-primary-deep);"
+        >
+          <i class="bi bi-tags me-2" aria-hidden="true"></i>
+          Browse all categories &amp; subcategories
+          <?php
+            $totalSubCount = 0;
+            foreach ($categoryTree as $c) { $totalSubCount += count($c['children']); }
+          ?>
+          <?php if ($totalSubCount > 0): ?>
+            <span class="ms-2 badge text-bg-secondary fw-normal" style="font-size:var(--mci-text-micro)">
+              <?= $totalSubCount ?> subcategories
+            </span>
+          <?php endif; ?>
+        </button>
+      </h2>
+      <div id="mciSiteIndexCatBody" class="accordion-collapse collapse" aria-labelledby="mciSiteIndexCatHead" data-bs-parent="#mciSiteIndexAccordion">
+        <div class="accordion-body pt-3 pb-4 px-3 px-md-4">
+          <?php if (empty($categoryTree)): ?>
+            <p class="text-muted small mb-0">No categories yet — <a href="/cp/categories/">add some in the control panel</a>.</p>
+          <?php else: ?>
+            <?php foreach ($categoryTree as $parent): ?>
+              <div class="mb-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <?php if ($parent['icon']): ?>
+                    <span style="font-size:var(--mci-text-base);"><?= mci_render_category_icon($parent['icon'], '') ?></span>
+                  <?php endif; ?>
+                  <a href="/business-category/<?= urlencode($parent['slug']) ?>/"
+                     class="fw-semibold text-uppercase text-decoration-none"
+                     style="font-size:var(--mci-text-micro);letter-spacing:0.08em;color:var(--mci-color-primary-deep);">
+                    <?= htmlspecialchars($parent['name']) ?>
+                  </a>
+                </div>
+                <?php if (!empty($parent['children'])): ?>
+                  <div class="d-flex flex-wrap gap-2">
+                    <?php foreach ($parent['children'] as $sub): ?>
+                      <a href="/business-category/<?= urlencode($sub['slug']) ?>/" class="mci-site-index-tag">
+                        <?= htmlspecialchars($sub['name']) ?>
+                      </a>
+                    <?php endforeach; ?>
+                  </div>
+                <?php else: ?>
+                  <span class="text-muted" style="font-size:var(--mci-text-xs);">No subcategories yet</span>
+                <?php endif; ?>
+              </div>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </div>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="border-top" aria-hidden="true"></div>
+
+    <!-- Locations accordion item -->
+    <div class="accordion-item border-0">
+      <h2 class="accordion-header" id="mciSiteIndexLocHead">
+        <button
+          class="accordion-button collapsed fw-semibold"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#mciSiteIndexLocBody"
+          aria-expanded="false"
+          aria-controls="mciSiteIndexLocBody"
+          style="background:var(--mci-color-primary-soft);color:var(--mci-color-primary-deep);"
+        >
+          <i class="bi bi-geo-alt me-2" aria-hidden="true"></i>
+          Browse by city &amp; location
+          <span class="ms-2 badge text-bg-secondary fw-normal" style="font-size:var(--mci-text-micro)">
+            <?= array_sum(array_map('count', $siteIndexLocations)) ?> cities
+          </span>
+        </button>
+      </h2>
+      <div id="mciSiteIndexLocBody" class="accordion-collapse collapse" aria-labelledby="mciSiteIndexLocHead" data-bs-parent="#mciSiteIndexAccordion">
+        <div class="accordion-body pt-3 pb-4 px-3 px-md-4">
+          <?php foreach ($siteIndexLocations as $region => $cities): ?>
+            <div class="mb-3">
+              <div class="fw-semibold small mb-2 text-uppercase" style="font-size:var(--mci-text-micro);letter-spacing:0.08em;color:var(--mci-color-primary-deep);">
+                <?= htmlspecialchars($region) ?>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <?php foreach ($cities as $city):
+                  $citySlug = strtolower(trim(preg_replace('/[^a-z0-9]+/', '-', $city) ?? '', '-'));
+                ?>
+                  <a href="/business-listing/?where=<?= urlencode($city) ?>" class="mci-site-index-tag">
+                    <?= htmlspecialchars($city) ?>
+                  </a>
+                <?php endforeach; ?>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <?php

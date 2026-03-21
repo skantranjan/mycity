@@ -461,7 +461,7 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') =
     try {
         $pdo = api_db();
         $rows = $pdo->query('
-      SELECT c.id, c.parent_id, c.name, c.slug, c.sort_order,
+      SELECT c.id, c.parent_id, c.name, c.slug, c.icon, c.sort_order,
              c.page_title, c.meta_keywords, c.meta_description, c.description, c.created_at,
              p.name AS parent_name
       FROM mci_categories c
@@ -507,11 +507,15 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') 
         }
         [$pageTitle, $metaKeywords, $metaDescription] = api_parse_seo_fields($data);
         $description = api_parse_description_field($data);
+        $icon = isset($data['icon']) ? trim((string) $data['icon']) : null;
+        if ($icon === '') {
+            $icon = null;
+        }
         try {
             $ins = $pdo->prepare(
-                'INSERT INTO mci_categories (name, slug, parent_id, sort_order, page_title, meta_keywords, meta_description, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO mci_categories (name, slug, icon, parent_id, sort_order, page_title, meta_keywords, meta_description, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
             );
-            $ins->execute([$name, $slug, $parentId, $sortOrder, $pageTitle, $metaKeywords, $metaDescription, $description]);
+            $ins->execute([$name, $slug, $icon, $parentId, $sortOrder, $pageTitle, $metaKeywords, $metaDescription, $description]);
             api_json(['ok' => true, 'id' => (int) $pdo->lastInsertId()]);
         } catch (Throwable $e) {
             api_error('category_already_exists_or_invalid', 409);
@@ -553,10 +557,16 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') 
         }
         [$pageTitle, $metaKeywords, $metaDescription] = api_parse_seo_fields($data);
         [$hasDesc, $descVal] = api_parse_description_field_ex($data);
+        $hasIcon = array_key_exists('icon', $data);
+        $iconVal = $hasIcon ? (trim((string) $data['icon']) ?: null) : null;
 
         if (array_key_exists('parent_id', $data)) {
             $sets = ['name = ?', 'slug = ?', 'parent_id = ?', 'sort_order = ?', 'page_title = ?', 'meta_keywords = ?', 'meta_description = ?'];
             $params = [$name, $slug, $parentId, $sortOrder, $pageTitle, $metaKeywords, $metaDescription];
+            if ($hasIcon) {
+                $sets[] = 'icon = ?';
+                $params[] = $iconVal;
+            }
             if ($hasDesc) {
                 $sets[] = 'description = ?';
                 $params[] = $descVal;
@@ -567,6 +577,10 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') 
         } else {
             $sets = ['name = ?', 'slug = ?', 'sort_order = ?', 'page_title = ?', 'meta_keywords = ?', 'meta_description = ?'];
             $params = [$name, $slug, $sortOrder, $pageTitle, $metaKeywords, $metaDescription];
+            if ($hasIcon) {
+                $sets[] = 'icon = ?';
+                $params[] = $iconVal;
+            }
             if ($hasDesc) {
                 $sets[] = 'description = ?';
                 $params[] = $descVal;
@@ -931,6 +945,188 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') 
     }
 }
 
+// =============================================================================
+// Business registration — image upload
+// Must be matched BEFORE api_request_data() calls below (multipart)
+// POST /api/v1/upload/image
+// =============================================================================
+if ($method === 'POST' && ($segments[0] ?? '') === 'upload' && ($segments[1] ?? '') === 'image') {
+    $allowedTypes = ['logo', 'profile', 'banner', 'gallery', 'item_image'];
+    $type = trim((string)($_POST['type'] ?? ''));
+    if (!in_array($type, $allowedTypes, true)) {
+        api_error('invalid_type', 400, ['allowed' => $allowedTypes]);
+    }
+    if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+        $uploadErr = $_FILES['file']['error'] ?? -1;
+        if ($uploadErr === UPLOAD_ERR_INI_SIZE || $uploadErr === UPLOAD_ERR_FORM_SIZE) {
+            api_error('file_too_large', 413);
+        }
+        api_error('file_required', 400);
+    }
+    $file     = $_FILES['file'];
+    $tmpPath  = (string)$file['tmp_name'];
+    $origName = (string)($file['name'] ?? '');
+    $maxBytes = 2 * 1024 * 1024; // 2 MB
+    if ($file['size'] > $maxBytes) {
+        api_error('file_too_large', 413);
+    }
+    $mime = mime_content_type($tmpPath);
+    $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!in_array($mime, $allowedMimes, true)) {
+        api_error('invalid_mime', 415, ['mime' => $mime]);
+    }
+    $extMap = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+    $ext    = $extMap[$mime] ?? 'jpg';
+    $dir    = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/') . '/storage/uploads/' . $type;
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+    require_once __DIR__ . '/lib/uuid.php';
+    $filename = api_uuid_v4() . '.' . $ext;
+    $dest     = $dir . '/' . $filename;
+    if (!move_uploaded_file($tmpPath, $dest)) {
+        api_error('upload_failed', 500);
+    }
+    $path = '/storage/uploads/' . $type . '/' . $filename;
+    api_json(['ok' => true, 'path' => $path]);
+}
+
+// =============================================================================
+// Public — categories tree (no auth)
+// GET /api/v1/public/categories
+// =============================================================================
+if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'categories') {
+    $pdo = api_db();
+    $stmt = $pdo->query('SELECT id, name, slug, parent_id FROM mci_categories ORDER BY parent_id IS NOT NULL, name');
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $roots = [];
+    $children = [];
+    foreach ($rows as $row) {
+        if ($row['parent_id'] === null) {
+            $row['children'] = [];
+            $roots[$row['id']] = $row;
+        } else {
+            $children[(int)$row['parent_id']][] = [
+                'id'   => (int)$row['id'],
+                'name' => $row['name'],
+                'slug' => $row['slug'],
+            ];
+        }
+    }
+    $result = [];
+    foreach ($roots as $root) {
+        $root['id']       = (int)$root['id'];
+        $root['children'] = $children[$root['id']] ?? [];
+        $result[]         = $root;
+    }
+    api_json(['ok' => true, 'categories' => $result]);
+}
+
+// =============================================================================
+// Public — tags flat list (no auth)
+// GET /api/v1/public/tags
+// =============================================================================
+if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'tags') {
+    $pdo  = api_db();
+    $stmt = $pdo->query('SELECT id, name, slug FROM mci_tags ORDER BY name');
+    $tags = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($tags as &$t) {
+        $t['id'] = (int)$t['id'];
+    }
+    unset($t);
+    api_json(['ok' => true, 'tags' => $tags]);
+}
+
+// =============================================================================
+// Business registration
+// POST /api/v1/businesses
+// =============================================================================
+if ($method === 'POST' && ($segments[0] ?? '') === 'businesses' && !isset($segments[1])) {
+    require_once __DIR__ . '/lib/business_helpers.php';
+    require_once __DIR__ . '/lib/business_service.php';
+
+    $auth = api_business_try_auth(); // optional — null for guests
+    $data = api_request_data();
+
+    $res = api_business_create(api_db(), $data, $auth);
+    if (!$res['ok']) {
+        api_error($res['error'], $res['status'] ?? 400);
+    }
+
+    $out = ['ok' => true, 'id' => $res['id'], 'slug' => $res['slug'], 'branch_id' => $res['branch_id']];
+    if (isset($res['token'])) {
+        // Guest created an account at submit — return JWT so client can log in
+        $out['token']     = $res['token'];
+        $out['token_exp'] = $res['token_exp'];
+        api_write_auth_token_cookie($res['token'], $res['token_exp']);
+    }
+    api_json($out, 201);
+}
+
+// =============================================================================
+// CP — business moderation
+// GET  /api/v1/cp/businesses
+// POST /api/v1/cp/businesses/{id}/approve
+// POST /api/v1/cp/businesses/{id}/reject
+// POST /api/v1/cp/businesses/{id}/suspend
+// =============================================================================
+if (($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'businesses') {
+    require_once __DIR__ . '/lib/business_helpers.php';
+    require_once __DIR__ . '/lib/business_service.php';
+
+    $auth = api_require_auth(['super_admin', 'co_admin']);
+    $pdo  = api_db();
+
+    // GET /api/v1/cp/businesses
+    if ($method === 'GET' && !isset($segments[2])) {
+        $qp = $_GET;
+        $filters = [
+            'status'        => $qp['status']       ?? null,
+            'added_by_role' => $qp['role']          ?? null,
+            'category_id'   => isset($qp['category_id']) ? (int)$qp['category_id'] : null,
+            'q'             => $qp['q']             ?? null,
+            'page'          => (int)($qp['page']    ?? 1),
+            'per_page'      => (int)($qp['per_page'] ?? 25),
+        ];
+        api_json(api_business_list_cp($pdo, $filters));
+    }
+
+    // POST /api/v1/cp/businesses/{id}/approve|reject|suspend
+    if ($method === 'POST' && isset($segments[2], $segments[3])) {
+        $groupId = (string)$segments[2];
+        $action  = (string)$segments[3];
+        $body    = api_request_data();
+        $notes   = trim((string)($body['notes'] ?? '')) ?: null;
+
+        $statusMap = ['approve' => 'live', 'reject' => 'rejected', 'suspend' => 'suspended'];
+        if (!isset($statusMap[$action])) {
+            api_error('unknown_action', 400);
+        }
+
+        $ok = api_business_update_status($pdo, $groupId, $statusMap[$action], $auth['user_id'], $notes);
+        if (!$ok) {
+            api_error('business_not_found', 404);
+        }
+        api_json(['ok' => true]);
+    }
+}
+
+// =============================================================================
+// Subscriber — own business list
+// GET /api/v1/businesses?owner=me
+// =============================================================================
+if ($method === 'GET' && ($segments[0] ?? '') === 'businesses' && !isset($segments[1]) && ($_GET['owner'] ?? '') === 'me') {
+    require_once __DIR__ . '/lib/business_helpers.php';
+    require_once __DIR__ . '/lib/business_service.php';
+
+    $auth = api_require_auth(['subscriber', 'super_admin', 'co_admin']);
+    $pdo  = api_db();
+    api_json(api_business_list_owner($pdo, $auth['user_id']));
+}
+
+// =============================================================================
+// 404 fallthrough
+// =============================================================================
 http_response_code(404);
 echo json_encode([
     'error' => 'not_found',

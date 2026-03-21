@@ -14,6 +14,14 @@
   --mci-color-accent:        #f59e0b;   /* amber-500  — warm CTA */
   --mci-color-accent-hot:    #f97316;   /* orange-500 — hover accent */
 
+  /* ── State colors ────────────────────────────── */
+  --mci-color-success:       #22c55e;   /* green-500 */
+  --mci-color-success-soft:  #f0fdf4;   /* green-50 */
+  --mci-color-warning:       #f59e0b;   /* amber-500 */
+  --mci-color-warning-soft:  #fffbeb;   /* amber-50 */
+  --mci-color-danger:        #ef4444;   /* red-500 */
+  --mci-color-danger-soft:   #fef2f2;   /* red-50 */
+
   /* ── Surfaces ────────────────────────────────── */
   --mci-body-bg:     #ffffff;
   --mci-body-color:  #0f172a;
@@ -24,11 +32,42 @@
   --mci-label:       #4f46e5;
   --mci-hero-highlight: #fef08a;
 
-  /* ── Typography ──────────────────────────────── */
+  /* ── Typography — fonts ──────────────────────── */
   --mci-font-display: "Bricolage Grotesque", "Plus Jakarta Sans", system-ui, sans-serif;
-  --mci-font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto,
+  --mci-font-sans:    "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
-  --mci-line-height-base: 1.55;
+
+  /* ── Type scale ──────────────────────────────── */
+  /* micro  — uppercase badges, kickers, section sub-labels        */
+  --mci-text-micro:   0.68rem;
+  /* xs     — icon labels, table column headers, secondary meta    */
+  --mci-text-xs:      0.75rem;
+  /* sm     — form labels, helper text, Bootstrap .small equiv.    */
+  --mci-text-sm:      0.875rem;
+  /* base   — default body copy                                    */
+  --mci-text-base:    1rem;
+  /* md     — card titles, sidebar headings, minor section heads   */
+  --mci-text-md:      1.05rem;
+  /* lg     — step headers, page sub-headings                      */
+  --mci-text-lg:      1.15rem;
+  /* xl     — business name, auth panel title, modal titles        */
+  --mci-text-xl:      clamp(1.25rem, 3vw, 1.65rem);
+  /* 2xl    — page / section hero titles                           */
+  --mci-text-2xl:     clamp(1.5rem, 4vw, 2rem);
+  /* 3xl    — home hero (largest display heading)                  */
+  --mci-text-3xl:     clamp(1.4rem, 4vw + 0.75rem, 2.6rem);
+
+  /* ── Type weights ────────────────────────────── */
+  --mci-weight-normal:    400;
+  --mci-weight-medium:    500;
+  --mci-weight-semibold:  600;
+  --mci-weight-bold:      700;
+  --mci-weight-extrabold: 800;
+
+  /* ── Line heights ────────────────────────────── */
+  --mci-line-height-base:    1.55;   /* body */
+  --mci-line-height-tight:   1.25;   /* headings */
+  --mci-line-height-snug:    1.4;    /* labels / compact text */
 
   /* ── Radius ──────────────────────────────────── */
   --mci-radius-sm: 0.5rem;
@@ -87,6 +126,19 @@ body.mci-body {
 h1, h2, .mci-display {
   font-family: var(--mci-font-display);
   letter-spacing: -0.025em;
+}
+
+/* ─── Utility classes ───────────────────────────────── */
+.mci-line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mci-truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* ─── Container ─────────────────────────────────────── */
@@ -208,6 +260,80 @@ h1, h2, .mci-display {
   transform: translateY(-1px);
 }
 
+/* ─── Header city picker ────────────────────────────── */
+.mci-city-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 9999px;
+  background: rgba(255,255,255,0.12);
+  border: 1.5px solid rgba(255,255,255,0.25);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.3;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+  max-width: 160px;
+}
+.mci-city-pill:hover,
+.mci-city-pill:focus-visible {
+  background: rgba(255,255,255,0.22);
+  border-color: rgba(255,255,255,0.45);
+  outline: none;
+}
+.mci-city-pill #mciActiveCityLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100px;
+}
+.mci-city-pill__edit {
+  font-size: 0.65rem;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.mci-city-popover {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  left: auto;
+  min-width: 260px;
+  background: #fff;
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 32px rgba(15,23,42,0.14), 0 0 0 1px rgba(99,102,241,0.12);
+  padding: 0.9rem 1rem;
+  z-index: 1080;
+}
+.mci-city-popover__label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--mci-color-primary-deep, #4f46e5);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.mci-city-popover__hint {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  margin-top: 0.4rem;
+}
+
+/* On mobile: full-width popover anchored to viewport */
+@media (max-width: 575.98px) {
+  .mci-city-popover {
+    position: fixed;
+    top: auto;
+    bottom: 1rem;
+    left: 1rem;
+    right: 1rem;
+    min-width: unset;
+  }
+}
+
 /* ─── Global buttons ────────────────────────────────── */
 
 /* Primary: indigo gradient with glow */
@@ -303,8 +429,58 @@ iframe { max-width: 100%; }
   }
 }
 
+/* ─── Site index accordion ──────────────────────────── */
+#mciSiteIndexAccordion .accordion-button:not(.collapsed) {
+  background: var(--mci-color-primary-soft, #eef2ff);
+  color: var(--mci-color-primary-deep, #4f46e5);
+  box-shadow: none;
+}
+#mciSiteIndexAccordion .accordion-button::after {
+  filter: invert(28%) sepia(93%) saturate(1352%) hue-rotate(224deg) brightness(97%) contrast(97%);
+}
+#mciSiteIndexAccordion .accordion-button:not(.collapsed)::after {
+  filter: invert(28%) sepia(93%) saturate(1352%) hue-rotate(224deg) brightness(97%) contrast(97%);
+}
+
+/* ─── Site index accordion tags ────────────────────── */
+.mci-site-index-tag {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--mci-color-primary-deep, #4f46e5);
+  background: var(--mci-color-primary-soft, #eef2ff);
+  border: 1px solid rgba(99,102,241,0.15);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  line-height: 1.4;
+}
+.mci-site-index-tag:hover {
+  background: var(--mci-color-primary-deep, #4f46e5);
+  color: #fff;
+  border-color: transparent;
+}
+
 /* ─── Table helpers ─────────────────────────────────── */
-.table-responsive { -webkit-overflow-scrolling: touch; }
+.table-responsive {
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+/* Fade-out on right edge hints at horizontal scroll */
+@media (max-width: 767.98px) {
+  .table-responsive::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 2.5rem;
+    height: 100%;
+    background: linear-gradient(to right, transparent, #fff);
+    pointer-events: none;
+    border-radius: 0 var(--mci-radius-md, 0.75rem) var(--mci-radius-md, 0.75rem) 0;
+  }
+}
 #dropFiles { min-height: 9rem; }
 @media (min-width: 576px) { #dropFiles { min-height: 10rem; } }
 

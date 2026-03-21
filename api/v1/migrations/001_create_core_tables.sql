@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS `mci_categories` (
   `parent_id` int unsigned DEFAULT NULL COMMENT 'NULL = top-level category; FK -> mci_categories.id',
   `name` varchar(255) NOT NULL,
   `slug` varchar(255) NOT NULL COMMENT 'Globally unique (used in URLs)',
+  `icon` varchar(32) DEFAULT NULL COMMENT 'Optional display icon — unicode emoji (e.g. 🏠) or Bootstrap Icon class (e.g. bi-house)',
   `sort_order` int unsigned NOT NULL DEFAULT 0 COMMENT 'Ordering among siblings',
   `page_title` varchar(255) DEFAULT NULL COMMENT 'SEO: HTML <title> (optional override)',
   `meta_keywords` varchar(512) DEFAULT NULL COMMENT 'SEO: meta keywords',
@@ -261,3 +262,13 @@ SELECT
   NOW(6)
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM mci_users WHERE email = 'superadmin2.dev@mycityinfo.local');
+
+-- =============================================================================
+-- Incremental migrations (safe to re-run on existing databases)
+-- =============================================================================
+
+-- Migration 001a: add icon column to mci_categories
+ALTER TABLE `mci_categories`
+  ADD COLUMN IF NOT EXISTS `icon` varchar(32) DEFAULT NULL
+    COMMENT 'Optional display icon — unicode emoji (e.g. 🏠) or Bootstrap Icon class (e.g. bi-house)'
+  AFTER `slug`;

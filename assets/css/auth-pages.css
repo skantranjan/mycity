@@ -35,8 +35,8 @@
 }
 
 .mci-auth-benefits__kicker {
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: var(--mci-text-xs, 0.75rem);
+  font-weight: var(--mci-weight-bold, 700);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--mci-color-primary-deep);
@@ -44,16 +44,16 @@
 }
 
 .mci-auth-benefits__title {
-  font-size: clamp(1.35rem, 2.5vw, 1.75rem);
-  font-weight: 800;
-  line-height: 1.25;
+  font-size: var(--mci-text-xl, clamp(1.25rem, 3vw, 1.65rem));
+  font-weight: var(--mci-weight-extrabold, 800);
+  line-height: var(--mci-line-height-tight, 1.25);
   color: var(--mci-body-color);
   margin-bottom: 0.75rem;
 }
 
 .mci-auth-benefits__lead {
   color: var(--mci-muted);
-  font-size: 0.95rem;
+  font-size: var(--mci-text-base, 1rem);
   line-height: 1.6;
   margin-bottom: 1.25rem;
 }
@@ -100,22 +100,22 @@
   align-items: center;
   justify-content: center;
   color: var(--mci-color-primary-deep);
-  font-size: 1.1rem;
+  font-size: var(--mci-text-lg, 1.15rem);
   box-shadow: var(--mci-shadow-sm);
 }
 
 .mci-auth-benefits__item strong {
   display: block;
-  font-size: 0.95rem;
+  font-size: var(--mci-text-base, 1rem);
   margin-bottom: 0.15rem;
   color: var(--mci-body-color);
 }
 
 .mci-auth-benefits__item p {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--mci-text-sm, 0.875rem);
   color: var(--mci-muted);
-  line-height: 1.5;
+  line-height: var(--mci-line-height-snug, 1.4);
 }
 
 .mci-auth-form-card {
