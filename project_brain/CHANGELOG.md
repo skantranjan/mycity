@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### API
+
+- **`POST /api/v1/auth/login`** — unified login with `audience`: `subscriber` or `cp` (super_admin/co_admin). **`GET /api/v1/auth/me`**, **`POST /api/v1/auth/logout`**. **`Authorization: Bearer`** supported alongside `mci_api_token` cookie. Shared helper **`api_direct_auth_login()`**; **`/login/`** and **`/cp/login/`** use it (same behaviour as the JSON API). See [API_AUTHENTICATION.md](API_AUTHENTICATION.md).
+
 ### Configuration
 
 - Project root `.env` support via `includes/mci_load_env.php`, loaded from `api/v1/lib/config.php` before reading `MCI_DB_*` and `MCI_JWT_SECRET`. Added `.env.example` and `.gitignore` entry for `.env`.

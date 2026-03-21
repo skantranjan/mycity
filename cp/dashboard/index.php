@@ -1,4 +1,12 @@
 <?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../../includes/mci_session.php';
+require_once __DIR__ . '/../../includes/mci_require_session.php';
+
+mci_require_cp_session();
+
 $pageTitle = 'CP Dashboard - My City Info';
 $activePage = '';
 $cpActive = 'dashboard';
@@ -22,6 +30,10 @@ ob_start();
           </div>
           <div class="text-muted small">Super admin only</div>
         </div>
+
+        <?php if (($_GET['notice'] ?? '') === 'forbidden'): ?>
+          <div class="alert alert-warning py-2 small mb-3" role="status">That page is only available to super admins.</div>
+        <?php endif; ?>
 
         <div class="row g-3">
           <div class="col-12 col-md-4">

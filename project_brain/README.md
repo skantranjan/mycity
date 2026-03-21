@@ -6,6 +6,7 @@
 
 | File | What it is |
 |------|------------|
+| [**REQUIREMENTS_AND_FEATURES.md**](REQUIREMENTS_AND_FEATURES.md) | **Single source of truth:** product requirements, features, acceptance criteria, how we build (with links to technical docs). Update this as scope evolves. |
 | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) | Ground truth: purpose, users, DB/API pointers |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Stack, layers, data flow, folders, integrations |
 | [CODING_AND_SECURITY.md](CODING_AND_SECURITY.md) | Coding rules, security, pre-merge checklist |
@@ -15,6 +16,7 @@
 | [ROADMAP_AND_ISSUES.md](ROADMAP_AND_ISSUES.md) | Decisions, known issues, roadmap |
 | [CHANGELOG.md](CHANGELOG.md) | What changed |
 | [SETUP_AND_DEPLOY.md](SETUP_AND_DEPLOY.md) | Env, DB import, run, deploy |
+| [API_AUTHENTICATION.md](API_AUTHENTICATION.md) | Auth API: subscriber + CP login, `/auth/me`, curl examples |
 | [DEV_TEST_ACCOUNTS.md](DEV_TEST_ACCOUNTS.md) | Local dev logins + optional DB seed (not for production) |
 | [HOW_WE_WORK.md](HOW_WE_WORK.md) | Workflow for AI/devs + master prompts |
 | [planning.md](planning.md) | PRD template + planning checklists |

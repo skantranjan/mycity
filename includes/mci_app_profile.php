@@ -105,3 +105,71 @@ function mci_app_profile_full_name_for_form(string $appArea): string
 
     return (string) ($_SESSION[$k['name']] ?? '');
 }
+
+/**
+ * Optional HTTP(S) image URL from DB profile (session), used when no uploaded avatar data URI exists.
+ */
+function mci_app_profile_avatar_url_from_session(string $appArea): ?string
+{
+    $k = $appArea === 'cp' ? 'mci_cp_profile_image_url' : 'mci_sub_profile_image_url';
+    $u = trim((string) ($_SESSION[$k] ?? ''));
+    if ($u === '') {
+        return null;
+    }
+    if (!preg_match('#^https?://#i', $u)) {
+        return null;
+    }
+
+    return $u;
+}
+
+/**
+ * Avatar for header: uploaded data URI wins; otherwise profile image URL from session.
+ *
+ * @return non-empty-string|null
+ */
+function mci_app_profile_avatar_for_header(string $appArea): ?string
+{
+    $data = mci_app_profile_avatar_data_uri($appArea);
+    if ($data !== null) {
+        return $data;
+    }
+
+    return mci_app_profile_avatar_url_from_session($appArea);
+}
+
+/**
+ * Sync display name + profile image URL into session from mci_account_get_profile_bundle() result.
+ *
+ * @param array<string, mixed> $bundle
+ */
+function mci_app_profile_apply_bundle_to_session(string $appArea, array $bundle): void
+{
+    if (empty($bundle['ok'])) {
+        return;
+    }
+    $keys = mci_app_profile_keys($appArea);
+    $u = $bundle['user'] ?? [];
+    $p = $bundle['profile'] ?? null;
+
+    $display = trim((string) ($u['display_name'] ?? ''));
+    if ($display === '' && is_array($p)) {
+        $fn = trim((string) ($p['first_name'] ?? ''));
+        $ln = trim((string) ($p['last_name'] ?? ''));
+        $display = trim($fn . ' ' . $ln);
+    }
+    if ($display !== '') {
+        $_SESSION[$keys['name']] = $display;
+    }
+
+    $imgKey = $appArea === 'cp' ? 'mci_cp_profile_image_url' : 'mci_sub_profile_image_url';
+    $url = '';
+    if (is_array($p) && isset($p['profile_image'])) {
+        $url = trim((string) $p['profile_image']);
+    }
+    if ($url !== '' && preg_match('#^https?://#i', $url)) {
+        $_SESSION[$imgKey] = $url;
+    } else {
+        unset($_SESSION[$imgKey]);
+    }
+}

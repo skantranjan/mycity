@@ -40,6 +40,18 @@ Then use **`/login/`**, **`/api/v1/...`**, etc. as usual. When you deploy, chang
 - Web server serves PHP frontend pages.
 - API: `/api/v1/*`.
 
+### VS Code / Cursor — PHP built-in server
+
+From the **project root** (folder that contains `index.php`), in the integrated terminal:
+
+```bash
+php -S localhost:8000
+```
+
+Then open **http://localhost:8000/** . Stop with **Ctrl+C**.
+
+This does **not** apply `.htaccess` rewrites; use Apache/nginx (or Laragon/XAMPP) if you need identical pretty URLs locally.
+
 ## Deploy (e.g. Hostinger)
 
 - Deploy project files.

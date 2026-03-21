@@ -24,7 +24,7 @@ function cpLinkClass(string $key, string $cpActive): string
       <i class="bi bi-grid-1x2-fill" aria-hidden="true"></i> Dashboard
     </a>
     <a class="<?= cpLinkClass('users', $cpActive) ?>" href="/cp/users/">
-      <i class="bi bi-people-fill" aria-hidden="true"></i> Registered Subscribers
+      <i class="bi bi-people-fill" aria-hidden="true"></i> Users
     </a>
     <a class="<?= cpLinkClass('listings', $cpActive) ?>" href="/cp/listings/">
       <i class="bi bi-collection" aria-hidden="true"></i> All listings

@@ -86,7 +86,13 @@ $(function () {
     };
 
     // Prefer API when auth cookie exists; otherwise keep the demo behavior.
-    fetch('/api/v1/cp/anon-business-submissions', {
+    var apiSubmit =
+      (typeof window.mciApiUrl === 'function'
+        ? window.mciApiUrl
+        : function (p) {
+            return '/api/v1' + p;
+          })('/cp/anon-business-submissions');
+    fetch(apiSubmit, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },

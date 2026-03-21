@@ -10,7 +10,7 @@ require_once __DIR__ . '/response.php';
  */
 function api_require_auth(array $allowedRoles): array
 {
-    $token = api_read_auth_token_from_cookie();
+    $token = api_read_auth_token_from_request();
     if ($token === null) {
         api_error('unauthorized', 401);
     }

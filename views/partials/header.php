@@ -55,7 +55,7 @@ function navActive(string $key, string $activePage): string
         <?php if ($appArea === 'subscriber'): ?>
           <?php
           $mciHdrName = mci_app_profile_display_name('subscriber');
-          $mciHdrAvatar = mci_app_profile_avatar_data_uri('subscriber');
+          $mciHdrAvatar = mci_app_profile_avatar_for_header('subscriber');
           ?>
           <div class="d-flex align-items-center gap-2 ms-lg-3 pt-2 pt-lg-0">
             <span class="text-white-50 d-none d-lg-inline" aria-hidden="true">|</span>
@@ -99,7 +99,7 @@ function navActive(string $key, string $activePage): string
         <?php elseif ($appArea === 'cp'): ?>
           <?php
           $mciHdrName = mci_app_profile_display_name('cp');
-          $mciHdrAvatar = mci_app_profile_avatar_data_uri('cp');
+          $mciHdrAvatar = mci_app_profile_avatar_for_header('cp');
           ?>
           <div class="d-flex align-items-center gap-2 ms-lg-3 pt-2 pt-lg-0">
             <span class="text-white-50 d-none d-lg-inline" aria-hidden="true">|</span>

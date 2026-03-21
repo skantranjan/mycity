@@ -41,3 +41,18 @@ function api_jwt_secret(): string
     return api_env('MCI_JWT_SECRET');
 }
 
+/** True if env var is 1 / true / yes (case-insensitive). */
+function api_env_flag(string $key): bool
+{
+    $v = getenv($key);
+    if (!is_string($v) || $v === '') {
+        $v = $_ENV[$key] ?? $_SERVER[$key] ?? '';
+    }
+    if (!is_string($v)) {
+        return false;
+    }
+    $v = strtolower(trim($v));
+
+    return $v === '1' || $v === 'true' || $v === 'yes';
+}
+
