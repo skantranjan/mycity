@@ -16,6 +16,31 @@ require_once __DIR__ . '/uuid.php';
 require_once __DIR__ . '/ip.php';
 
 /**
+ * Unified login — same contract as `POST /api/v1/auth/login` (`audience` / `type`).
+ * Use `subscriber` (or `sub`) for public accounts; `cp` (or `admin`, `super_admin`, `co_admin`, `coadmin`) for control panel.
+ *
+ * @return array{ok:true, user: array{id: string, email: string, role: string}, token: string, exp: int}|array{ok:false, error: string, status?: int}
+ */
+function api_direct_auth_login(string $email, string $password, string $audience): array
+{
+    $audience = mb_strtolower(trim($audience));
+    if ($audience === 'subscriber' || $audience === 'sub') {
+        return api_direct_subscriber_login($email, $password);
+    }
+    if (
+        $audience === 'cp'
+        || $audience === 'admin'
+        || $audience === 'super_admin'
+        || $audience === 'coadmin'
+        || $audience === 'co_admin'
+    ) {
+        return api_direct_cp_login($email, $password);
+    }
+
+    return ['ok' => false, 'error' => 'invalid_audience', 'status' => 400];
+}
+
+/**
  * @return array{ok:true, user: array{id: string, email: string, role: string}, token: string, exp: int}|array{ok:false, error: string, status?: int}
  */
 function api_direct_subscriber_login(string $email, string $password): array

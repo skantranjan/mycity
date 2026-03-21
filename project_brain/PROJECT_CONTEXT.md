@@ -38,7 +38,7 @@ Create a trusted local directory with moderated contributions and clear user res
 - `api/v1/migrations/001_create_core_tables.sql`
   - `mci_users` / `mci_roles`
   - `mci_userprofiles`
-  - `mci_categories` / `mci_tags`
+  - `mci_categories` (`parent_id`, `slug`, SEO fields) / `mci_tags` (`slug`, SEO: `page_title`, `meta_keywords`, `meta_description`, optional `description`)
   - `mci_category_requests`
   - `mci_anon_business_submissions`
   - `mci_user_auth_providers` (social login mapping; schema created, API wiring pending)

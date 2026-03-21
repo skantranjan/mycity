@@ -12,6 +12,26 @@ function api_read_auth_token_from_cookie(): ?string
     return $cookie;
 }
 
+/**
+ * Cookie first, then `Authorization: Bearer <jwt>` (for fetch/Postman/mobile).
+ */
+function api_read_auth_token_from_request(): ?string
+{
+    $fromCookie = api_read_auth_token_from_cookie();
+    if ($fromCookie !== null) {
+        return $fromCookie;
+    }
+    $hdr = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    if (!is_string($hdr) || $hdr === '') {
+        return null;
+    }
+    if (preg_match('/^\s*Bearer\s+(\S+)/i', $hdr, $m)) {
+        $t = trim($m[1]);
+        return $t !== '' ? $t : null;
+    }
+    return null;
+}
+
 function api_write_auth_token_cookie(string $jwt, int $expTimestamp): void
 {
     // 15m expiry default is driven by JWT exp, cookie expiry follows it.

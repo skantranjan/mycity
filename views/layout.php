@@ -9,6 +9,7 @@
 $mciErrorHandlerIncluded = false;
 require_once __DIR__ . '/../includes/mci_error_handler.php';
 $mciErrorHandlerIncluded = true;
+require_once __DIR__ . '/../includes/mci_paths.php';
 $appArea = isset($appArea) && in_array($appArea, ['subscriber', 'cp'], true) ? $appArea : '';
 $__mciBodyClass = 'mci-body';
 if ($appArea !== '') {
@@ -24,6 +25,22 @@ if ($appArea !== '') {
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="description" content="Explore local business, services and places in your city." />
     <title><?= htmlspecialchars($pageTitle ?? 'My City Info') ?></title>
+    <script>
+(function () {
+  var b = <?= json_encode(mci_api_v1_base(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+  window.MCI_API_BASE = b;
+  window.mciApiUrl = function (p) {
+    p = p || '';
+    if (p.charAt(0) !== '/') {
+      p = '/' + p;
+    }
+    var base = (typeof window.MCI_API_BASE === 'string' && window.MCI_API_BASE !== '')
+      ? window.MCI_API_BASE.replace(/\/$/, '')
+      : '/api/v1';
+    return base + p;
+  };
+})();
+    </script>
     <?= $extraHead ?? '' ?>
 
     <!-- Bootstrap (components + grid) -->

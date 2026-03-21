@@ -2,6 +2,26 @@
 
 This repository is a server-rendered PHP web app (“My City Info”) for discovering local businesses and submitting/updating listings.
 
+## Run locally (VS Code / Cursor)
+
+1. Open this folder as the workspace root.
+2. Open the **integrated terminal** (**Terminal → New Terminal** in VS Code, or **Terminal** in Cursor).
+3. From the project root (where `index.php` lives), start PHP’s built-in web server **with the router** so `/api/v1/*` works (Apache `.htaccess` is not used):
+
+   ```bash
+   php -S localhost:8000 router.php
+   ```
+
+4. In your browser, go to **http://localhost:8000/**
+
+Keep that terminal open while you work. Stop the server with **Ctrl+C**.
+
+**Notes**
+
+- Without `router.php`, requests to `/api/v1/...` return HTML (404), and CP pages that call the API show “Unexpected token `<`” / invalid JSON.
+- If the app is in a **subfolder** (e.g. `http://localhost/mycity/`), set env **`MCI_BASE_PATH=/mycity`** (no trailing slash) so API URLs resolve correctly, or rely on auto-detection from `DOCUMENT_ROOT` vs project path.
+- For full pretty URLs + production, use Apache, nginx, or Laragon/XAMPP with the project `.htaccess`. Database/API setup: see `project_brain/SETUP_AND_DEPLOY.md`.
+
 ## What’s implemented so far
 
 ### Public site basics

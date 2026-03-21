@@ -89,17 +89,28 @@ CREATE TABLE IF NOT EXISTS `mci_userprofiles` (
   COMMENT='Per-user profile data (name, avatar, demographics)';
 
 -- -----------------------------------------------------------------------------
--- 4) Categories (standalone)
+-- 4) Categories (hierarchical: optional parent = subcategory; max depth enforced in API)
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `mci_categories` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `parent_id` int unsigned DEFAULT NULL COMMENT 'NULL = top-level category; FK -> mci_categories.id',
   `name` varchar(255) NOT NULL,
-  `slug` varchar(255) DEFAULT NULL,
+  `slug` varchar(255) NOT NULL COMMENT 'Globally unique (used in URLs)',
+  `sort_order` int unsigned NOT NULL DEFAULT 0 COMMENT 'Ordering among siblings',
+  `page_title` varchar(255) DEFAULT NULL COMMENT 'SEO: HTML <title> (optional override)',
+  `meta_keywords` varchar(512) DEFAULT NULL COMMENT 'SEO: meta keywords',
+  `meta_description` varchar(512) DEFAULT NULL COMMENT 'SEO: meta description',
+  `description` text DEFAULT NULL COMMENT 'Optional editorial / display description (not the SEO meta)',
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_mci_categories_name` (`name`),
-  KEY `idx_mci_categories_slug` (`slug`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  UNIQUE KEY `uniq_mci_categories_slug` (`slug`),
+  KEY `idx_mci_categories_parent` (`parent_id`),
+  KEY `idx_mci_categories_name` (`name`),
+  CONSTRAINT `fk_mci_categories_parent`
+    FOREIGN KEY (`parent_id`) REFERENCES `mci_categories` (`id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Business categories; subcategories reference parent_id';
 
 -- -----------------------------------------------------------------------------
 -- 5) Tags (standalone)
@@ -107,9 +118,15 @@ CREATE TABLE IF NOT EXISTS `mci_categories` (
 CREATE TABLE IF NOT EXISTS `mci_tags` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(255) NOT NULL,
+  `slug` varchar(255) NOT NULL COMMENT 'Globally unique (URLs, APIs)',
+  `page_title` varchar(255) DEFAULT NULL COMMENT 'SEO: HTML <title>',
+  `meta_keywords` varchar(512) DEFAULT NULL COMMENT 'SEO: meta keywords',
+  `meta_description` varchar(512) DEFAULT NULL COMMENT 'SEO: meta description',
+  `description` text DEFAULT NULL COMMENT 'Optional editorial / display description',
   `created_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_mci_tags_name` (`name`)
+  UNIQUE KEY `uniq_mci_tags_name` (`name`),
+  UNIQUE KEY `uniq_mci_tags_slug` (`slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------------------------

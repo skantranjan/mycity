@@ -18,7 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 
-    $result = api_direct_subscriber_login($em, $pw);
+    // Same backend as POST /api/v1/auth/login with audience=subscriber
+    $result = api_direct_auth_login($em, $pw, 'subscriber');
     if (!empty($result['ok'])) {
         $user = $result['user'] ?? [];
         $userId = (string)($user['id'] ?? '');
@@ -131,7 +132,7 @@ ob_start();
             <?php endif; ?>
         <div class="mb-4">
           <div class="fw-bold fs-4">Sign in</div>
-          <div class="text-muted small mt-1">Use your email and password or continue with social login.</div>
+          <div class="text-muted small mt-1">Uses the same logic as <code>POST /api/v1/auth/login</code> with <code>audience=subscriber</code> (in-process, no extra HTTP hop).</div>
           <div class="alert alert-info small mt-3 mb-0 text-start">
             <strong>Demo:</strong> Submitting this form signs you in so you can try features (e.g. anonymous business reviews). Full database + API integration is still in progress.
           </div>

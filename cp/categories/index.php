@@ -1,7 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
-require_once __DIR__ . '/../../includes/mci_directory_listings.php';
+require_once __DIR__ . '/../../includes/mci_session.php';
+require_once __DIR__ . '/../../includes/mci_require_session.php';
+
+mci_require_cp_session();
 
 $pageTitle = 'Categories & Tags - CP - My City Info';
 $activePage = '';
@@ -9,659 +13,363 @@ $cpActive = 'categories';
 $hideCta = true;
 $appArea = 'cp';
 
-$seedCategories = [];
-$seedTags = [];
-
-foreach ($mciDirectoryListings as $row) {
-    $c = trim((string)($row['category'] ?? ''));
-    if ($c !== '') {
-        $seedCategories[$c] = true;
-    }
-    foreach (($row['tags'] ?? []) as $t) {
-        $tt = trim((string) $t);
-        if ($tt !== '') {
-            $seedTags[$tt] = true;
-        }
-    }
-}
-
-$seedCategories = array_keys($seedCategories);
-sort($seedCategories, SORT_NATURAL | SORT_FLAG_CASE);
-$seedTags = array_keys($seedTags);
-sort($seedTags, SORT_NATURAL | SORT_FLAG_CASE);
+$extraHead = <<<'HTML'
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+HTML;
 
 $extraJS = <<<'HTML'
 <script>
 (function () {
-  var CAT_KEY = 'mci_cp_categories';
-  var TAG_KEY = 'mci_cp_tags';
-  var REQ_KEY = 'mci_cp_category_requests';
+  var apiBase = (typeof window.mciApiUrl === 'function' ? window.mciApiUrl : function (p) { return '/api/v1' + p; });
+  var apiCat = apiBase('/cp/categories');
+  var apiTag = apiBase('/cp/tags');
 
-  // API-first mode (fallback to localStorage if API auth/DB isn't ready yet).
-  var useApi = false;
-  var apiState = {
-    categories: [],
-    tags: [],
-    requests: []
-  };
+  function el(id) { return document.getElementById(id); }
 
-  var SEED_CATEGORIES = JSON.parse(document.getElementById('mciSeedCategories').textContent);
-  var SEED_TAGS = JSON.parse(document.getElementById('mciSeedTags').textContent);
-
-  function safeParse(json, fallback) {
-    try { return JSON.parse(json); } catch (e) { return fallback; }
+  function toast(msg, err) {
+    var box = el('mciCpTaxAlert');
+    if (!box) return;
+    box.className = 'alert py-2 small ' + (err ? 'alert-danger' : 'alert-success');
+    box.textContent = msg;
+    box.hidden = false;
+    setTimeout(function () { box.hidden = true; }, 5000);
   }
 
-  function loadArray(key) {
-    var raw = localStorage.getItem(key);
-    if (!raw) return null;
-    var v = safeParse(raw, null);
-    return Array.isArray(v) ? v : null;
+  function apiErr(j) {
+    if (!j || typeof j !== 'object') return 'Request failed';
+    return String(j.error || j.message || 'Request failed');
   }
 
-  function seedIfMissing(key, seed) {
-    var v = loadArray(key);
-    if (v && v.length) return v;
-    localStorage.setItem(key, JSON.stringify(seed));
-    return seed;
-  }
-
-  function uniqStrings(arr) {
-    var out = [];
-    var set = new Set();
-    (arr || []).forEach(function (x) {
-      var s = (typeof x === 'string') ? x : (x && (x.name || x.value) ? (x.name || x.value) : '');
-      s = (s || '').toString().trim();
-      if (!s || set.has(s)) return;
-      set.add(s);
-      out.push(s);
-    });
-    return out;
-  }
-
-  function getActiveRoleLabel() {
-    var label = '';
-    try { label = localStorage.getItem('mci_cp_active_cp_user_label') || ''; } catch (e) {}
-    label = (label || '').toString().trim();
-    return label || 'Super admin';
-  }
-
-  function mapRequestsFromApi(rows) {
-    return (rows || []).map(function (r) {
-      return {
-        id: r.id,
-        requester: r.requester_id || 'Subscriber',
-        category: r.requested_category_name || '',
-        reason: r.reason || '',
-        createdAt: r.created_at || '',
-        status: r.status || 'pending'
-      };
-    });
-  }
-
-  function refetchFromApi() {
-    return Promise.all([
-      fetch('/api/v1/cp/categories', { credentials: 'include' }).then(function (r) { return r.json(); }),
-      fetch('/api/v1/cp/tags', { credentials: 'include' }).then(function (r) { return r.json(); }),
-      fetch('/api/v1/cp/category-requests', { credentials: 'include' }).then(function (r) { return r.json(); })
-    ]).then(function (results) {
-      apiState.categories = (results[0] && results[0].categories) ? results[0].categories : [];
-      apiState.tags = (results[1] && results[1].tags) ? results[1].tags : [];
-      apiState.requests = mapRequestsFromApi((results[2] && results[2].requests) ? results[2].requests : []);
-    });
-  }
-
-  function initApiMode() {
-    // If the API call fails (401/500), we fall back to localStorage mode.
-    return refetchFromApi()
-      .then(function () {
-        useApi = true;
-      })
-      .catch(function () {
-        useApi = false;
+  function fetchJson(url, opts) {
+    return fetch(url, opts).then(function (r) {
+      return r.text().then(function (text) {
+        var j;
+        try {
+          j = JSON.parse(text);
+        } catch (e) {
+          throw new Error('API returned non-JSON (check URL, rewrite rules, or PHP errors). Open Network tab for: ' + url);
+        }
+        if (!r.ok) throw new Error(apiErr(j));
+        return j;
       });
+    });
   }
 
-  function getCategories() {
-    if (useApi) {
-      return (apiState.categories || []).map(function (c) { return c.name; });
-    }
-    var raw = loadArray(CAT_KEY);
-    if (!raw) raw = seedIfMissing(CAT_KEY, SEED_CATEGORIES);
-    return uniqStrings(raw);
+  var state = { categories: [], tags: [], catMode: 'add', tagMode: 'add', catEditId: null, tagEditId: null };
+
+  function loadAll() {
+    return Promise.all([
+      fetchJson(apiCat, { credentials: 'include' }),
+      fetchJson(apiTag, { credentials: 'include' })
+    ]).then(function (pair) {
+      state.categories = pair[0].categories || [];
+      state.tags = pair[1].tags || [];
+    });
   }
 
-  function setCategories(arr) {
-    localStorage.setItem(CAT_KEY, JSON.stringify(uniqStrings(arr)));
+  function rootHasChildren(catId) {
+    return state.categories.some(function (x) {
+      return x.parent_id != null && String(x.parent_id) === String(catId);
+    });
   }
 
-  function getTags() {
-    if (useApi) {
-      return (apiState.tags || []).map(function (t) { return t.name; });
-    }
-    var raw = loadArray(TAG_KEY);
-    if (!raw) raw = seedIfMissing(TAG_KEY, SEED_TAGS);
-    return uniqStrings(raw);
-  }
-
-  function setTags(arr) {
-    localStorage.setItem(TAG_KEY, JSON.stringify(uniqStrings(arr)));
-  }
-
-  function getRequests() {
-    if (useApi) {
-      return Array.isArray(apiState.requests) ? apiState.requests : [];
-    }
-    var raw = loadArray(REQ_KEY);
-    if (!raw) raw = [];
-    return Array.isArray(raw) ? raw : [];
-  }
-
-  function setRequests(arr) {
-    localStorage.setItem(REQ_KEY, JSON.stringify(Array.isArray(arr) ? arr : []));
+  function fillCatParentOptions(selectedId, lockIfRootWithKids) {
+    var sel = el('mciCatParent');
+    sel.innerHTML = '<option value="">— Top level —</option>';
+    state.categories.forEach(function (c) {
+      if (c.parent_id) return;
+      if (state.catMode === 'edit' && state.catEditId && String(c.id) === String(state.catEditId)) return;
+      var opt = document.createElement('option');
+      opt.value = String(c.id);
+      opt.textContent = c.name;
+      if (selectedId != null && String(c.id) === String(selectedId)) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.disabled = !!lockIfRootWithKids;
   }
 
   function renderCategories() {
-    var tbody = document.getElementById('mciCpCategoriesBody');
-    if (!tbody) return;
-
-    var cats = getCategories();
+    var tbody = el('mciCpCategoriesBody');
     tbody.innerHTML = '';
-
-    if (!cats.length) {
-      tbody.innerHTML = '<tr><td colspan="2" class="text-muted small">No categories yet.</td></tr>';
+    if (!state.categories.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-muted small">No categories in database.</td></tr>';
       return;
     }
-
-    cats.forEach(function (name) {
+    state.categories.forEach(function (c) {
       var tr = document.createElement('tr');
-
-      var tdName = document.createElement('td');
-      tdName.textContent = name;
-      tr.appendChild(tdName);
-
-      var tdActions = document.createElement('td');
-      tdActions.className = 'text-end';
-
-      var btnEdit = document.createElement('button');
-      btnEdit.type = 'button';
-      btnEdit.className = 'btn btn-sm btn-outline-dark me-2';
-      btnEdit.textContent = 'Edit';
-      btnEdit.addEventListener('click', function () {
-        var next = window.prompt('Edit category name:', name);
-        if (!next) return;
-        next = next.toString().trim();
-        if (!next) return;
-
-        if (useApi) {
-          var cat = (apiState.categories || []).find(function (c) { return c.name === name; });
-          if (!cat || !cat.id) return;
-          fetch('/api/v1/cp/categories', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'update', id: cat.id, name: next })
-          })
-            .then(function () { return refetchFromApi(); })
-            .then(function () { renderCategories(); renderRequests(); })
-            .catch(function () { useApi = false; });
-          return;
-        }
-
-        var arr = getCategories();
-        var idx = arr.indexOf(name);
-        if (idx >= 0) arr[idx] = next;
-        setCategories(arr);
-        renderCategories();
-        renderRequests();
+      var parentLabel = '—';
+      if (c.parent_id) {
+        parentLabel = c.parent_name || ('#' + c.parent_id);
+      }
+      tr.innerHTML =
+        '<td class="fw-semibold">' + esc(c.name) + '</td>' +
+        '<td class="small">' + esc(parentLabel) + '</td>' +
+        '<td class="small text-muted">' + esc(c.slug || '—') + '</td>' +
+        '<td class="small">' + esc(String(c.sort_order != null ? c.sort_order : 0)) + '</td>' +
+        '<td class="small text-muted">' + esc(truncDesc(c.description, 80)) + '</td>' +
+        '<td class="text-end"></td>';
+      var td = tr.querySelector('td:last-child');
+      var b1 = document.createElement('button');
+      b1.type = 'button';
+      b1.className = 'btn btn-sm btn-outline-dark me-1';
+      b1.textContent = 'Edit';
+      b1.addEventListener('click', function () { openCatPanel('edit', c); });
+      var b2 = document.createElement('button');
+      b2.type = 'button';
+      b2.className = 'btn btn-sm btn-outline-danger';
+      b2.textContent = 'Delete';
+      b2.addEventListener('click', function () {
+        if (!window.confirm('Delete category “' + (c.name || '') + '”?')) return;
+        fetchJson(apiCat, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', id: c.id })
+        })
+          .then(function () { toast('Category deleted.', false); return loadAll(); })
+          .then(function () { renderCategories(); renderTags(); })
+          .catch(function (e) { toast(e.message, true); });
       });
-
-      var btnDelete = document.createElement('button');
-      btnDelete.type = 'button';
-      btnDelete.className = 'btn btn-sm btn-outline-danger';
-      btnDelete.textContent = 'Delete';
-      btnDelete.addEventListener('click', function () {
-        if (!window.confirm('Delete this category?')) return;
-
-        if (useApi) {
-          var cat = (apiState.categories || []).find(function (c) { return c.name === name; });
-          if (!cat || !cat.id) return;
-          fetch('/api/v1/cp/categories', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'delete', id: cat.id })
-          })
-            .then(function () { return refetchFromApi(); })
-            .then(function () { renderCategories(); renderRequests(); })
-            .catch(function () { useApi = false; });
-          return;
-        }
-
-        var arr = getCategories().filter(function (x) { return x !== name; });
-        setCategories(arr);
-        renderCategories();
-        renderRequests();
-      });
-
-      tdActions.appendChild(btnEdit);
-      tdActions.appendChild(btnDelete);
-      tr.appendChild(tdActions);
-
+      td.appendChild(b1);
+      td.appendChild(b2);
       tbody.appendChild(tr);
     });
   }
 
   function renderTags() {
-    var tbody = document.getElementById('mciCpTagsBody');
-    if (!tbody) return;
-
-    var tags = getTags();
+    var tbody = el('mciCpTagsBody');
     tbody.innerHTML = '';
-
-    if (!tags.length) {
-      tbody.innerHTML = '<tr><td colspan="2" class="text-muted small">No tags yet.</td></tr>';
+    if (!state.tags.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-muted small">No tags in database.</td></tr>';
       return;
     }
-
-    tags.forEach(function (name) {
+    state.tags.forEach(function (t) {
       var tr = document.createElement('tr');
-
-      var tdName = document.createElement('td');
-      tdName.textContent = name;
-      tr.appendChild(tdName);
-
-      var tdActions = document.createElement('td');
-      tdActions.className = 'text-end';
-
-      var btnEdit = document.createElement('button');
-      btnEdit.type = 'button';
-      btnEdit.className = 'btn btn-sm btn-outline-dark me-2';
-      btnEdit.textContent = 'Edit';
-      btnEdit.addEventListener('click', function () {
-        var next = window.prompt('Edit tag:', name);
-        if (!next) return;
-        next = next.toString().trim();
-        if (!next) return;
-
-        if (useApi) {
-          var tag = (apiState.tags || []).find(function (t) { return t.name === name; });
-          if (!tag || !tag.id) return;
-          fetch('/api/v1/cp/tags', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'update', id: tag.id, name: next })
-          })
-            .then(function () { return refetchFromApi(); })
-            .then(function () { renderTags(); })
-            .catch(function () { useApi = false; });
-          return;
-        }
-
-        var arr = getTags();
-        var idx = arr.indexOf(name);
-        if (idx >= 0) arr[idx] = next;
-        setTags(arr);
-        renderTags();
+      tr.innerHTML =
+        '<td class="fw-semibold">' + esc(t.name) + '</td>' +
+        '<td class="small text-muted">' + esc(t.slug || '—') + '</td>' +
+        '<td class="small text-muted">' + esc(truncDesc(t.description, 80)) + '</td>' +
+        '<td class="text-end"></td>';
+      var td = tr.querySelector('td:last-child');
+      var b1 = document.createElement('button');
+      b1.type = 'button';
+      b1.className = 'btn btn-sm btn-outline-dark me-1';
+      b1.textContent = 'Edit';
+      b1.addEventListener('click', function () { openTagPanel('edit', t); });
+      var b2 = document.createElement('button');
+      b2.type = 'button';
+      b2.className = 'btn btn-sm btn-outline-danger';
+      b2.textContent = 'Delete';
+      b2.addEventListener('click', function () {
+        if (!window.confirm('Delete tag “' + (t.name || '') + '”?')) return;
+        fetchJson(apiTag, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', id: t.id })
+        })
+          .then(function () { toast('Tag deleted.', false); return loadAll(); })
+          .then(function () { renderCategories(); renderTags(); })
+          .catch(function (e) { toast(e.message, true); });
       });
-
-      var btnDelete = document.createElement('button');
-      btnDelete.type = 'button';
-      btnDelete.className = 'btn btn-sm btn-outline-danger';
-      btnDelete.textContent = 'Delete';
-      btnDelete.addEventListener('click', function () {
-        if (!window.confirm('Delete this tag?')) return;
-
-        if (useApi) {
-          var tag = (apiState.tags || []).find(function (t) { return t.name === name; });
-          if (!tag || !tag.id) return;
-          fetch('/api/v1/cp/tags', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'delete', id: tag.id })
-          })
-            .then(function () { return refetchFromApi(); })
-            .then(function () { renderTags(); })
-            .catch(function () { useApi = false; });
-          return;
-        }
-
-        var arr = getTags().filter(function (x) { return x !== name; });
-        setTags(arr);
-        renderTags();
-      });
-
-      tdActions.appendChild(btnEdit);
-      tdActions.appendChild(btnDelete);
-      tr.appendChild(tdActions);
-
+      td.appendChild(b1);
+      td.appendChild(b2);
       tbody.appendChild(tr);
     });
   }
 
-  function renderRequests() {
-    var tbody = document.getElementById('mciCpCategoryRequestsBody');
-    if (!tbody) return;
-
-    var reqs = getRequests();
-    tbody.innerHTML = '';
-
-    var pending = reqs.filter(function (r) { return (r && r.status) === 'pending'; }).length;
-    var resolved = reqs.length - pending;
-
-    var badgePending = document.getElementById('mciCpReqPendingBadge');
-    var badgeResolved = document.getElementById('mciCpReqResolvedBadge');
-    if (badgePending) badgePending.textContent = String(pending);
-    if (badgeResolved) badgeResolved.textContent = String(resolved);
-
-    if (!reqs.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-muted small">No category requests yet.</td></tr>';
-      return;
-    }
-
-    reqs.slice().sort(function (a, b) {
-      var da = (a && a.createdAt) ? new Date(a.createdAt).getTime() : 0;
-      var db = (b && b.createdAt) ? new Date(b.createdAt).getTime() : 0;
-      return db - da;
-    }).forEach(function (r) {
-      if (!r) return;
-
-      var tr = document.createElement('tr');
-      var tdRequester = document.createElement('td');
-      tdRequester.textContent = r.requester || 'Subscriber';
-
-      var tdCategory = document.createElement('td');
-      tdCategory.textContent = r.category || '';
-
-      var tdReason = document.createElement('td');
-      tdReason.textContent = r.reason || '';
-
-      var tdWhen = document.createElement('td');
-      if (r.createdAt) {
-        var d = new Date(r.createdAt);
-        tdWhen.textContent = isNaN(d.getTime()) ? r.createdAt : d.toLocaleString();
-      } else {
-        tdWhen.textContent = '—';
-      }
-
-      var tdStatus = document.createElement('td');
-      var span = document.createElement('span');
-      span.className = 'badge rounded-pill ' + ((r.status === 'pending') ? 'text-bg-warning' : (r.status === 'approved' ? 'text-bg-success' : 'text-bg-secondary'));
-      span.textContent = (r.status || 'pending');
-      tdStatus.appendChild(span);
-
-      var tdActions = document.createElement('td');
-      tdActions.className = 'text-end';
-
-      if (r.status === 'pending') {
-        var btnApprove = document.createElement('button');
-        btnApprove.type = 'button';
-        btnApprove.className = 'btn btn-sm btn-outline-success me-2';
-        btnApprove.textContent = 'Approve';
-        btnApprove.addEventListener('click', function () {
-          if (useApi) {
-            if (!r || !r.id) return;
-            fetch('/api/v1/cp/category-requests/' + encodeURIComponent(String(r.id)) + '/approve', {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({})
-            })
-              .then(function () { return refetchFromApi(); })
-              .then(function () { renderCategories(); renderRequests(); })
-              .catch(function () { useApi = false; });
-            return;
-          }
-
-          var cats = getCategories();
-          var cat = (r.category || '').toString().trim();
-          if (cat && cats.indexOf(cat) === -1) cats.push(cat);
-          setCategories(cats);
-
-          var all = getRequests();
-          all.forEach(function (x) {
-            if (x === r) x.status = 'approved';
-          });
-          // In case object identity differs, fallback to matching by createdAt+requester+category.
-          all = all.map(function (x) {
-            if (!x) return x;
-            var match = (x.requester === r.requester && x.category === r.category && x.createdAt === r.createdAt);
-            if (match) x.status = 'approved';
-            return x;
-          });
-          setRequests(all);
-
-          renderCategories();
-          renderRequests();
-        });
-
-        var btnReject = document.createElement('button');
-        btnReject.type = 'button';
-        btnReject.className = 'btn btn-sm btn-outline-danger';
-        btnReject.textContent = 'Reject';
-        btnReject.addEventListener('click', function () {
-          if (useApi) {
-            if (!r || !r.id) return;
-            fetch('/api/v1/cp/category-requests/' + encodeURIComponent(String(r.id)) + '/reject', {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({})
-            })
-              .then(function () { return refetchFromApi(); })
-              .then(function () { renderRequests(); })
-              .catch(function () { useApi = false; });
-            return;
-          }
-
-          var all = getRequests();
-          all = all.map(function (x) {
-            if (!x) return x;
-            var match = (x.requester === r.requester && x.category === r.category && x.createdAt === r.createdAt);
-            if (match) x.status = 'rejected';
-            return x;
-          });
-          setRequests(all);
-          renderRequests();
-        });
-
-        tdActions.appendChild(btnApprove);
-        tdActions.appendChild(btnReject);
-      } else {
-        tdActions.textContent = '—';
-      }
-
-      tr.appendChild(tdRequester);
-      tr.appendChild(tdCategory);
-      tr.appendChild(tdReason);
-      tr.appendChild(tdWhen);
-      tr.appendChild(tdStatus);
-      tr.appendChild(tdActions);
-
-      tbody.appendChild(tr);
-    });
+  function esc(s) {
+    if (s == null) return '';
+    s = String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // UI: Add category
-  var btnAddCategory = document.getElementById('mciCpAddCategoryBtn');
-  if (btnAddCategory) {
-    btnAddCategory.addEventListener('click', function () {
-      var input = document.getElementById('mciCpNewCategoryInput');
-      if (!input) return;
-      var name = (input.value || '').toString().trim();
-      if (!name) return;
-
-      if (useApi) {
-        fetch('/api/v1/cp/categories', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'create', name: name })
-        })
-          .then(function () { return refetchFromApi(); })
-          .then(function () { input.value = ''; renderCategories(); renderRequests(); })
-          .catch(function () { useApi = false; });
-        return;
-      }
-
-      var cats = getCategories();
-      if (cats.indexOf(name) === -1) cats.push(name);
-      setCategories(cats);
-      input.value = '';
-      renderCategories();
-      renderRequests();
-    });
+  function truncDesc(s, n) {
+    if (s == null || s === '') return '—';
+    s = String(s);
+    if (s.length <= n) return s;
+    return s.slice(0, n) + '…';
   }
 
-  // UI: Add tag
-  var btnAddTag = document.getElementById('mciCpAddTagBtn');
-  if (btnAddTag) {
-    btnAddTag.addEventListener('click', function () {
-      var input = document.getElementById('mciCpNewTagInput');
-      if (!input) return;
-      var name = (input.value || '').toString().trim();
-      if (!name) return;
-
-      if (useApi) {
-        fetch('/api/v1/cp/tags', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'create', name: name })
-        })
-          .then(function () { return refetchFromApi(); })
-          .then(function () { input.value = ''; renderTags(); })
-          .catch(function () { useApi = false; });
-        return;
-      }
-
-      var tags = getTags();
-      if (tags.indexOf(name) === -1) tags.push(name);
-      setTags(tags);
-      input.value = '';
-      renderTags();
-    });
+  function openCatPanel(mode, row) {
+    state.catMode = mode;
+    state.catEditId = row && row.id ? row.id : null;
+    el('mciCatPanelTitle').textContent = mode === 'add' ? 'Add category' : 'Edit category';
+    el('mciCatName').value = row && row.name ? row.name : '';
+    el('mciCatSort').value = row && row.sort_order != null ? String(row.sort_order) : '0';
+    el('mciCatSlugNote').textContent = row && row.slug
+      ? 'Slug: ' + row.slug + ' (regenerated when name changes).'
+      : 'Slug is generated from name (globally unique).';
+    var lockParent = !!(row && !row.parent_id && rootHasChildren(row.id));
+    fillCatParentOptions(row && row.parent_id ? row.parent_id : null, lockParent);
+    el('mciCatParentHelp').textContent = lockParent
+      ? 'This category has subcategories; it must stay a top-level category.'
+      : 'Subcategories can only be created under a top-level category.';
+    el('mciCatPageTitle').value = row && row.page_title ? row.page_title : '';
+    el('mciCatMetaKeywords').value = row && row.meta_keywords ? row.meta_keywords : '';
+    el('mciCatMetaDescription').value = row && row.meta_description ? row.meta_description : '';
+    el('mciCatDescription').value = row && row.description ? row.description : '';
+    var panel = el('mciCatOffcanvas');
+    (bootstrap.Offcanvas.getInstance(panel) || new bootstrap.Offcanvas(panel)).show();
   }
 
-  // Render initial UI
-  initApiMode().then(function () {
-    if (useApi) {
-      renderCategories();
-      renderTags();
-      renderRequests();
-    } else {
-      seedIfMissing(CAT_KEY, SEED_CATEGORIES);
-      seedIfMissing(TAG_KEY, SEED_TAGS);
-      renderCategories();
-      renderTags();
-      renderRequests();
-    }
+  function openTagPanel(mode, row) {
+    state.tagMode = mode;
+    state.tagEditId = row && row.id ? row.id : null;
+    el('mciTagPanelTitle').textContent = mode === 'add' ? 'Add tag' : 'Edit tag';
+    el('mciTagName').value = row && row.name ? row.name : '';
+    el('mciTagSlugNote').textContent = row && row.slug
+      ? 'Slug: ' + row.slug + ' (regenerated when name changes).'
+      : 'Slug is generated from name (globally unique).';
+    el('mciTagPageTitle').value = row && row.page_title ? row.page_title : '';
+    el('mciTagMetaKeywords').value = row && row.meta_keywords ? row.meta_keywords : '';
+    el('mciTagMetaDescription').value = row && row.meta_description ? row.meta_description : '';
+    el('mciTagDescription').value = row && row.description ? row.description : '';
+    var panel = el('mciTagOffcanvas');
+    (bootstrap.Offcanvas.getInstance(panel) || new bootstrap.Offcanvas(panel)).show();
+  }
 
-    var roleLabel = getActiveRoleLabel();
-    var roleEl = document.getElementById('mciCpActiveRoleLabel');
-    if (roleEl) roleEl.textContent = roleLabel;
+  el('mciCpAddCategoryBtn').addEventListener('click', function () { openCatPanel('add', null); });
+  el('mciCpAddTagBtn').addEventListener('click', function () { openTagPanel('add', null); });
+
+  el('mciCatForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var name = el('mciCatName').value.trim();
+    if (!name) return;
+    var sortOrder = parseInt(el('mciCatSort').value, 10);
+    if (isNaN(sortOrder) || sortOrder < 0) sortOrder = 0;
+    var parentVal = el('mciCatParent').value;
+    var parentId = parentVal === '' ? null : parseInt(parentVal, 10);
+
+    var seo = {
+      page_title: el('mciCatPageTitle').value.trim(),
+      meta_keywords: el('mciCatMetaKeywords').value.trim(),
+      meta_description: el('mciCatMetaDescription').value.trim()
+    };
+    var desc = el('mciCatDescription').value;
+    var body = state.catMode === 'edit' && state.catEditId
+      ? { action: 'update', id: state.catEditId, name: name, sort_order: sortOrder, parent_id: parentId, description: desc, page_title: seo.page_title, meta_keywords: seo.meta_keywords, meta_description: seo.meta_description }
+      : { action: 'create', name: name, sort_order: sortOrder, parent_id: parentId, description: desc, page_title: seo.page_title, meta_keywords: seo.meta_keywords, meta_description: seo.meta_description };
+    fetchJson(apiCat, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+      .then(function () {
+        toast('Category saved.', false);
+        var oc = bootstrap.Offcanvas.getInstance(el('mciCatOffcanvas'));
+        if (oc) oc.hide();
+        return loadAll();
+      })
+      .then(function () { renderCategories(); })
+      .catch(function (e) { toast(e.message, true); });
   });
+
+  el('mciTagForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var name = el('mciTagName').value.trim();
+    if (!name) return;
+    var seo = {
+      page_title: el('mciTagPageTitle').value.trim(),
+      meta_keywords: el('mciTagMetaKeywords').value.trim(),
+      meta_description: el('mciTagMetaDescription').value.trim()
+    };
+    var desc = el('mciTagDescription').value;
+    var body = state.tagMode === 'edit' && state.tagEditId
+      ? { action: 'update', id: state.tagEditId, name: name, description: desc, page_title: seo.page_title, meta_keywords: seo.meta_keywords, meta_description: seo.meta_description }
+      : { action: 'create', name: name, description: desc, page_title: seo.page_title, meta_keywords: seo.meta_keywords, meta_description: seo.meta_description };
+    fetchJson(apiTag, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+      .then(function () {
+        toast('Tag saved.', false);
+        var oc = bootstrap.Offcanvas.getInstance(el('mciTagOffcanvas'));
+        if (oc) oc.hide();
+        return loadAll();
+      })
+      .then(function () { renderTags(); })
+      .catch(function (e) { toast(e.message, true); });
+  });
+
+  loadAll()
+    .then(function () { renderCategories(); renderTags(); })
+    .catch(function (e) { toast(e.message || 'Could not load taxonomy', true); });
 })();
 </script>
 HTML;
 
 ob_start();
 ?>
+
 <div class="row g-4">
   <div class="col-12 col-lg-3">
     <?php include __DIR__ . '/../../views/partials/cp-sidebar.php'; ?>
   </div>
   <div class="col-12 col-lg-9">
+    <div id="mciCpTaxAlert" class="alert py-2 small" role="status" hidden></div>
+
     <div class="card border-0 shadow-sm bg-white">
       <div class="card-body p-4">
-        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
-          <div>
-            <div class="fw-semibold mb-1">Categories, tags &amp; requests</div>
-            <div class="text-muted small">
-              Demo-only management in <code>localStorage</code>. Acting as: <span id="mciCpActiveRoleLabel">Super admin</span>
-            </div>
-          </div>
-          <div class="text-muted small">
-            <span class="badge text-bg-light border me-2">Pending <span id="mciCpReqPendingBadge">0</span></span>
-            <span class="badge text-bg-light border">Resolved <span id="mciCpReqResolvedBadge">0</span></span>
-          </div>
+        <div class="mb-3">
+          <div class="fw-semibold">Categories &amp; tags</div>
+          <div class="text-muted small">Categories (and subcategories), and tags can store an optional description plus SEO fields (page title, meta keywords, meta description).</div>
         </div>
 
-        <ul class="nav nav-tabs mci-tabs" role="tablist" aria-label="Category admin tabs">
+        <ul class="nav nav-tabs" role="tablist">
           <li class="nav-item" role="presentation">
-            <button class="nav-link active" type="button" data-bs-toggle="tab" data-bs-target="#mciTabCategories" role="tab" aria-selected="true">
-              Categories
-            </button>
+            <button class="nav-link active" type="button" data-bs-toggle="tab" data-bs-target="#mciTabCategories" role="tab">Categories</button>
           </li>
           <li class="nav-item" role="presentation">
-            <button class="nav-link" type="button" data-bs-toggle="tab" data-bs-target="#mciTabTags" role="tab" aria-selected="false">
-              Tags
-            </button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" type="button" data-bs-toggle="tab" data-bs-target="#mciTabRequests" role="tab" aria-selected="false">
-              Category requests
-            </button>
+            <button class="nav-link" type="button" data-bs-toggle="tab" data-bs-target="#mciTabTags" role="tab">Tags</button>
           </li>
         </ul>
 
         <div class="tab-content pt-3">
           <div class="tab-pane fade show active" id="mciTabCategories" role="tabpanel">
-            <div class="d-flex gap-2 flex-wrap align-items-center mb-3">
-              <input id="mciCpNewCategoryInput" class="form-control" style="max-width: 360px;" type="text" placeholder="New category name" />
-              <button id="mciCpAddCategoryBtn" class="btn btn-dark">Add category</button>
+            <div class="d-flex justify-content-end mb-2">
+              <button type="button" class="btn btn-dark btn-sm" id="mciCpAddCategoryBtn"><i class="bi bi-plus-lg me-1"></i>Add category</button>
             </div>
             <div class="table-responsive">
-              <table class="table table-bordered align-middle bg-white mb-0">
+              <table class="table table-sm table-bordered align-middle bg-white mb-0">
                 <thead class="table-light">
                   <tr>
-                    <th>Category</th>
-                    <th style="width: 200px;" class="text-end">Actions</th>
+                    <th>Name</th>
+                    <th>Parent</th>
+                    <th>Slug</th>
+                    <th>Sort</th>
+                    <th>Description</th>
+                    <th class="text-end" style="min-width:140px">Actions</th>
                   </tr>
                 </thead>
-                <tbody id="mciCpCategoriesBody"></tbody>
+                <tbody id="mciCpCategoriesBody">
+                  <tr><td colspan="6" class="text-muted small">Loading…</td></tr>
+                </tbody>
               </table>
             </div>
           </div>
 
           <div class="tab-pane fade" id="mciTabTags" role="tabpanel">
-            <div class="d-flex gap-2 flex-wrap align-items-center mb-3">
-              <input id="mciCpNewTagInput" class="form-control" style="max-width: 360px;" type="text" placeholder="New tag" />
-              <button id="mciCpAddTagBtn" class="btn btn-dark">Add tag</button>
+            <div class="d-flex justify-content-end mb-2">
+              <button type="button" class="btn btn-dark btn-sm" id="mciCpAddTagBtn"><i class="bi bi-plus-lg me-1"></i>Add tag</button>
             </div>
             <div class="table-responsive">
-              <table class="table table-bordered align-middle bg-white mb-0">
+              <table class="table table-sm table-bordered align-middle bg-white mb-0">
                 <thead class="table-light">
                   <tr>
-                    <th>Tag</th>
-                    <th style="width: 200px;" class="text-end">Actions</th>
+                    <th>Name</th>
+                    <th>Slug</th>
+                    <th>Description</th>
+                    <th class="text-end" style="min-width:140px">Actions</th>
                   </tr>
                 </thead>
-                <tbody id="mciCpTagsBody"></tbody>
+                <tbody id="mciCpTagsBody">
+                  <tr><td colspan="4" class="text-muted small">Loading…</td></tr>
+                </tbody>
               </table>
-            </div>
-          </div>
-
-          <div class="tab-pane fade" id="mciTabRequests" role="tabpanel">
-            <div class="table-responsive">
-              <table class="table table-bordered align-middle bg-white mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th>Requested by</th>
-                    <th>Requested category</th>
-                    <th>Reason / for what</th>
-                    <th>When</th>
-                    <th>Status</th>
-                    <th style="width: 220px;" class="text-end">Admin actions</th>
-                  </tr>
-                </thead>
-                <tbody id="mciCpCategoryRequestsBody"></tbody>
-              </table>
-            </div>
-            <div class="text-muted small mt-2">
-              When a request is approved, the category is added to the CP categories list (demo/localStorage).
             </div>
           </div>
         </div>
@@ -670,11 +378,86 @@ ob_start();
   </div>
 </div>
 
-<script id="mciSeedCategories" type="application/json"><?= htmlspecialchars(json_encode($seedCategories, JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?></script>
-<script id="mciSeedTags" type="application/json"><?= htmlspecialchars(json_encode($seedTags, JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8') ?></script>
+<div class="offcanvas offcanvas-end" tabindex="-1" id="mciCatOffcanvas" aria-labelledby="mciCatPanelTitle">
+  <div class="offcanvas-header border-bottom">
+    <h2 class="offcanvas-title h5 mb-0" id="mciCatPanelTitle">Category</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <form id="mciCatForm">
+      <div class="mb-3">
+        <label class="form-label" for="mciCatName">Name</label>
+        <input type="text" class="form-control" id="mciCatName" required maxlength="255" />
+        <div class="form-text" id="mciCatSlugNote"></div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="mciCatParent">Parent</label>
+        <select class="form-select" id="mciCatParent" aria-describedby="mciCatParentHelp"></select>
+        <div class="form-text" id="mciCatParentHelp"></div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="mciCatSort">Sort order</label>
+        <input type="number" class="form-control" id="mciCatSort" min="0" value="0" />
+        <div class="form-text">Lower numbers first within the same parent.</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="mciCatDescription">Description</label>
+        <textarea class="form-control" id="mciCatDescription" rows="4" placeholder="Optional text shown on category pages or in admin (not the SEO meta description below)"></textarea>
+      </div>
+      <hr class="my-3" />
+      <div class="fw-semibold small text-uppercase text-muted mb-2">SEO</div>
+      <div class="mb-3">
+        <label class="form-label" for="mciCatPageTitle">Page title</label>
+        <input type="text" class="form-control" id="mciCatPageTitle" maxlength="255" placeholder="&lt;title&gt; — defaults to category name if empty" autocomplete="off" />
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="mciCatMetaKeywords">Meta keywords</label>
+        <input type="text" class="form-control" id="mciCatMetaKeywords" maxlength="512" placeholder="Comma-separated keywords" autocomplete="off" />
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="mciCatMetaDescription">Meta description</label>
+        <textarea class="form-control" id="mciCatMetaDescription" rows="3" maxlength="512" placeholder="Short summary for search results"></textarea>
+      </div>
+      <button type="submit" class="btn btn-dark w-100">Save</button>
+    </form>
+  </div>
+</div>
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="mciTagOffcanvas" aria-labelledby="mciTagPanelTitle">
+  <div class="offcanvas-header border-bottom">
+    <h2 class="offcanvas-title h5 mb-0" id="mciTagPanelTitle">Tag</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <form id="mciTagForm">
+      <div class="mb-3">
+        <label class="form-label" for="mciTagName">Name</label>
+        <input type="text" class="form-control" id="mciTagName" required maxlength="255" />
+        <div class="form-text" id="mciTagSlugNote"></div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="mciTagDescription">Description</label>
+        <textarea class="form-control" id="mciTagDescription" rows="4" placeholder="Optional text for tag landing pages or internal use"></textarea>
+      </div>
+      <hr class="my-3" />
+      <div class="fw-semibold small text-uppercase text-muted mb-2">SEO</div>
+      <div class="mb-3">
+        <label class="form-label" for="mciTagPageTitle">Page title</label>
+        <input type="text" class="form-control" id="mciTagPageTitle" maxlength="255" placeholder="&lt;title&gt; — optional" autocomplete="off" />
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="mciTagMetaKeywords">Meta keywords</label>
+        <input type="text" class="form-control" id="mciTagMetaKeywords" maxlength="512" placeholder="Comma-separated keywords" autocomplete="off" />
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="mciTagMetaDescription">Meta description</label>
+        <textarea class="form-control" id="mciTagMetaDescription" rows="3" maxlength="512" placeholder="Short summary for search results"></textarea>
+      </div>
+      <button type="submit" class="btn btn-dark w-100">Save</button>
+    </form>
+  </div>
+</div>
 
 <?php
 $content = ob_get_clean();
 include __DIR__ . '/../../views/layout.php';
-?>
-

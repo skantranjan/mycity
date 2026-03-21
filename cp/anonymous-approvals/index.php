@@ -10,6 +10,10 @@ $extraJS = <<<'HTML'
 (function () {
   var QUEUE_KEY = 'mci_cp_anon_business_queue';
 
+  function apiUrl(suffix) {
+    return (typeof window.mciApiUrl === 'function' ? window.mciApiUrl : function (p) { return '/api/v1' + p; })(suffix);
+  }
+
   // API-first mode with localStorage fallback.
   var useApi = false;
   var apiSubmissions = [];
@@ -116,7 +120,7 @@ $extraJS = <<<'HTML'
       btnApproveLive.disabled = !!disabled;
       btnApproveLive.addEventListener('click', function () {
         if (useApi) {
-          fetch('/api/v1/cp/anon-business-submissions/' + encodeURIComponent(String(item.id)) + '/approve', {
+          fetch(apiUrl('/cp/anon-business-submissions/' + encodeURIComponent(String(item.id)) + '/approve'), {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -139,7 +143,7 @@ $extraJS = <<<'HTML'
       btnApproveClaim.disabled = !!disabled;
       btnApproveClaim.addEventListener('click', function () {
         if (useApi) {
-          fetch('/api/v1/cp/anon-business-submissions/' + encodeURIComponent(String(item.id)) + '/approve', {
+          fetch(apiUrl('/cp/anon-business-submissions/' + encodeURIComponent(String(item.id)) + '/approve'), {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -162,7 +166,7 @@ $extraJS = <<<'HTML'
       btnReject.disabled = !!disabled;
       btnReject.addEventListener('click', function () {
         if (useApi) {
-          fetch('/api/v1/cp/anon-business-submissions/' + encodeURIComponent(String(item.id)) + '/reject', {
+          fetch(apiUrl('/cp/anon-business-submissions/' + encodeURIComponent(String(item.id)) + '/reject'), {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -203,10 +207,18 @@ $extraJS = <<<'HTML'
   if (typeof window.localStorage === 'undefined') return;
 
   function loadApiQueue() {
-    return fetch('/api/v1/cp/anon-business-submissions', { credentials: 'include' })
+    return fetch(apiUrl('/cp/anon-business-submissions'), { credentials: 'include' })
       .then(function (r) {
-        if (!r.ok) throw new Error('api_failed');
-        return r.json();
+        return r.text().then(function (text) {
+          var data;
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            throw new Error('non_json');
+          }
+          if (!r.ok) throw new Error('api_failed');
+          return data;
+        });
       })
       .then(function (data) {
         apiSubmissions = (data && data.submissions) ? data.submissions : [];

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/mci_session.php';
+require_once __DIR__ . '/../../includes/mci_auth_messages.php';
+require_once __DIR__ . '/../../api/v1/lib/auth_direct.php';
 
 $pageTitle = 'Control panel login - My City Info';
 $activePage = '';
@@ -18,7 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 
-    $result = api_direct_cp_login($em, $pw);
+    // Same backend as POST /api/v1/auth/login with audience=cp
+    $result = api_direct_auth_login($em, $pw, 'cp');
     if (!empty($result['ok'])) {
         $user = $result['user'] ?? [];
         $userId = (string)($user['id'] ?? '');
@@ -112,7 +115,7 @@ ob_start();
         <?php endif; ?>
         <div class="mb-4">
           <div class="fw-bold fs-4">Control panel sign in</div>
-          <div class="text-muted small mt-1">Super admin or co-admin email and password.</div>
+          <div class="text-muted small mt-1">Super admin or co-admin. Same logic as <code>POST /api/v1/auth/login</code> with <code>audience=cp</code>.</div>
           <div class="alert alert-info small mt-3 mb-0 text-start">
             <strong>Dev:</strong> Accounts are seeded by <code>001_create_core_tables.sql</code>; see <code>project_brain/DEV_TEST_ACCOUNTS.md</code>.
           </div>
@@ -130,6 +133,10 @@ ob_start();
           </div>
 
           <button class="btn btn-dark w-100" type="submit">Sign in</button>
+
+          <div class="text-center mt-2">
+            <a class="text-decoration-none small" href="/forgot-password/">Forgot password?</a>
+          </div>
 
           <div class="text-muted small text-center mt-auto pt-3">
             <a href="/" class="text-decoration-none">Back to site</a>
