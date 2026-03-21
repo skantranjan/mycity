@@ -31,7 +31,7 @@
         <div class="mci-footer__title">Legal</div>
         <ul class="mci-footer__links" aria-label="Legal links">
           <li><a class="mci-footer__link" href="/privacy-policy/">Privacy Policy</a></li>
-          <li><a class="mci-footer__link" href="/terms/">Terms of Use</a></li>
+          <li><a class="mci-footer__link" href="/terms-of-use/">Terms of Use</a></li>
           <li><a class="mci-footer__link" href="/disclaimer/">Disclaimer</a></li>
           <li><a class="mci-footer__link" href="/cookies/">Cookies</a></li>
         </ul>

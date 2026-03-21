@@ -1,0 +1,14 @@
+---
+description: Point AI agents to the project knowledge base before large changes.
+alwaysApply: false
+---
+
+# Project brain
+
+Before substantial edits, read the project brain index:
+
+- `project_brain/README.md`
+
+Ground truth and architecture: `project_brain/PROJECT_CONTEXT.md`, `project_brain/ARCHITECTURE.md`, `project_brain/CODING_AND_SECURITY.md`.
+
+Database schema single source of truth: `api/v1/migrations/001_create_core_tables.sql`.

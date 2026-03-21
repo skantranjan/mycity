@@ -1,0 +1,8 @@
+# Local secrets — never commit
+.env
+
+# OS / IDE
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/*.log

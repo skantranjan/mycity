@@ -1,6 +1,11 @@
 RewriteEngine On
 
 # ------------------------------------------------------------
+# API routing: /api/v1/* -> api/v1/index.php
+# ------------------------------------------------------------
+RewriteRule ^api/v1/?(.*)$ api/v1/index.php [L,QSA]
+
+# ------------------------------------------------------------
 # Canonical redirects: .php URLs -> pretty URLs
 # ------------------------------------------------------------
 RewriteCond %{THE_REQUEST} \s/+index\.php[\s?] [NC]
@@ -28,7 +33,18 @@ RewriteCond %{THE_REQUEST} \s/+privacy-policy\.php[\s?] [NC]
 RewriteRule ^privacy-policy\.php$ /privacy-policy/ [R=301,L]
 
 RewriteCond %{THE_REQUEST} \s/+terms\.php[\s?] [NC]
-RewriteRule ^terms\.php$ /terms/ [R=301,L]
+RewriteRule ^terms\.php$ /terms-of-use/ [R=301,L]
+
+RewriteCond %{THE_REQUEST} \s/+forgot-password\.php[\s?] [NC]
+RewriteRule ^forgot-password\.php$ /forgot-password/ [R=301,L]
+
+RewriteCond %{THE_REQUEST} \s/+logout\.php[\s?] [NC]
+RewriteRule ^logout\.php$ /logout/ [R=301,L]
+
+# Old /category/ and /terms/ paths -> renamed folders
+RewriteRule ^category/(.+)$ /business-category/$1 [R=301,L]
+RewriteRule ^category/?$ /business-category/ [R=301,L]
+RewriteRule ^terms/?$ /terms-of-use/ [R=301,L]
 
 RewriteCond %{THE_REQUEST} \s/+disclaimer\.php[\s?] [NC]
 RewriteRule ^disclaimer\.php$ /disclaimer/ [R=301,L]
@@ -77,47 +93,101 @@ RewriteCond %{THE_REQUEST} \s/+cp/change-password\.php[\s?] [NC]
 RewriteRule ^cp/change-password\.php$ /cp/change-password/ [R=301,L]
 RewriteCond %{THE_REQUEST} \s/+cp/logout\.php[\s?] [NC]
 RewriteRule ^cp/logout\.php$ /cp/logout/ [R=301,L]
+RewriteCond %{THE_REQUEST} \s/+cp/login\.php[\s?] [NC]
+RewriteRule ^cp/login\.php$ /cp/login/ [R=301,L]
+
+RewriteCond %{THE_REQUEST} \s/+cp/categories\.php[\s?] [NC]
+RewriteRule ^cp/categories\.php$ /cp/categories/ [R=301,L]
+RewriteCond %{THE_REQUEST} \s/+cp/coadmins\.php[\s?] [NC]
+RewriteRule ^cp/coadmins\.php$ /cp/coadmins/ [R=301,L]
+RewriteCond %{THE_REQUEST} \s/+cp/anonymous-business\.php[\s?] [NC]
+RewriteRule ^cp/anonymous-business\.php$ /cp/anonymous-business/ [R=301,L]
 
 # ------------------------------------------------------------
-# Pretty URLs -> existing PHP entry points
+# Pretty URLs -> folder index.php entrypoints
 # ------------------------------------------------------------
 RewriteRule ^$ index.php [L]
-RewriteRule ^business-listing/?$ listings.php [L,QSA]
-RewriteRule ^submit-business-listing/?$ submit-listing.php [L,QSA]
-RewriteRule ^register/?$ register.php [L,QSA]
-RewriteRule ^login/?$ login.php [L,QSA]
-RewriteRule ^about/?$ about-us.php [L,QSA]
-RewriteRule ^contact/?$ contact.php [L,QSA]
-RewriteRule ^privacy-policy/?$ privacy-policy.php [L,QSA]
-RewriteRule ^terms/?$ terms.php [L,QSA]
-RewriteRule ^disclaimer/?$ disclaimer.php [L,QSA]
-RewriteRule ^cookies/?$ cookies.php [L,QSA]
-RewriteRule ^business/?$ business.php [L,QSA]
-RewriteRule ^listing-preview/?$ listing-preview.php [L,QSA]
+RewriteRule ^business-listing/?$ business-listing/index.php [L,QSA]
+RewriteRule ^submit-business-listing/?$ submit-business-listing/index.php [L,QSA]
+RewriteRule ^submit-listing/?$ /submit-business-listing/ [R=301,L,QSA]
+RewriteRule ^register/?$ register/index.php [L,QSA]
+RewriteRule ^login/?$ login/index.php [L,QSA]
+RewriteRule ^about/?$ about/index.php [L,QSA]
+RewriteRule ^contact/?$ contact/index.php [L,QSA]
+RewriteRule ^privacy-policy/?$ privacy-policy/index.php [L,QSA]
+RewriteRule ^terms-of-use/?$ terms-of-use/index.php [L,QSA]
+RewriteRule ^disclaimer/?$ disclaimer/index.php [L,QSA]
+RewriteRule ^cookies/?$ cookies/index.php [L,QSA]
+RewriteRule ^business/?$ business/index.php [L,QSA]
+RewriteRule ^forgot-password/?$ forgot-password/index.php [L,QSA]
+RewriteRule ^logout/?$ logout/index.php [L,QSA]
+RewriteRule ^listing-preview/?$ listing-preview/index.php [L,QSA]
+RewriteRule ^products/?$ products/index.php [L,QSA]
+RewriteRule ^services/?$ services/index.php [L,QSA]
 
-RewriteRule ^subscriber/dashboard/?$ subscriber/dashboard.php [L,QSA]
-RewriteRule ^subscriber/list-business/?$ subscriber/list-business.php [L,QSA]
-RewriteRule ^subscriber/listings/?$ subscriber/listings.php [L,QSA]
-RewriteRule ^subscriber/favourites/?$ subscriber/favourites.php [L,QSA]
-RewriteRule ^subscriber/enquiries/?$ subscriber/enquiries.php [L,QSA]
-RewriteRule ^subscriber/reviews/?$ subscriber/reviews.php [L,QSA]
-RewriteRule ^subscriber/profile/?$ subscriber/profile.php [L,QSA]
-RewriteRule ^subscriber/change-password/?$ subscriber/change-password.php [L,QSA]
-RewriteRule ^subscriber/logout/?$ subscriber/logout.php [L,QSA]
-RewriteRule ^subscriber/listing-delete/?$ subscriber/listing-delete.php [L,QSA]
+RewriteRule ^subscriber/dashboard/?$ subscriber/dashboard/index.php [L,QSA]
+RewriteRule ^subscriber/list-business/?$ subscriber/list-business/index.php [L,QSA]
+RewriteRule ^subscriber/listings/?$ subscriber/listings/index.php [L,QSA]
+RewriteRule ^subscriber/favourites/?$ subscriber/favourites/index.php [L,QSA]
+RewriteRule ^subscriber/enquiries/?$ subscriber/enquiries/index.php [L,QSA]
+RewriteRule ^subscriber/reviews/?$ subscriber/reviews/index.php [L,QSA]
+RewriteRule ^subscriber/profile/?$ subscriber/profile/index.php [L,QSA]
+RewriteRule ^subscriber/change-password/?$ subscriber/change-password/index.php [L,QSA]
+RewriteRule ^subscriber/logout/?$ subscriber/logout/index.php [L,QSA]
+RewriteRule ^subscriber/listing-delete/?$ subscriber/listing-delete/index.php [L,QSA]
 
-RewriteRule ^cp/dashboard/?$ cp/dashboard.php [L,QSA]
-RewriteRule ^cp/users/?$ cp/users.php [L,QSA]
-RewriteRule ^cp/listings/?$ cp/listings.php [L,QSA]
-RewriteRule ^cp/anonymous-approvals/?$ cp/anonymous-approvals.php [L,QSA]
-RewriteRule ^cp/profile/?$ cp/profile.php [L,QSA]
-RewriteRule ^cp/change-password/?$ cp/change-password.php [L,QSA]
-RewriteRule ^cp/logout/?$ cp/logout.php [L,QSA]
+RewriteRule ^cp/dashboard/?$ cp/dashboard/index.php [L,QSA]
+RewriteRule ^cp/users/?$ cp/users/index.php [L,QSA]
+RewriteRule ^cp/listings/?$ cp/listings/index.php [L,QSA]
+RewriteRule ^cp/anonymous-approvals/?$ cp/anonymous-approvals/index.php [L,QSA]
+RewriteRule ^cp/profile/?$ cp/profile/index.php [L,QSA]
+RewriteRule ^cp/change-password/?$ cp/change-password/index.php [L,QSA]
+RewriteRule ^cp/logout/?$ cp/logout/index.php [L,QSA]
+RewriteRule ^cp/categories/?$ cp/categories/index.php [L,QSA]
+RewriteRule ^cp/coadmins/?$ cp/coadmins/index.php [L,QSA]
+RewriteRule ^cp/anonymous-business/?$ cp/anonymous-business/index.php [L,QSA]
 
-# Keep existing category folder rewrites working
-RewriteRule ^category/?$ category/index.php [L,QSA]
+# Legacy .php URLs (root/subscriber scripts removed; internal rewrite to folder entrypoints)
+RewriteRule ^listings\.php$ business-listing/index.php [L,QSA]
+RewriteRule ^business\.php$ business/index.php [L,QSA]
+RewriteRule ^contact\.php$ contact/index.php [L,QSA]
+RewriteRule ^cookies\.php$ cookies/index.php [L,QSA]
+RewriteRule ^disclaimer\.php$ disclaimer/index.php [L,QSA]
+RewriteRule ^login\.php$ login/index.php [L,QSA]
+RewriteRule ^privacy-policy\.php$ privacy-policy/index.php [L,QSA]
+RewriteRule ^register\.php$ register/index.php [L,QSA]
+RewriteRule ^submit-listing\.php$ submit-business-listing/index.php [L,QSA]
+RewriteRule ^terms\.php$ terms-of-use/index.php [L,QSA]
+RewriteRule ^forgot-password\.php$ forgot-password/index.php [L,QSA]
+RewriteRule ^logout\.php$ logout/index.php [L,QSA]
+RewriteRule ^listing-preview\.php$ listing-preview/index.php [L,QSA]
 
-# Final fallback for legacy direct php requests and physical assets
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^cp/dashboard\.php$ cp/dashboard/index.php [L,QSA]
+RewriteRule ^cp/users\.php$ cp/users/index.php [L,QSA]
+RewriteRule ^cp/listings\.php$ cp/listings/index.php [L,QSA]
+RewriteRule ^cp/anonymous-approvals\.php$ cp/anonymous-approvals/index.php [L,QSA]
+RewriteRule ^cp/profile\.php$ cp/profile/index.php [L,QSA]
+RewriteRule ^cp/change-password\.php$ cp/change-password/index.php [L,QSA]
+RewriteRule ^cp/logout\.php$ cp/logout/index.php [L,QSA]
+RewriteRule ^cp/login\.php$ cp/login/index.php [L,QSA]
+RewriteRule ^cp/categories\.php$ cp/categories/index.php [L,QSA]
+RewriteRule ^cp/coadmins\.php$ cp/coadmins/index.php [L,QSA]
+RewriteRule ^cp/anonymous-business\.php$ cp/anonymous-business/index.php [L,QSA]
+
+RewriteRule ^subscriber/dashboard\.php$ subscriber/dashboard/index.php [L,QSA]
+RewriteRule ^subscriber/list-business\.php$ subscriber/list-business/index.php [L,QSA]
+RewriteRule ^subscriber/listings\.php$ subscriber/listings/index.php [L,QSA]
+RewriteRule ^subscriber/favourites\.php$ subscriber/favourites/index.php [L,QSA]
+RewriteRule ^subscriber/enquiries\.php$ subscriber/enquiries/index.php [L,QSA]
+RewriteRule ^subscriber/reviews\.php$ subscriber/reviews/index.php [L,QSA]
+RewriteRule ^subscriber/profile\.php$ subscriber/profile/index.php [L,QSA]
+RewriteRule ^subscriber/change-password\.php$ subscriber/change-password/index.php [L,QSA]
+RewriteRule ^subscriber/logout\.php$ subscriber/logout/index.php [L,QSA]
+RewriteRule ^subscriber/listing-delete\.php$ subscriber/listing-delete/index.php [L,QSA]
+
+# Business categories (folder has its own .htaccess for /business-category/{slug}/)
+RewriteRule ^business-category/?$ business-category/index.php [L,QSA]
+
+# Final fallback: avoid rewriting existing files (but allow directories to be rewritten)
+RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]

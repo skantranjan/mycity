@@ -7,6 +7,35 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
     $mm = $m % 60;
     $times[] = sprintf('%02d:%02d', $h, $mm);
 }
+
+$submitPublicGuest = !empty($submitPublicGuest);
+$submitHideStep7InlinePreview = !empty($submitHideStep7InlinePreview);
+if (!isset($mciExistingListingSlugs)) {
+    require_once __DIR__ . '/../../includes/mci_directory_listings.php';
+    /** @var list<array<string, mixed>> $mciDirectoryListings */
+    $mciExistingListingSlugs = array_values(array_unique(array_filter(array_map(
+        static function (array $row): string {
+            return trim((string) ($row['slug'] ?? ''));
+        },
+        $mciDirectoryListings
+    ))));
+}
+$mciPublicSiteOrigin = $mciPublicSiteOrigin ?? 'https://mycityinfo.com';
+
+// Reusable wizard inner for both subscriber + CP super-admin flows.
+// Caller can override these labels/behavior via variables.
+$submitKicker = $submitKicker ?? 'Subscriber';
+$submitTitle = $submitTitle ?? 'List your business';
+$submitLead = $submitLead ?? 'Seven guided steps — save anytime; preview before you publish.';
+
+$formOrigin = $formOrigin ?? 'ui_subscriber_listing';
+$postingType = $postingType ?? 'registered';
+$requesterLabel = $requesterLabel ?? 'Subscriber';
+
+$step7HeaderDesc = $step7HeaderDesc ?? 'You’re signed in — submit when everything looks right.';
+$step7AlertTitle = $step7AlertTitle ?? 'Preview &amp; publish';
+$step7AlertBody = $step7AlertBody ?? 'You’re already logged in. Confirm the preview below and submit your business for listing review.';
+$step7SubmitText = $step7SubmitText ?? 'Submit listing';
 ?>
 
 <div class="mci-submit-wrap" id="mciSubmitWrap">
@@ -14,9 +43,9 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
     <div class="col-12">
 
       <div class="mci-submit-hero mb-4">
-        <p class="mci-submit-hero__kicker">Subscriber</p>
-        <h1 class="mci-submit-hero__title">List your business</h1>
-        <p class="mci-submit-hero__lead">Seven guided steps — save anytime; preview before you publish.</p>
+        <p class="mci-submit-hero__kicker"><?= htmlspecialchars((string) $submitKicker, ENT_QUOTES, 'UTF-8') ?></p>
+        <h1 class="mci-submit-hero__title"><?= htmlspecialchars((string) $submitTitle, ENT_QUOTES, 'UTF-8') ?></h1>
+        <p class="mci-submit-hero__lead"><?= htmlspecialchars((string) $submitLead, ENT_QUOTES, 'UTF-8') ?></p>
       </div>
 
       <div class="mci-steps-nav mci-steps-nav--7 mb-4" aria-label="Form progress">
@@ -34,10 +63,9 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
             $n = $i + 1;
             ?>
           <button type="button" class="mci-step-btn <?= $n === 1 ? 'is-active' : '' ?>" data-step="<?= $n ?>"
-            aria-label="Step <?= $n ?>: <?= htmlspecialchars($s['label']) ?>">
-            <?php if ($n === 1): ?>
-              aria-current="step"
-            <?php endif; ?>
+            aria-label="Step <?= $n ?>: <?= htmlspecialchars($s['label']) ?>"
+            <?= $n === 1 ? 'aria-current="step"' : '' ?>
+          >
             <span class="mci-step-btn__dot">
               <i class="bi <?= htmlspecialchars($s['icon']) ?>"></i>
               <span class="mci-step-btn__check"><i class="bi bi-check-lg"></i></span>
@@ -55,9 +83,14 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
       </div>
 
       <form action="#" method="post" enctype="multipart/form-data" id="mciSubmitForm" novalidate>
-        <input type="hidden" name="form_origin" value="ui_subscriber_listing" />
-        <input type="hidden" name="posting_type" value="registered" />
+        <input type="hidden" name="form_origin" value="<?= htmlspecialchars((string) $formOrigin, ENT_QUOTES, 'UTF-8') ?>" />
+        <?php if (!$submitPublicGuest): ?>
+        <input type="hidden" name="posting_type" value="<?= htmlspecialchars((string) $postingType, ENT_QUOTES, 'UTF-8') ?>" />
+        <?php endif; ?>
+        <input type="hidden" id="mciRequesterLabel" value="<?= htmlspecialchars((string) $requesterLabel, ENT_QUOTES, 'UTF-8') ?>" />
+        <input type="hidden" id="mciSubmitPublicGuest" value="<?= $submitPublicGuest ? '1' : '0' ?>" />
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars((string) ($mciSubmitCsrfToken ?? ''), ENT_QUOTES, 'UTF-8') ?>" />
+        <script type="application/json" id="mciExistingSlugs"><?= json_encode($mciExistingListingSlugs, JSON_UNESCAPED_SLASHES) ?></script>
 
         <!-- STEP 1 — Business + tags -->
         <div class="mci-step is-active" data-step="1">
@@ -74,6 +107,32 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
               <input class="form-control form-control-lg" id="listing_title" type="text" name="listing_title" placeholder="e.g. City Auto Care" required autocomplete="organization" />
             </div>
             <div class="col-12">
+              <label class="form-label mci-field-label" for="listing_slug">Slug</label>
+              <div class="input-group">
+                <input
+                  class="form-control"
+                  id="listing_slug"
+                  type="text"
+                  name="listing_slug"
+                  autocomplete="off"
+                  placeholder="e.g. city-auto-care"
+                  pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                  title="Lowercase letters, numbers, and hyphens only"
+                />
+                <button type="button" class="btn btn-outline-secondary" id="mciCheckSlugBtn">Check availability</button>
+              </div>
+              <div class="form-text">Auto-filled from your business name — edit if needed. Your public URL also uses your <strong>city</strong> (step 3) when set.</div>
+              <div id="mciSlugStatus" class="small mt-2" aria-live="polite"></div>
+              <div
+                class="text-muted small mt-2 pt-1 border-top"
+                id="mciBusinessUrlPreview"
+                data-origin="<?= htmlspecialchars((string) $mciPublicSiteOrigin, ENT_QUOTES, 'UTF-8') ?>"
+              >
+                <span class="fw-semibold text-body">Your listing URL will look like:</span><br />
+                <span id="mciBusinessUrlPreviewText" class="user-select-all">—</span>
+              </div>
+            </div>
+            <div class="col-12">
               <label class="form-label mci-field-label" for="tagline">Tagline</label>
               <input class="form-control" id="tagline" type="text" name="tagline" placeholder="One punchy line customers will remember" />
             </div>
@@ -84,7 +143,34 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
                 <?php foreach ($categories as $c): ?>
                   <option value="<?= htmlspecialchars($c) ?>"><?= htmlspecialchars($c) ?></option>
                 <?php endforeach; ?>
+                <option value="__request_new__">Request a new category…</option>
               </select>
+
+              <input type="hidden" id="is_category_request" value="0" />
+
+              <div id="categoryRequestFields" class="d-none mt-3">
+                <div class="mci-submit-label mb-1" style="font-size: 0.9rem;">Category request</div>
+
+                <label class="form-label small mb-1" for="requested_category_name">Requested category name</label>
+                <input
+                  class="form-control"
+                  id="requested_category_name"
+                  type="text"
+                  name="requested_category_name"
+                  placeholder="e.g. Homeopathy Clinic"
+                  autocomplete="off"
+                />
+
+                <label class="form-label small mt-3 mb-1" for="category_request_reason">For what / why do you need it?</label>
+                <textarea
+                  class="form-control"
+                  id="category_request_reason"
+                  name="category_request_reason"
+                  rows="3"
+                  placeholder="Tell us what you want customers to find..."
+                ></textarea>
+                <div class="form-text">Saved to CP queue (demo/localStorage).</div>
+              </div>
             </div>
             <div class="col-12">
               <label class="form-label mci-field-label" for="description">Description <span class="text-danger">*</span></label>
@@ -450,20 +536,75 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
             <div class="mci-step-header__icon mci-step-header__icon--7" aria-hidden="true"><i class="bi bi-send"></i></div>
             <div>
               <div class="mci-step-header__title">Review &amp; publish</div>
-              <div class="mci-step-header__desc">You’re signed in — submit when everything looks right.</div>
+              <div class="mci-step-header__desc"><?= htmlspecialchars((string) $step7HeaderDesc, ENT_QUOTES, 'UTF-8') ?></div>
             </div>
           </div>
+          <?php if (!$submitPublicGuest): ?>
           <div class="alert alert-light border mb-4 py-3">
             <div class="fw-semibold small mb-1">
               <i class="bi bi-person-check-fill me-1 text-primary" aria-hidden="true"></i>
-              Preview &amp; publish
+                <?= htmlspecialchars((string) $step7AlertTitle, ENT_QUOTES, 'UTF-8') ?>
             </div>
             <p class="text-muted small mb-0">
-              You’re already logged in. Confirm the preview below and submit your business for listing review.
+              <?= htmlspecialchars((string) $step7AlertBody, ENT_QUOTES, 'UTF-8') ?>
             </p>
           </div>
+          <?php else: ?>
+          <p class="text-muted small mb-3"><?= htmlspecialchars((string) $step7AlertBody, ENT_QUOTES, 'UTF-8') ?></p>
+          <div class="mci-posting-cards mb-4">
+            <label class="mci-posting-card">
+              <input type="radio" name="posting_type" value="registered" checked class="visually-hidden mci-posting-card__radio" />
+              <span class="mci-posting-card__icon"><i class="bi bi-person-check-fill"></i></span>
+              <div>
+                <div class="mci-posting-card__title">With an account</div>
+                <div class="mci-posting-card__desc">Faster publication, manage your listing anytime, receive review alerts.</div>
+              </div>
+              <span class="mci-posting-card__check"><i class="bi bi-check-circle-fill"></i></span>
+            </label>
+            <label class="mci-posting-card">
+              <input type="radio" name="posting_type" value="anonymous" class="visually-hidden mci-posting-card__radio" />
+              <span class="mci-posting-card__icon mci-posting-card__icon--anon"><i class="bi bi-incognito"></i></span>
+              <div>
+                <div class="mci-posting-card__title">Anonymous</div>
+                <div class="mci-posting-card__desc">No account needed. Admin reviews the listing before it goes live.</div>
+              </div>
+              <span class="mci-posting-card__check"><i class="bi bi-check-circle-fill"></i></span>
+            </label>
+          </div>
+          <div id="accountFields">
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label mci-field-label" for="email">Email <span class="text-danger">*</span></label>
+                <input class="form-control" id="email" type="email" name="email" placeholder="you@example.com" autocomplete="email" />
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label mci-field-label" for="password">Password <span class="text-danger">*</span></label>
+                <input class="form-control" id="password" type="password" name="password" placeholder="Create a password" autocomplete="new-password" />
+              </div>
+            </div>
+            <p class="text-muted small mb-3">Already registered? <a href="/login/?return=<?= rawurlencode('/submit-business-listing/') ?>" class="fw-semibold">Log in</a> — your details will be linked automatically.</p>
+            <div class="mci-or-divider mb-3"><span>or continue with</span></div>
+            <div class="d-flex gap-2 mb-4 flex-wrap">
+              <button type="button" class="btn btn-outline-secondary flex-fill mci-social-login-btn" data-provider="Google">
+                <svg class="me-1" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Google
+              </button>
+              <button type="button" class="btn btn-outline-secondary flex-fill mci-social-login-btn" data-provider="Facebook">
+                <i class="bi bi-facebook me-1" aria-hidden="true" style="color:#1877f2"></i>Facebook
+              </button>
+              <button type="button" class="btn btn-outline-secondary flex-fill mci-social-login-btn" data-provider="Apple">
+                <i class="bi bi-apple me-1" aria-hidden="true"></i>Apple
+              </button>
+            </div>
+          </div>
+          <?php endif; ?>
 
-          <div class="mci-submit-preview mb-4">
+          <div class="mci-submit-preview mb-4<?= $submitHideStep7InlinePreview ? ' d-none' : '' ?>" id="mciStep7InlinePreview" aria-hidden="<?= $submitHideStep7InlinePreview ? 'true' : 'false' ?>">
             <div class="mci-preview-label">
               <i class="bi bi-eye me-1" aria-hidden="true"></i>Preview
             </div>
@@ -506,13 +647,21 @@ for ($m = 0; $m < 24 * 60; $m += 30) {
               <span id="summCity" class="mci-submit-summary__item text-muted">No city</span>
             </div>
           </div>
-          <!-- (Removed external preview CTA; inline preview is shown above) -->
+          <div class="mci-preview-listing-bar mb-4 d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-3">
+            <div>
+              <div class="fw-semibold small">Want to see how it looks?</div>
+              <div class="text-muted small">Opens the full listing preview in a new tab. Your progress is saved in this browser.</div>
+            </div>
+            <button type="button" class="btn btn-outline-dark btn-sm flex-shrink-0" id="previewListingBtn">
+              <i class="bi bi-eye me-1" aria-hidden="true"></i>Preview listing
+            </button>
+          </div>
           <div class="form-check mb-4">
             <input class="form-check-input" type="checkbox" id="agreeTerms" required />
-            <label class="form-check-label" for="agreeTerms">I agree to the <a href="/terms/">Terms of Service</a> for listing on My City Info.</label>
+            <label class="form-check-label" for="agreeTerms">I agree to the <a href="/terms-of-use/">Terms of Service</a> for listing on My City Info.</label>
           </div>
           <button class="btn btn-dark btn-lg px-5 w-100" type="submit" id="submitBtn">
-            <i class="bi bi-check2-circle me-2" aria-hidden="true"></i>Submit listing
+            <i class="bi bi-check2-circle me-2" aria-hidden="true"></i><?= htmlspecialchars((string) $step7SubmitText, ENT_QUOTES, 'UTF-8') ?>
           </button>
           <p class="text-muted small text-center mt-3 mb-0">UI-only — backend save and moderation will connect when ready.</p>
         </div>
