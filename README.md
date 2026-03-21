@@ -12,7 +12,7 @@ This repository is a server-rendered PHP web app (“My City Info”) for discov
   - `views/partials/*` (header, footer, navigation sidebars, CTAs)
 
 ### “List your business” submit flow (public)
-- Page: `submit-listing.php`
+- Page: `submit-business-listing/index.php` (pretty URL: `/submit-business-listing/`)
 - UI: multi-step wizard with step indicators and a progressive form.
 - Key behaviors implemented:
   - Dynamic **Services & products** add-more UI (FAQ-style rows).
@@ -22,12 +22,12 @@ This repository is a server-rendered PHP web app (“My City Info”) for discov
     - cropped output stored in hidden fields (`img_logo`, `img_profile`, `img_banner`) as data URLs (base64).
   - A local **preview page**:
     - Button `Preview listing` saves the current form state into `localStorage`
-    - Opens `listing-preview.php`
+    - Opens `/listing-preview/` (`listing-preview/index.php`)
     - Local preview data is cleared on submit
 
 ### Business detail page layout
 - “Nearby” section placement and compact listing rendering were updated previously:
-  - `business.php` renders “Nearby” in the right sidebar below favorites.
+  - `business/index.php` renders “Nearby” in the right sidebar below favorites.
   - `views/components/listing-card.php` supports a `compact` variant for sidebar usage.
 
 ## Post-login experiences (Subscriber + CP)
@@ -73,19 +73,19 @@ This repository is a server-rendered PHP web app (“My City Info”) for discov
 
 ### Status filtering on reply UIs
 - Subscriber screens now support filtering by status:
-  - `subscriber/enquiries.php` filter options:
+  - `subscriber/enquiries/index.php` filter options:
     - All, New, Awaiting response, Replied
-  - `subscriber/reviews.php` filter options:
+  - `subscriber/reviews/index.php` filter options:
     - All, New, Awaiting response, Replied
 - Replying in the demo updates the in-memory status so filtering reflects changes.
 
 ### Delete listing flow (2-step confirmation)
-- `subscriber/listings.php` routes:
-  - View: public `business.php?slug=...`
-  - Edit: `subscriber/list-business.php?edit=1&slug=...`
-  - Delete: `subscriber/listing-delete.php?slug=...`
+- `subscriber/listings/index.php` routes:
+  - View: public `/business/?slug=...`
+  - Edit: `/subscriber/list-business/?edit=1&slug=...`
+  - Delete: `/subscriber/listing-delete/?slug=...`
 - New delete UI:
-  - `subscriber/listing-delete.php`
+  - `subscriber/listing-delete/index.php`
   - Step 1: choose delete permanently OR mark permanently closed
   - Step 2: require typing `delete` to confirm permanent deletion (UI demo)
 
@@ -100,12 +100,13 @@ This repository is a server-rendered PHP web app (“My City Info”) for discov
 - `views/layout.php` — shared layout, includes theme shell logic and JS.
 - `assets/css/theme.css` — global theme tokens + dark-mode overrides.
 - `assets/css/app-areas.css` — subscriber + CP panel styling.
-- `submit-listing.php` — public submit wizard.
-- `listing-preview.php` — localStorage-based preview render.
-- `subscriber/list-business.php` + `assets/js/subscriber-list-business.js` + `views/partials/subscriber-list-business-inner.php` — post-login wizard.
-- `subscriber/enquiries.php` — enquiries list + reply + status filter.
-- `subscriber/reviews.php` — comments/ratings reply + status filter.
-- `subscriber/listing-delete.php` — 2-step delete confirmation.
+- `submit-business-listing/index.php` — public submit wizard (`/submit-business-listing/`).
+- `listing-preview/index.php` — localStorage-based preview render (`/listing-preview/`).
+- `subscriber/list-business/index.php` + `assets/js/subscriber-list-business.js` + `views/partials/subscriber-list-business-inner.php` — post-login wizard.
+- `subscriber/enquiries/index.php` — enquiries list + reply + status filter.
+- `subscriber/reviews/index.php` — comments/ratings reply + status filter.
+- `subscriber/listing-delete/index.php` — 2-step delete confirmation.
+- `.htaccess` — pretty URLs and legacy `*.php` rewrites to `*/index.php`.
 - `includes/mci_app_profile.php` — session-backed profile avatar/name for header dropdown.
 
 ## Notes / assumptions

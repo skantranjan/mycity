@@ -1,0 +1,55 @@
+---
+description: PHP page structure, pretty URLs, and includes paths for My City Info
+alwaysApply: true
+---
+
+# PHP pages & routing (My City Info)
+
+## Canonical location for a routable page
+
+- **Put the real implementation in** `<segment>/index.php` (e.g. `login/index.php`, `business-listing/index.php`, `subscriber/dashboard/index.php`, `forgot-password/index.php`, `listing-preview/index.php`, `logout/index.php`).
+- **Control panel:** same pattern under **`cp/<feature>/index.php`** (e.g. `cp/dashboard/index.php`, `cp/categories/index.php`). Do **not** keep parallel `cp/<feature>.php` with the same markup.
+- **Do not** keep a second full copy at the project root (e.g. avoid both `login.php` and `login/index.php` with duplicated markup/logic). Root `index.php` is only the home page.
+
+## Legacy / bookmark URLs
+
+- If an old root script existed (`login.php`, `subscriber/dashboard.php`, etc.), either:
+  - **Prefer:** rely on `.htaccess` internal rewrites to the folder `index.php`, or
+  - **Optional thin file** at the old path: only `header('Location: /pretty-url/', true, 301); exit;` — no business logic.
+
+## Includes and layout paths
+
+From **`site-root/<folder>/index.php`** (one level down):
+
+- `require_once __DIR__ . '/../includes/...';`
+- `include __DIR__ . '/../views/layout.php';` (and `views/components/`, `views/partials/`).
+
+From **`subscriber/<feature>/index.php`** or **`cp/<feature>/index.php`** (two levels under area):
+
+- `require_once __DIR__ . '/../../includes/...';`
+- `include __DIR__ . '/../../views/...';`
+
+## Links and form actions in HTML/PHP
+
+- Use **pretty paths** (trailing slash): `/login/`, `/register/`, `/business-listing/`, `/business-category/`, `/products/`, `/services/`, `/listing-preview/`, `/forgot-password/`, `/logout/`, `/cp/dashboard/`, `/subscriber/dashboard/`, not `*.php` in new code.
+- Form `action` should target the same pretty URL (e.g. `action="/login/"`).
+
+## Apache
+
+- New public route: add a **`RewriteRule`** for the pretty path → `folder/index.php` in root `.htaccess`.
+- If removing a former `*.php` script, add a **legacy** `RewriteRule` from `^script\.php$` → `folder/index.php` so old links keep working.
+
+## API (separate from PHP pages)
+
+- REST API lives under **`api/v1/`** (single router `index.php`). Do not implement page controllers inside `api/v1/cp` or `api/v1/subscriber` as duplicate “sites”; use the router + shared `api/v1/lib/`.
+
+## File encoding
+
+- Save PHP files as **UTF-8 without BOM**. BOM breaks `declare(strict_types=1);` if it is not the first bytes after `<?php`.
+
+## Quick checklist for a new feature
+
+1. Create `your-feature/index.php` with full logic + layout include.
+2. Wire `.htaccess` pretty URL → `your-feature/index.php`.
+3. Update nav/footer links to `/your-feature/`.
+4. Add legacy rewrite only if an old `.php` URL existed.

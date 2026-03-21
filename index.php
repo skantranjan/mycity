@@ -153,7 +153,7 @@ ob_start();
       </div>
       <div class="d-flex flex-column flex-sm-row gap-2 align-self-stretch align-self-sm-auto">
         <a href="/business-listing/" class="btn btn-home-outline btn-sm text-center mci-touch-target mci-touch-target--sm">See all listings →</a>
-        <a href="/category/" class="btn btn-home-outline btn-sm text-center mci-touch-target mci-touch-target--sm">See all categories →</a>
+        <a href="/business-category/" class="btn btn-home-outline btn-sm text-center mci-touch-target mci-touch-target--sm">See all categories →</a>
       </div>
     </div>
 

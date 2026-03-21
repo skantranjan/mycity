@@ -39,7 +39,13 @@ function navActive(string $key, string $activePage): string
             <a class="nav-link rounded px-3 <?= navActive('listings', $activePage) ?>" href="/business-listing/">Listed Business</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link rounded px-3" href="/category/">Business by Categories</a>
+            <a class="nav-link rounded px-3 <?= navActive('categories', $activePage) ?>" href="/business-category/">Business Categories</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link rounded px-3 <?= navActive('products', $activePage) ?>" href="/products/">Products</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link rounded px-3 <?= navActive('services', $activePage) ?>" href="/services/">Services</a>
           </li>
           <li class="nav-item">
             <a class="nav-link rounded px-3 <?= navActive('submit', $activePage) ?>" href="<?= $appArea === 'subscriber' ? '/subscriber/list-business/' : '/submit-business-listing/' ?>">Add Business</a>

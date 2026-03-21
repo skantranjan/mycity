@@ -1,0 +1,6 @@
+-- =============================================================================
+-- Dev seed users are defined at the END of:
+--   api/v1/migrations/001_create_core_tables.sql
+-- Import that file instead of this one.
+-- See: project_brain/DEV_TEST_ACCOUNTS.md
+-- =============================================================================

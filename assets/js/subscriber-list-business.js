@@ -1,10 +1,31 @@
 /**
- * 7-step listing wizard for /subscriber/list-business.php
+ * 7-step listing wizard for /subscriber/list-business/
  * (loads after jQuery, Bootstrap, Cropper.js)
  */
 $(function () {
   var TOTAL_STEPS = 7;
   var currentStep = 1;
+
+  // If CP manages categories via localStorage, mirror them into the subscriber wizard.
+  try {
+    var cpCatsRaw = localStorage.getItem('mci_cp_categories');
+    var cpCats = cpCatsRaw ? JSON.parse(cpCatsRaw) : [];
+    if (Array.isArray(cpCats) && cpCats.length && $('#category').length) {
+      var currentVal = $('#category').val();
+      $('#category').empty();
+      $('#category').append('<option value="">Choose a category…</option>');
+      cpCats.forEach(function (c) {
+        var name = (typeof c === 'string') ? c : (c && (c.name || c.title) ? (c.name || c.title) : '');
+        name = (name || '').toString().trim();
+        if (!name) return;
+        $('#category').append('<option value="' + $('<div>').text(name).html() + '">' + $('<div>').text(name).html() + '</option>');
+      });
+      $('#category').append('<option value="__request_new__">Request a new category…</option>');
+      if (currentVal) {
+        $('#category').val(currentVal);
+      }
+    }
+  } catch (e0) {}
 
   function goTo(n) {
     if (n < 1 || n > TOTAL_STEPS) return;
@@ -65,6 +86,10 @@ $(function () {
   function updatePreview() {
     var name = $('#listing_title').val().trim() || 'Your business name';
     var cat  = $('#category').val() || 'Category';
+    if (cat === '__request_new__') {
+      var req = ($('#requested_category_name').val() || '').trim();
+      cat = req || 'Requested category';
+    }
     var tag  = $('#tagline').val().trim();
     var desc = $('#description').val().trim();
     var city = $('#city').val().trim();
@@ -83,8 +108,160 @@ $(function () {
     $('#previewWebsite').find('span').text(web || '\u2014');
   }
 
+  function syncCategoryRequestUI() {
+    var isReq = $('#category').val() === '__request_new__';
+    $('#is_category_request').val(isReq ? '1' : '0');
+    $('#categoryRequestFields').toggleClass('d-none', !isReq);
+    $('#requested_category_name').prop('required', !!isReq);
+    $('#category_request_reason').prop('required', !!isReq);
+  }
+
+  $('#category').on('change input', function () {
+    syncCategoryRequestUI();
+    updatePreview();
+    if (currentStep === 7) updateSummary();
+  });
+
+  // Keep summary/preview synced when the requested name changes.
+  $('#requested_category_name').on('input change', function () {
+    updatePreview();
+    if (currentStep === 7) updateSummary();
+  });
+
   $('#listing_title, #category, #tagline, #description, #city, #phone, #website').on('input change', updatePreview);
   updatePreview();
+  syncCategoryRequestUI();
+
+  // ── URL slug (listing_slug + city for full path) ─────────────────
+  var existingSlugs = [];
+  try {
+    var slugJsonEl = document.getElementById('mciExistingSlugs');
+    if (slugJsonEl && slugJsonEl.textContent) {
+      existingSlugs = JSON.parse(slugJsonEl.textContent);
+    }
+  } catch (eSl) { existingSlugs = []; }
+
+  var slugAutoFromName = true;
+
+  function mciSlugify(str) {
+    if (!str) return '';
+    return str.toString().toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  function mciFullListingSlug(baseSlug, cityVal) {
+    var b = mciSlugify(baseSlug);
+    var c = mciSlugify(cityVal || '');
+    if (!b) return '';
+    if (!c) return b;
+    return b + '-' + c;
+  }
+
+  function mciUpdateBusinessUrlPreview() {
+    if (!$('#listing_slug').length) return;
+    var base = $('#listing_slug').val().trim();
+    var city = $('#city').val().trim();
+    var full = mciFullListingSlug(base, city);
+    var $wrap = $('#mciBusinessUrlPreview');
+    if (!$wrap.length) return;
+    var origin = ($wrap.data('origin') || '').toString().replace(/\/$/, '') || window.location.origin.replace(/\/$/, '') || 'https://mycityinfo.com';
+    var $txt = $('#mciBusinessUrlPreviewText');
+    if (!full) {
+      $txt.text('\u2014');
+      return;
+    }
+    $txt.text(origin + '/business/' + full + '/');
+  }
+
+  function mciSuggestFreeBaseSlug(baseName) {
+    var b = mciSlugify(baseName);
+    var city = $('#city').val().trim();
+    if (!b) return '';
+    for (var i = 0; i < 100; i++) {
+      var trialBase = i === 0 ? b : (b + '-' + (i + 1));
+      var full = mciFullListingSlug(trialBase, city);
+      if (full && existingSlugs.indexOf(full) === -1) return trialBase;
+    }
+    return b + '-' + Date.now();
+  }
+
+  $('#listing_title').on('input', function () {
+    if (!$('#listing_slug').length) return;
+    if (!slugAutoFromName) return;
+    var s = mciSlugify($(this).val());
+    $('#listing_slug').val(s);
+    mciUpdateBusinessUrlPreview();
+  });
+
+  $('#listing_slug').on('input', function () {
+    if (!$(this).length) return;
+    var manual = mciSlugify($(this).val());
+    $(this).val(manual);
+    var auto = mciSlugify($('#listing_title').val());
+    slugAutoFromName = !manual || manual === auto;
+    mciUpdateBusinessUrlPreview();
+  });
+
+  $('#city').on('input change', function () {
+    mciUpdateBusinessUrlPreview();
+  });
+
+  $(document).on('click', '#mciApplySuggestedSlug', function () {
+    var sug = $(this).data('suggestedBase');
+    if (!sug) return;
+    $('#listing_slug').val(String(sug));
+    slugAutoFromName = false;
+    mciUpdateBusinessUrlPreview();
+    $('#mciSlugStatus').html('<span class="text-success"><i class="bi bi-check-circle me-1" aria-hidden="true"></i>Slug updated. Use \u201cCheck availability\u201d again to confirm.</span>');
+  });
+
+  $('#mciCheckSlugBtn').on('click', function () {
+    if (!$('#listing_slug').length) return;
+    var base = $('#listing_slug').val().trim();
+    var city = $('#city').val().trim();
+    var full = mciFullListingSlug(base, city);
+    var $st = $('#mciSlugStatus');
+    if (!$st.length) return;
+    $st.empty();
+    if (!mciSlugify(base)) {
+      $st.html('<span class="text-danger">Enter a business name or slug first.</span>');
+      return;
+    }
+    if (!full) {
+      $st.html('<span class="text-danger">Could not build a URL slug.</span>');
+      return;
+    }
+    var taken = existingSlugs.indexOf(full) !== -1;
+    if (!taken) {
+      $st.html('<span class="text-success"><i class="bi bi-check-circle me-1" aria-hidden="true"></i>This URL is available.</span>');
+      return;
+    }
+    var suggested = mciSuggestFreeBaseSlug(base);
+    var msg = '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>That URL is already taken.</span>';
+    if (suggested) {
+      msg += ' Suggested base slug: <button type="button" class="btn btn-link btn-sm p-0 align-baseline" id="mciApplySuggestedSlug" data-suggested-base="' + String(suggested).replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '">' + suggested + '</button>';
+    }
+    $st.html(msg);
+  });
+
+  mciUpdateBusinessUrlPreview();
+
+  // ── Public publish step: posting type + account fields ───────────
+  function syncPostingType() {
+    if (!$('.mci-posting-card').length) return;
+    var val = $('input[name="posting_type"]:checked').val();
+    $('.mci-posting-card').each(function () {
+      $(this).toggleClass('is-selected', $(this).find('input').val() === val);
+    });
+    if (val === 'anonymous') {
+      $('#accountFields').slideUp(200);
+      $('#email, #password').removeAttr('required');
+    } else {
+      $('#accountFields').slideDown(200);
+      $('#email, #password').attr('required', 'required');
+    }
+  }
+  $('input[name="posting_type"]').on('change', syncPostingType);
+  syncPostingType();
 
   (function () {
     var $desc = $('#description');
@@ -97,7 +274,12 @@ $(function () {
 
   function updateSummary() {
     $('#summBizName').text($('#listing_title').val().trim() || '\u2014');
-    $('#summCategory').text($('#category').val() || 'No category');
+    var cat = $('#category').val() || 'No category';
+    if (cat === '__request_new__') {
+      var req = ($('#requested_category_name').val() || '').trim();
+      cat = req || 'Requested category';
+    }
+    $('#summCategory').text(cat);
     $('#summCity').text($('#city').val().trim() || 'No city');
   }
 
@@ -311,6 +493,13 @@ $(function () {
       if (v) data[n] = v;
     });
 
+    // If user requested a new category, ensure listing payload uses the requested name.
+    var isReq = ($('#is_category_request').val() === '1') || ($('#category').val() === '__request_new__');
+    if (isReq) {
+      var requestedName = ($('#requested_category_name').val() || '').trim();
+      if (requestedName) data['category'] = requestedName;
+    }
+
     return data;
   }
 
@@ -327,10 +516,91 @@ $(function () {
   $('#previewListingBtn').on('click', function () {
     savePreview();
     // Prevent tabnabbing when opening preview in a new tab.
-    window.open('/listing-preview.php', '_blank', 'noopener,noreferrer');
+    window.open('/listing-preview/', '_blank', 'noopener,noreferrer');
   });
 
-  $('#mciSubmitForm').on('submit', function () {
-    try { localStorage.removeItem(LS_KEY); } catch(e) {}
+  $('#mciSubmitForm').on('submit', function (e) {
+    // Ensure the latest form state is captured before any queue/save logic.
+    try { savePreview(); } catch(e0) {}
+
+    // If user chose "Request a new category...", create the CP category request via API.
+    try {
+      var isReq = ($('#is_category_request').val() === '1') || ($('#category').val() === '__request_new__');
+      var requestedName = ($('#requested_category_name').val() || '').trim();
+      var reason = ($('#category_request_reason').val() || '').trim();
+      if (isReq && !requestedName) {
+        alert('Please enter the requested category name.');
+        return false;
+      }
+
+      if (isReq && requestedName) {
+        // Create CP queue entry via API first.
+        // If API auth isn't wired yet, fall back to localStorage queue (demo behavior).
+        e.preventDefault();
+
+        var payload = {
+          requested_category_name: requestedName,
+          category_request_reason: reason
+        };
+
+        var fallbackToLocalStorage = function () {
+          var reqKey = 'mci_cp_category_requests';
+          var arr = [];
+          try { arr = JSON.parse(localStorage.getItem(reqKey) || '[]'); } catch (e2) { arr = []; }
+          if (!Array.isArray(arr)) arr = [];
+
+          var requester = ($('#mciRequesterLabel').val() || 'Subscriber').trim() || 'Subscriber';
+          arr.push({
+            requester: requester,
+            category: requestedName,
+            reason: reason,
+            createdAt: new Date().toISOString(),
+            status: 'pending'
+          });
+
+          localStorage.setItem(reqKey, JSON.stringify(arr));
+        };
+
+        try {
+          fetch('/api/v1/subscriber/category-requests', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+          })
+            .then(function (res) {
+              if (!res.ok) {
+                fallbackToLocalStorage();
+                alert('Category request saved. (API auth not ready yet)');
+              }
+              return res.json().catch(function () { return {}; });
+            })
+            .then(function () {
+              // Go show the super-admin request list.
+              window.location.href = '/cp/categories/';
+            })
+            .catch(function () {
+              fallbackToLocalStorage();
+              alert('Category request saved. (Offline/demo fallback)');
+              window.location.href = '/cp/categories/';
+            });
+        } catch (fetchErr) {
+          fallbackToLocalStorage();
+          alert('Category request saved. (Demo fallback)');
+          window.location.href = '/cp/categories/';
+        }
+
+        return false;
+      }
+    } catch (e) {}
+
+    // Clear saved preview only for real subscriber submissions.
+    // CP super-admin anonymous submission needs LS_KEY to remain available.
+    try {
+      var postingType = ($('input[name="posting_type"]:checked').val() || $('input[name="posting_type"]').val() || 'registered').toString();
+      if (postingType === 'registered') {
+        localStorage.removeItem(LS_KEY);
+      }
+    } catch (e3) {}
   });
 });
