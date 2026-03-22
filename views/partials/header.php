@@ -75,24 +75,34 @@ if ($appArea === '') {
               title="Change city"
             >
               <i class="bi bi-geo-alt-fill" aria-hidden="true"></i>
-              <span id="mciActiveCityLabel">your city</span>
+              <span id="mciActiveCityLabel">All locations</span>
               <i class="bi bi-pencil-fill mci-city-pill__edit" aria-hidden="true"></i>
             </button>
             <!-- Popover -->
             <div id="mciCityPickerPopover" class="mci-city-popover" hidden>
               <div class="mci-city-popover__label">Change your city</div>
-              <div class="d-flex gap-2">
+              <div class="d-flex gap-2" style="position:relative;">
                 <input
                   type="text"
                   id="mciCityPickerInput"
                   class="form-control form-control-sm"
-                  placeholder="Enter city name…"
-                  autocomplete="address-level2"
+                  placeholder="Enter city or area…"
+                  autocomplete="off"
                   maxlength="80"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded="false"
+                  aria-controls="mciCitySuggestions"
                 />
                 <button type="button" id="mciCityPickerSave" class="btn btn-sm btn-dark text-nowrap">Save</button>
               </div>
-              <div class="mci-city-popover__hint">Press Enter or click Save</div>
+              <ul id="mciCitySuggestions" class="mci-city-suggestions" role="listbox" hidden></ul>
+              <div class="mci-city-popover__hint">Type to search, then press Enter or click Save</div>
+              <div class="mt-2 text-center">
+                <button type="button" id="mciCityShowAll" class="btn btn-link btn-sm p-0 text-muted small">
+                  Show all locations
+                </button>
+              </div>
             </div>
           </li>
         </ul>

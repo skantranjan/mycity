@@ -322,6 +322,33 @@ h1, h2, .mci-display {
   margin-top: 0.4rem;
 }
 
+/* City autocomplete suggestion list */
+.mci-city-suggestions {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  border: 1px solid var(--mci-border, #e2e8f0);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(15,23,42,0.08);
+}
+.mci-city-suggestions li {
+  padding: 0.45rem 0.85rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  color: var(--mci-body-color, #0f172a);
+  transition: background 0.1s;
+}
+.mci-city-suggestions li:not(:last-child) {
+  border-bottom: 1px solid var(--mci-border, #e2e8f0);
+}
+.mci-city-suggestions li:hover,
+.mci-city-suggestions li.is-active {
+  background: var(--mci-color-primary-soft, #eef2ff);
+  color: var(--mci-color-primary-deep, #3730a3);
+}
+
 /* On mobile: full-width popover anchored to viewport */
 @media (max-width: 575.98px) {
   .mci-city-popover {

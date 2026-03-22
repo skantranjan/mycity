@@ -1,0 +1,19 @@
+-- =============================================================================
+-- My City Info — Master Seed: Categories
+-- File: database/seed/master/02_categories.sql
+--
+-- 22 parent categories + 163 subcategories = 185 total rows.
+--
+-- The canonical data file is: database/seed_categories.sql
+-- Run that file directly — it is idempotent (START TRANSACTION + ON DUPLICATE KEY).
+--
+-- Command line:
+--   mysql -u <user> -p <database> < database/seed_categories.sql
+--
+-- MySQL client:
+--   SOURCE database/seed_categories.sql;
+--
+-- Run order: after 01_roles_and_system_user.sql
+-- Full reset (if needed before re-seeding):
+--   SET foreign_key_checks=0; TRUNCATE TABLE mci_categories; SET foreign_key_checks=1;
+-- =============================================================================

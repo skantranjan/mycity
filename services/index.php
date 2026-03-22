@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../includes/mci_category_icons.php';
+require_once __DIR__ . '/../api/v1/lib/db.php';
+
 $pageTitle = 'Services - My City Info';
 $activePage = 'services';
 $metaDescription = 'Find trusted local services — health, trades, hospitality, and more on My City Info. Search by keyword or category and connect with providers in your city.';
@@ -9,6 +12,54 @@ $metaDescription = 'Find trusted local services — health, trades, hospitality,
 $extraHead = <<<'HTML'
 <link rel="stylesheet" href="/assets/css/home.css" />
 HTML;
+
+// ── Active city (from URL param or cookie) ────────────────────────────────────
+$activeCity = trim((string)($_GET['location'] ?? ''));
+if ($activeCity === '') {
+    $activeCity = trim((string)(urldecode($_COOKIE['mci_active_city'] ?? '')));
+}
+
+// ── Load categories that have at least one live business with services ─────────
+$serviceCategories = [];
+try {
+    $pdo  = api_db();
+    $stmt = $pdo->query("
+        SELECT DISTINCT c.name, c.slug, c.icon
+        FROM mci_categories c
+        INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
+        INNER JOIN mci_business_services s ON s.business_group_id = g.id AND s.is_active = 1
+        WHERE c.parent_id IS NULL
+        ORDER BY c.sort_order, c.name
+    ");
+    foreach (($stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : []) as $row) {
+        $serviceCategories[] = [
+            'name' => $row['name'],
+            'slug' => $row['slug'],
+            'icon' => $row['icon'] ?: mci_category_icon($row['slug']),
+        ];
+    }
+} catch (Throwable $ignored) {}
+
+// Fallback to all live-business categories if no service-specific ones found
+if (empty($serviceCategories)) {
+    try {
+        $stmt = $pdo->query("
+            SELECT DISTINCT c.name, c.slug, c.icon
+            FROM mci_categories c
+            INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
+            WHERE c.parent_id IS NULL
+            ORDER BY c.sort_order, c.name
+            LIMIT 12
+        ");
+        foreach (($stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : []) as $row) {
+            $serviceCategories[] = [
+                'name' => $row['name'],
+                'slug' => $row['slug'],
+                'icon' => $row['icon'] ?: mci_category_icon($row['slug']),
+            ];
+        }
+    } catch (Throwable $ignored) {}
+}
 
 ob_start();
 ?>
@@ -55,21 +106,12 @@ ob_start();
     <!-- Popular service categories -->
     <div class="fw-semibold mb-3 mt-2">Browse by service category</div>
     <div class="row g-2 mb-4">
-      <?php
-      $serviceCategories = [
-        ['name' => 'Health', 'slug' => 'health', 'icon' => '⚕️'],
-        ['name' => 'Spa & Wellness', 'slug' => 'spa', 'icon' => '🧖'],
-        ['name' => 'Gym & Fitness', 'slug' => 'gym', 'icon' => '💪'],
-        ['name' => 'Electrician', 'slug' => 'electrician', 'icon' => '⚡'],
-        ['name' => 'Plumber', 'slug' => 'plumber', 'icon' => '🔧'],
-        ['name' => 'Automotive', 'slug' => 'automotive', 'icon' => '🚗'],
-      ];
-      foreach ($serviceCategories as $sc):
-      ?>
+      <?php foreach ($serviceCategories as $sc): ?>
         <div class="col-6 col-md-4 col-lg-2">
-          <a href="/business-category/<?= urlencode($sc['slug']) ?>" class="text-decoration-none">
+          <?php $catUrl = '/services/' . urlencode($sc['slug']) . '/' . ($activeCity !== '' ? '?location=' . urlencode($activeCity) : ''); ?>
+          <a href="<?= htmlspecialchars($catUrl) ?>" class="text-decoration-none">
             <div class="home-category-tile w-100 text-center flex-column gap-1 py-3">
-              <span class="home-category-icon" aria-hidden="true"><?= $sc['icon'] ?></span>
+              <span class="home-category-icon"><?= mci_render_category_icon((string)$sc['icon'], '') ?></span>
               <span class="small"><?= htmlspecialchars($sc['name']) ?></span>
             </div>
           </a>

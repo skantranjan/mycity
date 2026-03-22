@@ -193,6 +193,30 @@ RewriteRule ^subscriber/listing-delete\.php$ subscriber/listing-delete/index.php
 # Business categories (folder has its own .htaccess for /business-category/{slug}/)
 RewriteRule ^business-category/?$ business-category/index.php [L,QSA]
 
+# ------------------------------------------------------------
+# Pretty slug URLs — new sections
+# ------------------------------------------------------------
+
+# /business/{slug}/ — pretty business detail URL
+# 301 redirect from old query-string format: /business/?slug=foo -> /business/foo/
+RewriteCond %{THE_REQUEST} \s/+business/\?slug=([^&\s]+) [NC]
+RewriteRule ^business/?$ /business/%1/ [R=301,L]
+RewriteRule ^business/([^/]+)/?$ business/index.php?slug=$1 [L,QSA]
+
+# /tag/{slug}/ — listings filtered by tag
+RewriteRule ^tag/?$ tag/index.php [L,QSA]
+RewriteRule ^tag/([^/]+)/?$ tag/index.php?slug=$1 [L,QSA]
+
+# /location/{slug}/ — listings filtered by city/location
+RewriteRule ^location/?$ location/index.php [L,QSA]
+RewriteRule ^location/([^/]+)/?$ location/index.php?slug=$1 [L,QSA]
+
+# /products/{slug}/ — products filtered by category slug
+RewriteRule ^products/([^/]+)/?$ products/index.php?slug=$1 [L,QSA]
+
+# /services/{slug}/ — services filtered by category slug
+RewriteRule ^services/([^/]+)/?$ services/index.php?slug=$1 [L,QSA]
+
 # Final fallback: avoid rewriting existing files (but allow directories to be rewritten)
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]

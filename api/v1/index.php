@@ -1038,6 +1038,35 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '
 }
 
 // =============================================================================
+// Public — city / area autocomplete (no auth)
+// GET /api/v1/public/cities?q=pune&limit=10
+// Returns distinct cities from live business branches that match the query.
+// =============================================================================
+if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'cities') {
+    $q     = trim((string)($_GET['q'] ?? ''));
+    $limit = max(1, min(20, (int)($_GET['limit'] ?? 10)));
+
+    if ($q === '' || strlen($q) < 1) {
+        api_json(['ok' => true, 'cities' => []]);
+    }
+
+    $pdo  = api_db();
+    $stmt = $pdo->prepare("
+        SELECT DISTINCT b.city
+        FROM mci_business_branches b
+        INNER JOIN mci_business_groups g ON g.id = b.business_group_id AND g.status = 'live'
+        WHERE b.city != '' AND b.city LIKE :q
+        ORDER BY b.city
+        LIMIT :lim
+    ");
+    $stmt->bindValue(':q',   '%' . $q . '%', PDO::PARAM_STR);
+    $stmt->bindValue(':lim', $limit,         PDO::PARAM_INT);
+    $stmt->execute();
+    $cities = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'city');
+    api_json(['ok' => true, 'cities' => $cities]);
+}
+
+// =============================================================================
 // Business registration
 // POST /api/v1/businesses
 // =============================================================================

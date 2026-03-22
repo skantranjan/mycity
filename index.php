@@ -3,8 +3,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/includes/mci_category_icons.php';
 require_once __DIR__ . '/api/v1/lib/db.php';
+require_once __DIR__ . '/api/v1/lib/business_service.php';
 
-$pageTitle = 'Explore Your City - My City Info';
+$pageTitle = 'Explore Your City - My City Info'; // updated below once city is known
 $activePage = 'home';
 $metaDescription = 'Discover local businesses, services, restaurants, and hidden gems in your city. My City Info is your local discovery platform.';
 
@@ -46,7 +47,7 @@ try {
     }
     unset($c, $id);
 
-    // Top-level only for the grid
+    // Top-level only for the grid — pick 16 at random
     foreach ($categoryTree as $c) {
         $categories[] = [
             'name' => $c['name'],
@@ -54,6 +55,8 @@ try {
             'icon' => $c['icon'] ?: mci_category_icon($c['slug']),
         ];
     }
+    shuffle($categories);
+    $categories = array_slice($categories, 0, 16);
 } catch (Throwable $ignored) {
     // DB not ready — fall back to static list
 }
@@ -62,27 +65,47 @@ $extraHead = <<<'HTML'
 <link rel="stylesheet" href="/assets/css/home.css" />
 HTML;
 
-$recentListings = [
-  ['title' => 'Property 852', 'category' => 'Real Estate', 'location' => 'Hong Kong', 'address' => '88 Queens Rd Central, Central, Hong Kong', 'slug' => 'property-852', 'image' => 'https://picsum.photos/seed/mci-re-852/800/520'],
-  ['title' => 'Locker Shop UK Ltd', 'category' => 'Furniture Store', 'location' => 'Chester, UK', 'address' => '12 Brook St, Chester CH1 3DU, United Kingdom', 'slug' => 'locker-shop-uk', 'image' => 'https://picsum.photos/seed/mci-furn-locker/800/520'],
-  ['title' => 'Shelving Store', 'category' => 'Furniture Store', 'location' => 'Chester, UK', 'address' => 'Unit 4, Industrial Estate, Saltney Rd, Chester CH4 8RQ, UK', 'slug' => 'shelving-store', 'image' => 'https://picsum.photos/seed/mci-furn-shelf/800/520'],
-  ['title' => 'JXF Painting Service', 'category' => 'Painter', 'location' => 'Toronto, Ontario', 'address' => '2200 Yonge St Suite 1100, Toronto, ON M4S 2C6, Canada', 'slug' => 'jxf-painting', 'image' => 'https://picsum.photos/seed/mci-paint-jxf/800/520'],
-  ['title' => 'Hunter Hill Physiotherapy', 'category' => 'Health', 'location' => 'Hunters Hill NSW', 'address' => '46 Gladesville Rd, Hunters Hill NSW 2110, Australia', 'slug' => 'hunter-hill-physio', 'image' => 'https://picsum.photos/seed/mci-health-hh/800/520'],
-  ['title' => 'Famous Veg Restaurant In Bhopal', 'category' => 'Restaurant', 'location' => 'Bhopal, MP', 'address' => '45 Zone-II, Maharana Pratap Nagar, Bhopal, MP 462011, India', 'slug' => 'famous-veg-restaurant-bhopal', 'image' => 'https://picsum.photos/seed/mci-rest-bhopal/800/520'],
-  ['title' => 'City Auto Care', 'category' => 'Automotive', 'location' => 'Manchester', 'address' => '101 Great Ducie St, Manchester M3 1PT, United Kingdom', 'slug' => 'city-auto-care', 'image' => 'https://picsum.photos/seed/mci-auto-mcr/800/520'],
-  ['title' => 'Riverside Bakery', 'category' => 'Bakery', 'location' => 'Portland, OR', 'address' => '1842 SE Water Ave, Portland, OR 97214, USA', 'slug' => 'riverside-bakery', 'image' => 'https://picsum.photos/seed/mci-bake-pdx/800/520'],
-];
+// ── Helper: map a DB listing row to the shape listing-card.php expects ───────
+function mci_listing_row_to_card(array $row): array {
+    return [
+        'title'      => (string)($row['name']          ?? ''),
+        'category'   => (string)($row['category_name'] ?? ''),
+        'location'   => (string)($row['city']          ?? ''),
+        'address'    => (string)($row['city']          ?? ''),
+        'slug'       => (string)($row['slug']          ?? ''),
+        'image'      => !empty($row['logo_path'])
+                          ? $row['logo_path']
+                          : (!empty($row['banner_path'])
+                              ? $row['banner_path']
+                              : 'https://picsum.photos/seed/mci-' . ($row['slug'] ?? 'biz') . '/800/520'),
+        'price_range' => $row['price_range'] ?? null,
+    ];
+}
 
-$popularListings = [
-  ['title' => 'Harbour View Hotel', 'category' => 'Hotels', 'location' => 'Sydney', 'address' => '61 Macquarie St, Sydney NSW 2000, Australia', 'slug' => 'harbour-view-hotel', 'image' => 'https://picsum.photos/seed/mci-pop-hotel/800/520'],
-  ['title' => 'Iron & Steel Gym', 'category' => 'Gym', 'location' => 'Austin, TX', 'address' => '1200 E 6th St, Austin, TX 78702, USA', 'slug' => 'iron-steel-gym', 'image' => 'https://picsum.photos/seed/mci-pop-gym/800/520'],
-  ['title' => 'Bright Spark Electric', 'category' => 'Electrician', 'location' => 'Leeds', 'address' => '9 Wellington St, Leeds LS1 4AP, United Kingdom', 'slug' => 'bright-spark-electric', 'image' => 'https://picsum.photos/seed/mci-pop-elec/800/520'],
-  ['title' => 'The Corner Café', 'category' => 'Restaurant', 'location' => 'Dublin', 'address' => '18 Dame St, Dublin 2, D02 XY31, Ireland', 'slug' => 'corner-cafe-dublin', 'image' => 'https://picsum.photos/seed/mci-pop-cafe/800/520'],
-  ['title' => 'Metro Dental Clinic', 'category' => 'Health', 'location' => 'Calgary', 'address' => '250 6 Ave SW #100, Calgary, AB T2P 3H7, Canada', 'slug' => 'metro-dental-calgary', 'image' => 'https://picsum.photos/seed/mci-pop-dental/800/520'],
-  ['title' => 'Green Leaf Landscaping', 'category' => 'Painter', 'location' => 'Seattle, WA', 'address' => '4100 Brooklyn Ave NE, Seattle, WA 98105, USA', 'slug' => 'green-leaf-landscaping', 'image' => 'https://picsum.photos/seed/mci-pop-land/800/520'],
-  ['title' => 'Vintage Motors', 'category' => 'Automotive', 'location' => 'Birmingham', 'address' => '1 Great Charles St, Birmingham B3 3JY, United Kingdom', 'slug' => 'vintage-motors', 'image' => 'https://picsum.photos/seed/mci-pop-auto/800/520'],
-  ['title' => 'Sunrise Co-working', 'category' => 'Real Estate', 'location' => 'Singapore', 'address' => '1 Raffles Place, #40-02, Singapore 048616', 'slug' => 'sunrise-coworking', 'image' => 'https://picsum.photos/seed/mci-pop-cowork/800/520'],
-];
+// ── Active city filter ────────────────────────────────────────────────────────
+// Priority: ?where= URL param > cookie set by city picker JS
+$activeCity = trim((string)($_GET['where'] ?? ''));
+if ($activeCity === '') {
+    $activeCity = trim((string)(urldecode($_COOKIE['mci_active_city'] ?? '')));
+}
+if ($activeCity !== '') {
+    $pageTitle = 'Explore ' . $activeCity . ' - My City Info';
+}
+
+// ── Load recent + popular listings from DB ────────────────────────────────────
+$recentListings  = [];
+$popularListings = [];
+
+try {
+    $cityFilter  = $activeCity !== '' ? ['city' => $activeCity] : [];
+    $recentRows  = api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'newest'])['businesses'] ?? [];
+    $popularRows = api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'oldest'])['businesses'] ?? [];
+
+    foreach ($recentRows  as $row) { $recentListings[]  = mci_listing_row_to_card($row); }
+    foreach ($popularRows as $row) { $popularListings[] = mci_listing_row_to_card($row); }
+} catch (Throwable $ignored) {
+    // Graceful degradation — sections will render empty
+}
 
 
 ob_start();
@@ -108,12 +131,12 @@ ob_start();
         >
           <span class="home-hero-explore-line">
             <span class="home-hero-explore-prefix">Explore</span>
-            <span id="heroCityName" class="home-hero-city-name home-hero-highlight">your city</span>
+            <span id="heroCityName" class="home-hero-city-name home-hero-highlight"><?= $activeCity !== '' ? htmlspecialchars($activeCity) : 'your city' ?></span>
           </span>
         </h1>
         <p class="lead text-white-50 mb-4 mb-lg-5 home-hero-lead home-hero-tagline">
           Let’s uncover the best places, business and services in
-          <span id="heroTaglineCity" class="text-white fw-semibold">your city</span>.
+          <span id="heroTaglineCity" class="text-white fw-semibold"><?= $activeCity !== '' ? htmlspecialchars($activeCity) : 'your city' ?></span>.
         </p>
 
         <div class="d-none d-lg-flex flex-wrap align-items-center home-hero-cta-row gap-3">
@@ -243,7 +266,7 @@ ob_start();
         <div class="home-section-accent mb-2"></div>
         <h2 class="home-section-title h3 mb-1">
           Popular in
-          <span id="homePopularCity" class="home-popular-city-name">your city</span>
+          <span id="homePopularCity" class="home-popular-city-name"><?= $activeCity !== '' ? htmlspecialchars($activeCity) : 'your city' ?></span>
         </h2>
         <p class="text-muted small mb-0">Highly viewed listings near you—updated when we detect your area</p>
       </div>

@@ -234,6 +234,11 @@
   transform: translateY(-3px);
   color: var(--mci-color-primary-deep);
 }
+.home-category-tile--active {
+  border-color: var(--mci-color-primary, #6366f1) !important;
+  background: var(--mci-color-primary-soft, #eef2ff) !important;
+  color: var(--mci-color-primary-deep, #3730a3) !important;
+}
 
 .home-category-icon {
   width: 2.5rem;

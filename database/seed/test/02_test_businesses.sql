@@ -1,0 +1,27 @@
+-- =============================================================================
+-- My City Info — Test Data: Businesses
+-- File: database/seed/test/02_test_businesses.sql
+--
+-- 12 sample business listings across 8 categories:
+--   Spark Electricals, CleanNest Home Services, QuickCare Dental Clinic,
+--   LifeStep Physiotherapy, Glamour Studio, Urban Spa House,
+--   Naveen Famous Veg, Cafe Aroma, Chester Gym & Fitness,
+--   Sunrise Hotel Rooms, Property 852, SwiftMove Packers
+--
+-- DO NOT run on production databases.
+--
+-- Dependencies (must be seeded first):
+--   1. Master seed: 01_roles_and_system_user.sql
+--   2. Master seed: database/seed_categories.sql
+--   3. Master seed: database/seed_tags.sql
+--   4. Test seed:   01_test_users.sql  (businesses are attributed to superadmin UUID)
+--
+-- The canonical data file is: api/v1/migrations/011_seed_businesses.sql
+-- Run that file directly — it is idempotent (INSERT IGNORE throughout).
+--
+-- Command line:
+--   mysql -u <user> -p <database> < api/v1/migrations/011_seed_businesses.sql
+--
+-- MySQL client:
+--   SOURCE api/v1/migrations/011_seed_businesses.sql;
+-- =============================================================================

@@ -17,6 +17,17 @@ if ($appArea !== '') {
     require_once __DIR__ . '/../includes/mci_session.php';
     require_once __DIR__ . '/../includes/mci_app_profile.php';
 }
+
+// On public pages, detect whether a subscriber/CP session is active so we can
+// load app-areas.css in <head> before the header partial runs.
+$__needsAppCss = $appArea !== '';
+if (!$__needsAppCss) {
+    require_once __DIR__ . '/../includes/mci_session.php';
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start(['cookie_httponly' => true, 'cookie_samesite' => 'Lax']);
+    }
+    $__needsAppCss = !empty($_SESSION['mci_logged_in']) || !empty($_SESSION['mci_cp_logged_in']);
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -52,7 +63,7 @@ if ($appArea !== '') {
     <link rel="stylesheet" href="/assets/css/theme.css" />
     <!-- Icons (used by header controls like theme toggle) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-    <?php if ($appArea !== ''): ?>
+    <?php if ($__needsAppCss): ?>
       <link rel="stylesheet" href="/assets/css/app-areas.css" />
     <?php endif; ?>
   </head>

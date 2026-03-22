@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/mci_session.php';
 require_once __DIR__ . '/../includes/mci_reviews.php';
+require_once __DIR__ . '/../includes/mci_favourites.php';
+require_once __DIR__ . '/../api/v1/lib/db.php';
+require_once __DIR__ . '/../api/v1/lib/business_service.php';
 
 $pageTitle = 'Business Details - My City Info';
 $activePage = 'listings';
@@ -13,7 +16,7 @@ $slug = trim((string) ($_GET['slug'] ?? ''));
 $isLoggedIn = !empty($_SESSION['mci_logged_in']) && !empty($_SESSION['mci_user_id']);
 $userId = (string) ($_SESSION['mci_user_id'] ?? '');
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mci_review_submit'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['mci_review_submit']) || isset($_POST['mci_review_update']))) {
     $targetSlug = trim((string) ($_POST['business_slug'] ?? ''));
     if ($targetSlug === '') {
         $targetSlug = $slug;
@@ -23,23 +26,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mci_review_submit']))
         exit;
     }
     if (!$isLoggedIn) {
-        header('Location: /login/?return=' . rawurlencode('/business/?slug=' . $targetSlug . '#reviews'));
+        header('Location: /login/?return=' . rawurlencode('/business/' . $targetSlug . '/#reviews'));
         exit;
     }
     $rating = (int) ($_POST['rating'] ?? 0);
-    $text = trim((string) ($_POST['review_text'] ?? ''));
-    $result = mci_reviews_add($targetSlug, $rating, $text, $userId);
+    $text   = trim((string) ($_POST['review_text'] ?? ''));
+    $isUpdate = isset($_POST['mci_review_update']);
+    if ($isUpdate) {
+        $groupId = mci_reviews_group_id_for_slug($targetSlug);
+        $result  = mci_reviews_update($groupId, $rating, $text, $userId);
+    } else {
+        $groupId = mci_reviews_group_id_for_slug($targetSlug);
+        $result  = mci_reviews_add($groupId, $rating, $text, $userId);
+    }
     if ($result['ok']) {
-        header('Location: /business/?slug=' . rawurlencode($targetSlug) . '&review_ok=1#reviews');
+        $param = $isUpdate ? 'review_updated=1' : 'review_ok=1';
+        header('Location: /business/' . rawurlencode($targetSlug) . '/?' . $param . '#reviews');
     } else {
         $err = $result['error'] ?? 'Something went wrong.';
-        header('Location: /business/?slug=' . rawurlencode($targetSlug) . '&review_err=' . rawurlencode($err) . '#reviews');
+        header('Location: /business/' . rawurlencode($targetSlug) . '/?review_err=' . rawurlencode($err) . '#reviews');
     }
     exit;
 }
 
-$reviewFlashOk = isset($_GET['review_ok']);
-$reviewFlashErr = trim((string) ($_GET['review_err'] ?? ''));
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mci_fav_toggle'])) {
+    $favSlug = trim((string) ($_POST['business_slug'] ?? $slug));
+    if (!$isLoggedIn) {
+        header('Location: /login/?return=' . rawurlencode('/business/' . $favSlug . '/'));
+        exit;
+    }
+    // resolve group id from slug
+    try {
+        $favPdo = api_db();
+        $favSt  = $favPdo->prepare("SELECT id FROM mci_business_groups WHERE slug = ? LIMIT 1");
+        $favSt->execute([$favSlug]);
+        $favGroupId = (string)($favSt->fetchColumn() ?: '');
+        if ($favGroupId !== '') {
+            $favResult = mci_favourites_toggle($favPdo, $userId, $favGroupId);
+            $favMsg = $favResult['saved'] ? 'fav_saved=1' : 'fav_removed=1';
+        }
+    } catch (Throwable $ignored) {}
+    header('Location: /business/' . rawurlencode($favSlug) . '/?' . ($favMsg ?? 'fav_err=1'));
+    exit;
+}
+
+$reviewFlashOk      = isset($_GET['review_ok']);
+$reviewFlashUpdated = isset($_GET['review_updated']);
+$reviewFlashErr     = trim((string) ($_GET['review_err'] ?? ''));
 
 /**
  * OpenStreetMap embed (no API key). $lat, $lon in WGS84.
@@ -63,6 +96,194 @@ function mci_osm_embed_url(float $lat, float $lon): string
   );
 }
 
+// ── Fetch business from DB by slug ───────────────────────────────────────────
+$pdo     = api_db();
+$dbBiz   = null;
+if ($slug !== '') {
+    try {
+        $dbBiz = api_business_fetch_by_slug($pdo, $slug);
+    } catch (Throwable $ignored) {}
+}
+
+if ($dbBiz === null) {
+    http_response_code(404);
+    $dbBiz = []; // prevent undefined variable errors in map block below
+}
+
+// ── Map DB record to the $listing shape the view expects ─────────────────────
+$branch  = !empty($dbBiz['branches']) ? $dbBiz['branches'][0] : [];
+$tagNames = $dbBiz['tags'] ?? []; // keep full [{id, name, slug}] for URL generation
+$serviceNames = array_map(
+    static fn(array $s): string => (string)($s['name'] ?? ''),
+    $dbBiz['services'] ?? []
+);
+$productNames = array_map(
+    static fn(array $p): string => (string)($p['name'] ?? ''),
+    $dbBiz['products'] ?? []
+);
+$faqsRaw = $dbBiz['faqs'] ?? [];
+$listingFaqs = array_map(
+    static fn(array $f): array => ['q' => (string)($f['question'] ?? ''), 'a' => (string)($f['answer'] ?? '')],
+    $faqsRaw
+);
+
+$socialLinks = [];
+foreach ($dbBiz['social_links'] ?? [] as $sl) {
+    $socialLinks[(string)($sl['platform'] ?? '')] = (string)($sl['url'] ?? '');
+}
+
+$galleryImages = $dbBiz['images'] ?? [];
+
+$listing = [
+    'title'    => (string)($dbBiz['name']        ?? 'Business'),
+    'category' => (string)($dbBiz['category_name'] ?? ''),
+    'tagline'  => (string)($dbBiz['tagline']     ?? ''),
+    'location' => (string)($branch['city']       ?? ''),
+    'address'  => trim(implode(', ', array_filter([
+                      (string)($branch['address_line1'] ?? ''),
+                      (string)($branch['address_line2'] ?? ''),
+                      (string)($branch['city']          ?? ''),
+                      (string)($branch['state']         ?? ''),
+                      (string)($branch['pincode']       ?? ''),
+                  ]))),
+    'phone'    => (string)($branch['phone_primary']    ?? ''),
+    'whatsapp' => (string)($branch['whatsapp_number']  ?? ''),
+    'email'    => (string)($dbBiz['email']             ?? ''),
+    'website'  => (string)($dbBiz['website_url']       ?? ''),
+    'image'    => !empty($dbBiz['banner_path'])
+                    ? $dbBiz['banner_path']
+                    : (!empty($dbBiz['logo_path'])
+                        ? $dbBiz['logo_path']
+                        : 'https://picsum.photos/seed/mci-' . $slug . '/800/520'),
+    'map_lat'  => (float)($branch['latitude']  ?? 0),
+    'map_lon'  => (float)($branch['longitude'] ?? 0),
+    'about'    => array_filter([
+                      (string)($dbBiz['description'] ?? ''),
+                  ]),
+    'services' => array_merge($serviceNames, $productNames),
+    'tags'     => $tagNames,
+    'faqs'     => $listingFaqs,
+    'social_links' => $socialLinks,
+    'price_range'  => $dbBiz['price_range'] ?? null,
+    'video_url'    => $dbBiz['video_url']   ?? null,
+];
+
+$bizGroupId          = (string)($dbBiz['id'] ?? '');
+$listingIsClaimed    = !empty($dbBiz['claimed_by_user_id']);
+$listingClaimPending = false;
+// Check if the current user has a pending claim for this business
+if ($isLoggedIn && $bizGroupId !== '' && !$listingIsClaimed) {
+    try {
+        $claimChk = $pdo->prepare(
+            "SELECT 1 FROM mci_business_claims WHERE business_group_id = ? AND claimant_user_id = ? AND status = 'pending' LIMIT 1"
+        );
+        $claimChk->execute([$bizGroupId, $userId]);
+        $listingClaimPending = (bool)$claimChk->fetchColumn();
+    } catch (Throwable $ignored) {}
+}
+
+// ── Favourite state ───────────────────────────────────────────────────────────
+$isFavourited = $isLoggedIn && $bizGroupId !== '' && mci_favourites_is_saved($pdo, $userId, $bizGroupId);
+$favFlashSaved   = isset($_GET['fav_saved']);
+$favFlashRemoved = isset($_GET['fav_removed']);
+
+$faqAccordionId = 'mciBizFaq' . preg_replace('/[^a-zA-Z0-9]+/', '', $slug !== '' ? $slug : 'general');
+
+$pageTitle = $listing['title'] . ' - My City Info';
+
+$mapEmbedUrl    = mci_osm_embed_url((float)$listing['map_lat'], (float)$listing['map_lon']);
+$directionsUrl  = 'https://www.google.com/maps/dir/?api=1&destination=' . rawurlencode($listing['address']);
+$mapsSearchUrl  = 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($listing['address']);
+$whatsappDigits = preg_replace('/\D+/', '', (string)($listing['whatsapp'] ?? ''));
+$whatsappUrl    = $whatsappDigits !== '' ? 'https://wa.me/' . $whatsappDigits : '';
+
+$businessPageUrl = $slug !== '' ? '/business/' . urlencode($slug) . '/' : '/business-listing/';
+
+$reviewsDisplay      = mci_reviews_merged_for_display($slug);
+$reviewSummary       = mci_reviews_summary($reviewsDisplay);
+$userAlreadyReviewed = $slug !== '' && $isLoggedIn && $userId !== '' && mci_reviews_user_has_reviewed($slug, $userId);
+// Load the user's current review so the edit form can be pre-filled
+$userExistingReview  = null;
+if ($userAlreadyReviewed) {
+    $userExistingReview = mci_reviews_user_review($bizGroupId, $userId);
+}
+
+// ── Load display names for reviewers (only when the visitor is logged in) ─────
+$reviewerNames = [];
+if ($isLoggedIn) {
+    $reviewerUserIds = array_filter(array_unique(array_column($reviewsDisplay, 'submitted_by')));
+    if (!empty($reviewerUserIds)) {
+        try {
+            $inMarks = implode(',', array_fill(0, count($reviewerUserIds), '?'));
+            $nSt = $pdo->prepare("
+                SELECT u.id, COALESCE(NULLIF(TRIM(u.display_name),''), p.first_name, u.email) AS name
+                FROM mci_users u
+                LEFT JOIN mci_userprofiles p ON p.userid = u.id
+                WHERE u.id IN ($inMarks)
+            ");
+            $nSt->execute(array_values($reviewerUserIds));
+            foreach ($nSt->fetchAll(PDO::FETCH_ASSOC) as $nr) {
+                $reviewerNames[(string)$nr['id']] = (string)$nr['name'];
+            }
+        } catch (Throwable $ignored) {}
+    }
+}
+
+// ── Nearby businesses from DB ─────────────────────────────────────────────────
+require_once __DIR__ . '/../includes/mci_geo.php';
+
+$nearbyKmAllowed = [1, 2, 5, 10];
+$nearbyKm        = (int)($_GET['nearby_km'] ?? 5);
+if (!in_array($nearbyKm, $nearbyKmAllowed, true)) {
+    $nearbyKm = 5;
+}
+
+$nearbyResults = [];
+$originLat     = (float)($listing['map_lat'] ?? 0);
+$originLon     = (float)($listing['map_lon'] ?? 0);
+$hasOriginCoords = ($originLat !== 0.0 || $originLon !== 0.0);
+
+if ($hasOriginCoords) {
+    try {
+        // Load a batch of live businesses from DB to compute proximity
+        $nearbyBatch = api_business_list_public($pdo, ['per_page' => 50])['businesses'] ?? [];
+        foreach ($nearbyBatch as $row) {
+            $otherSlug = (string)($row['slug'] ?? '');
+            if ($otherSlug === $slug || $otherSlug === '') {
+                continue;
+            }
+            $olat = (float)($row['latitude']  ?? 0);
+            $olon = (float)($row['longitude'] ?? 0);
+            if ($olat === 0.0 && $olon === 0.0) {
+                continue;
+            }
+            $d = mci_distance_km($originLat, $originLon, $olat, $olon);
+            if ($d <= (float)$nearbyKm) {
+                $nearbyResults[] = [
+                    'title'       => (string)($row['name']          ?? ''),
+                    'category'    => (string)($row['category_name'] ?? ''),
+                    'location'    => (string)($row['city']          ?? ''),
+                    'slug'        => $otherSlug,
+                    'image'       => !empty($row['logo_path'])
+                                       ? $row['logo_path']
+                                       : 'https://picsum.photos/seed/mci-' . $otherSlug . '/480/320',
+                    'map_lat'     => $olat,
+                    'map_lon'     => $olon,
+                    'distance_km' => $d,
+                ];
+            }
+        }
+        usort($nearbyResults, static fn(array $a, array $b): int => ($a['distance_km'] <=> $b['distance_km']));
+        $nearbyResults = array_slice($nearbyResults, 0, 8);
+    } catch (Throwable $ignored) {}
+}
+
+$nearbyUrlParams = ['nearby_km' => $nearbyKm];
+if ($slug !== '') {
+    $nearbyUrlParams['slug'] = $slug;
+}
+
+// Legacy compatibility — $catalog is no longer used but avoid undefined errors
 $catalog = [
   'property-852' => [
     'title' => 'Property 852',
@@ -159,7 +380,7 @@ $catalog = [
     'tags' => ['Physiotherapy', 'Sports injury', 'Sydney', 'Rehab', 'Health'],
     'gallery_seeds' => ['mci-gal-hh-1', 'mci-gal-hh-2'],
     'faqs' => [
-      ['q' => 'Do I need a referral to book?', 'a' => 'No referral is required for private appointments (demo). If you are using insurance, bring your insurer’s requirements and we’ll advise.'],
+      ['q' => 'Do I need a referral to book?', 'a' => "No referral is required for private appointments (demo). If you are using insurance, bring your insurer's requirements and we'll advise."],
       ['q' => 'How long is the first visit?', 'a' => 'New patients typically get a 45-minute assessment: history, movement tests, and a first-step treatment or exercise plan.'],
       ['q' => 'Is parking available?', 'a' => 'Street parking is available nearby; paid options exist within a short walk. Check the map on this page for directions.'],
     ],
@@ -213,79 +434,10 @@ $defaultListing = [
   'gallery_seeds' => ['mci-gal-def-1', 'mci-gal-def-2', 'mci-gal-def-3'],
   'faqs' => [
     ['q' => 'What are your opening hours?', 'a' => 'Hours shown on this page are demo data. When your listing is live, your real schedule will appear here and in search results.'],
-    ['q' => 'How can I get a quote?', 'a' => 'Use the contact options on the right, or send an enquiry through our site. We’ll respond with next steps (sample text).'],
+    ['q' => 'How can I get a quote?', 'a' => "Use the contact options on the right, or send an enquiry through our site. We'll respond with next steps (sample text)."],
     ['q' => 'Do you serve my area?', 'a' => 'Coverage depends on the business. Add service areas and tags in your dashboard so customers can find you more easily.'],
   ],
 ];
-
-// UI demo: claim status per listing (unclaimed by default)
-$claimedSlugs = ['jxf-painting'];
-$pendingClaimSlugs = [];
-
-$listing = array_merge($defaultListing, $catalog[$slug] ?? []);
-$listingIsClaimed     = in_array($slug, $claimedSlugs,     true);
-$listingClaimPending  = in_array($slug, $pendingClaimSlugs, true);
-
-$listingFaqs = $listing['faqs'] ?? [];
-$listingFaqs = is_array($listingFaqs) ? $listingFaqs : [];
-$faqAccordionId = 'mciBizFaq' . preg_replace('/[^a-zA-Z0-9]+/', '', $slug !== '' ? $slug : 'general');
-
-$pageTitle = $listing['title'] . ' - My City Info';
-
-$mapEmbedUrl = mci_osm_embed_url((float) $listing['map_lat'], (float) $listing['map_lon']);
-$directionsUrl = 'https://www.google.com/maps/dir/?api=1&destination=' . rawurlencode($listing['address']);
-$mapsSearchUrl = 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($listing['address']);
-$whatsappDigits = preg_replace('/\D+/', '', (string) ($listing['whatsapp'] ?? ''));
-$whatsappUrl = $whatsappDigits !== '' ? 'https://wa.me/' . $whatsappDigits : '';
-
-$businessPageUrl = $slug !== '' ? '/business/?slug=' . rawurlencode($slug) : '/business-listing/';
-
-$reviewsDisplay = mci_reviews_merged_for_display($slug);
-$reviewSummary = mci_reviews_summary($reviewsDisplay);
-$userAlreadyReviewed = $slug !== '' && $isLoggedIn && $userId !== '' && mci_reviews_user_has_reviewed($slug, $userId);
-
-require_once __DIR__ . '/../includes/mci_directory_listings.php';
-require_once __DIR__ . '/../includes/mci_geo.php';
-
-$nearbyKmAllowed = [1, 2, 5, 10];
-$nearbyKm = (int) ($_GET['nearby_km'] ?? 5);
-if (!in_array($nearbyKm, $nearbyKmAllowed, true)) {
-    $nearbyKm = 5;
-}
-
-$nearbyResults = [];
-$originLat = (float) ($listing['map_lat'] ?? 0);
-$originLon = (float) ($listing['map_lon'] ?? 0);
-$hasOriginCoords = ($originLat !== 0.0 || $originLon !== 0.0);
-
-if ($hasOriginCoords) {
-    foreach ($mciDirectoryListings as $row) {
-        $otherSlug = (string) ($row['slug'] ?? '');
-        if ($slug !== '' && $otherSlug === $slug) {
-            continue;
-        }
-        $olat = (float) ($row['map_lat'] ?? 0);
-        $olon = (float) ($row['map_lon'] ?? 0);
-        if ($olat === 0.0 && $olon === 0.0) {
-            continue;
-        }
-        $d = mci_distance_km($originLat, $originLon, $olat, $olon);
-        if ($d <= (float) $nearbyKm) {
-            $copy = $row;
-            $copy['distance_km'] = $d;
-            $nearbyResults[] = $copy;
-        }
-    }
-    usort($nearbyResults, static function (array $a, array $b): int {
-        return ($a['distance_km'] <=> $b['distance_km']);
-    });
-    $nearbyResults = array_slice($nearbyResults, 0, 8);
-}
-
-$nearbyUrlParams = ['nearby_km' => $nearbyKm];
-if ($slug !== '') {
-    $nearbyUrlParams['slug'] = $slug;
-}
 
 $extraHead = <<<'HTML'
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
@@ -376,7 +528,7 @@ ob_start();
             <div class="d-flex align-items-center gap-2 mb-2">
               <span class="d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill" style="background:var(--mci-color-primary-soft);font-size:var(--mci-text-sm)">
                 <span style="color:#f59e0b;" aria-hidden="true">★</span>
-                <span class="fw-bold"><?= number_format((float)$reviewSummary['avg'], 1) ?></span>
+                <span class="fw-bold"><?= number_format((float)$reviewSummary['average'], 1) ?></span>
                 <span class="text-muted">&nbsp;·&nbsp;<?= (int)$reviewSummary['count'] ?> review<?= (int)$reviewSummary['count'] === 1 ? '' : 's' ?></span>
               </span>
             </div>
@@ -410,13 +562,20 @@ ob_start();
               <span class="mci-business-tags__label text-muted small fw-semibold me-2 align-middle">Tags</span>
               <div class="d-inline-flex flex-wrap gap-2 align-middle">
                 <?php foreach ($bizTags as $t): ?>
-                  <?php $t = trim((string) $t); if ($t === '') {
-                      continue;
-                  } ?>
+                  <?php
+                  $tName = trim((string)($t['name'] ?? $t));
+                  $tSlug = trim((string)($t['slug'] ?? ''));
+                  if ($tName === '') { continue; }
+                  if ($tSlug === '') {
+                      // fallback: slugify the name
+                      $tSlug = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $tName) ?? '');
+                      $tSlug = trim($tSlug, '-');
+                  }
+                  ?>
                   <a
                     class="mci-business-tag"
-                    href="/business-listing/?tag=<?= rawurlencode($t) ?>"
-                  ><?= htmlspecialchars($t) ?></a>
+                    href="/tag/<?= rawurlencode($tSlug) ?>/"
+                  ><?= htmlspecialchars($tName) ?></a>
                 <?php endforeach; ?>
               </div>
             </div>
@@ -467,25 +626,27 @@ ob_start();
               </table>
             </div>
 
+            <?php if (!empty($galleryImages)): ?>
             <div class="mci-business-section-title mt-4 mb-3">
               <i class="bi bi-images" aria-hidden="true"></i>
-              Gallery <span class="text-muted fw-normal fs-6">(demo photos)</span>
+              Gallery
             </div>
             <div class="row g-3" id="mciGalleryGrid">
-              <?php foreach ($listing['gallery_seeds'] as $i => $seed): ?>
+              <?php foreach ($galleryImages as $i => $img): ?>
                 <div class="col-6 col-md-4">
                   <button type="button" class="btn p-0 border-0 w-100 mci-gallery-open" data-index="<?= $i ?>" aria-label="View photo <?= $i + 1 ?>">
                     <img
                       class="mci-business-gallery-img"
-                      src="https://picsum.photos/seed/<?= htmlspecialchars($seed) ?>/640/480"
-                      data-full="https://picsum.photos/seed/<?= htmlspecialchars($seed) ?>/1280/960"
-                      alt="Gallery photo <?= $i + 1 ?>"
+                      src="<?= htmlspecialchars((string)($img['image_path'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                      data-full="<?= htmlspecialchars((string)($img['image_path'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                      alt="<?= htmlspecialchars((string)($img['caption'] ?? ('Gallery photo ' . ($i + 1))), ENT_QUOTES, 'UTF-8') ?>"
                       loading="lazy"
                     />
                   </button>
                 </div>
               <?php endforeach; ?>
             </div>
+            <?php endif; ?>
 
             <!-- Lightbox overlay -->
             <div id="mciLightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;cursor:zoom-out;align-items:center;justify-content:center;" role="dialog" aria-modal="true" aria-label="Photo lightbox">
@@ -559,8 +720,16 @@ ob_start();
               You must be signed in so we can prevent spam and duplicate reviews.
             </p>
 
+            <?php if ($favFlashSaved): ?>
+              <div class="alert alert-success py-2 small mb-3" role="status"><i class="bi bi-heart-fill me-1"></i>Business saved to your favourites.</div>
+            <?php endif; ?>
+            <?php if ($favFlashRemoved): ?>
+              <div class="alert alert-secondary py-2 small mb-3" role="status"><i class="bi bi-heartbreak me-1"></i>Business removed from your favourites.</div>
+            <?php endif; ?>
             <?php if ($reviewFlashOk): ?>
-              <div class="alert alert-success py-2 small mb-3" role="status">Thanks! Your review was posted anonymously.</div>
+              <div class="alert alert-success py-2 small mb-3" role="status">Thanks! Your review was posted.</div>
+            <?php elseif ($reviewFlashUpdated): ?>
+              <div class="alert alert-success py-2 small mb-3" role="status">Your review has been updated.</div>
             <?php endif; ?>
             <?php if ($reviewFlashErr !== ''): ?>
               <div class="alert alert-danger py-2 small mb-3" role="alert"><?= htmlspecialchars($reviewFlashErr) ?></div>
@@ -591,11 +760,20 @@ ob_start();
                   $rText = (string) ($rev['text'] ?? '');
                   $rWhen = $rev['created_at'] ?? '';
                   $rDate = $rWhen !== '' ? date('M j, Y', strtotime($rWhen)) : '';
+                  $rSubmittedBy = (string)($rev['submitted_by'] ?? '');
+                  $rDisplayName = ($isLoggedIn && $rSubmittedBy !== '' && isset($reviewerNames[$rSubmittedBy]))
+                      ? $reviewerNames[$rSubmittedBy]
+                      : 'Anonymous';
                   ?>
                   <div class="mci-review-item border rounded-3 p-3 mb-3 bg-white">
                     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
                       <div class="d-flex align-items-center gap-2">
-                        <span class="badge rounded-pill text-bg-light border fw-semibold">Anonymous</span>
+                        <span class="badge rounded-pill text-bg-light border fw-semibold">
+                          <?php if ($isLoggedIn && $rSubmittedBy !== ''): ?>
+                            <i class="bi bi-person-fill me-1" aria-hidden="true"></i>
+                          <?php endif; ?>
+                          <?= htmlspecialchars($rDisplayName) ?>
+                        </span>
                         <?= mci_reviews_stars_html($rStars) ?>
                       </div>
                       <?php if ($rDate !== ''): ?>
@@ -609,47 +787,53 @@ ob_start();
             </div>
 
             <?php if ($isLoggedIn): ?>
+              <?php
+              $editRating = $userExistingReview ? (int)$userExistingReview['rating'] : 0;
+              $editText   = $userExistingReview ? (string)$userExistingReview['review_text'] : '';
+              $formTitle  = $userAlreadyReviewed ? 'Update your review' : 'Write a review';
+              $submitBtn  = $userAlreadyReviewed ? 'Update review' : 'Submit review';
+              $submitName = $userAlreadyReviewed ? 'mci_review_update' : 'mci_review_submit';
+              ?>
+              <div class="mci-business-section-title mb-3">
+                <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                <?= htmlspecialchars($formTitle) ?>
+              </div>
               <?php if ($userAlreadyReviewed): ?>
-                <div class="alert alert-info small mb-0">You’ve already submitted a review for this business. Thank you!</div>
-                <div class="mt-2">
-                  <a class="small text-muted" href="/logout/?return=<?= rawurlencode('/business/?slug=' . $slug . '#reviews') ?>">Sign out</a>
+                <div class="alert alert-info py-2 small mb-3">
+                  You reviewed this business on <?= htmlspecialchars(date('d M Y', strtotime(['updated_at'] ?? ['created_at'] ?? 'now'))) ?>. You can update it below.
                 </div>
-              <?php else: ?>
-                <div class="mci-business-section-title mb-3">
-                  <i class="bi bi-pencil-square" aria-hidden="true"></i>
-                  Write a review
-                </div>
-                <form id="mciReviewForm" method="post" action="/business/" class="mci-review-form">
-                  <input type="hidden" name="business_slug" value="<?= htmlspecialchars($slug) ?>" />
-                  <fieldset class="mb-3">
-                    <legend class="form-label fw-semibold small mb-2">Your rating</legend>
-                    <input type="hidden" name="rating" id="mciRatingValue" value="0" />
-                    <div class="mci-star-picker d-flex gap-1" id="mciStarPicker" role="group" aria-label="Star rating 1 to 5">
-                      <?php for ($s = 1; $s <= 5; $s++): ?>
-                        <button type="button" class="btn btn-link mci-star-picker__btn p-0 border-0" data-star-value="<?= $s ?>" aria-label="<?= $s ?> star<?= $s === 1 ? '' : 's' ?>">
-                          <i class="bi bi-star mci-reviews-star--off fs-3" aria-hidden="true"></i>
-                        </button>
-                      <?php endfor; ?>
-                    </div>
-                    <div class="invalid-feedback d-block visually-hidden" id="mciRatingHint">Select 1–5 stars.</div>
-                  </fieldset>
-                  <div class="mb-3">
-                    <label class="form-label fw-semibold small" for="mciReviewText">Your review</label>
-                    <textarea class="form-control" name="review_text" id="mciReviewText" rows="4" required minlength="10" maxlength="2000" placeholder="Share your experience (minimum 10 characters). Your name will not be shown."></textarea>
-                    <div class="form-text">Posted publicly as Anonymous.</div>
-                  </div>
-                  <div class="d-flex flex-wrap align-items-center gap-3">
-                    <button type="submit" name="mci_review_submit" value="1" class="btn btn-dark">Submit review</button>
-                    <a class="small text-muted" href="/logout/?return=<?= rawurlencode('/business/?slug=' . $slug . '#reviews') ?>">Sign out</a>
-                  </div>
-                </form>
               <?php endif; ?>
+              <form id="mciReviewForm" method="post" action="/business/" class="mci-review-form">
+                <input type="hidden" name="business_slug" value="<?= htmlspecialchars($slug) ?>" />
+                <fieldset class="mb-3">
+                  <legend class="form-label fw-semibold small mb-2">Your rating</legend>
+                  <input type="hidden" name="rating" id="mciRatingValue" value="<?= $editRating ?>" />
+                  <div class="mci-star-picker d-flex gap-1" id="mciStarPicker" role="group" aria-label="Star rating 1 to 5"
+                    data-initial-rating="<?= $editRating ?>">
+                    <?php for ($s = 1; $s <= 5; $s++): ?>
+                      <button type="button" class="btn btn-link mci-star-picker__btn p-0 border-0" data-star-value="<?= $s ?>" aria-label="<?= $s ?> star<?= $s === 1 ? '' : 's' ?>">
+                        <i class="bi <?= $s <= $editRating ? 'bi-star-fill mci-reviews-star--on' : 'bi-star mci-reviews-star--off' ?> fs-3" aria-hidden="true"></i>
+                      </button>
+                    <?php endfor; ?>
+                  </div>
+                  <div class="invalid-feedback d-block visually-hidden" id="mciRatingHint">Select 1–5 stars.</div>
+                </fieldset>
+                <div class="mb-3">
+                  <label class="form-label fw-semibold small" for="mciReviewText">Your review</label>
+                  <textarea class="form-control" name="review_text" id="mciReviewText" rows="4" required minlength="10" maxlength="2000" placeholder="Share your experience (minimum 10 characters)."><?= htmlspecialchars($editText) ?></textarea>
+                  <div class="form-text">Posted publicly as Anonymous.</div>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-3">
+                  <button type="submit" name="<?= $submitName ?>" value="1" class="btn btn-dark"><?= htmlspecialchars($submitBtn) ?></button>
+                  <a class="small text-muted" href="/logout/?return=<?= rawurlencode('/business/' . $slug . '/#reviews') ?>">Sign out</a>
+                </div>
+              </form>
             <?php else: ?>
               <div class="border rounded-3 p-4 text-center" style="background: linear-gradient(180deg, #f8fafc 0%, #fff 100%); border-color: var(--mci-border) !important;">
                 <div class="fw-bold mb-2">Sign in to rate &amp; review</div>
                 <p class="text-muted small mb-3 mb-md-4">General users can rate any business. Reviews stay anonymous on the listing.</p>
-                <a class="btn btn-dark me-2" href="/login/?return=<?= rawurlencode('/business/?slug=' . $slug . '#reviews') ?>">Login</a>
-                <a class="btn btn-outline-dark" href="/register/?return=<?= rawurlencode('/business/?slug=' . $slug . '#reviews') ?>">Register</a>
+                <a class="btn btn-dark me-2" href="/login/?return=<?= rawurlencode('/business/' . $slug . '/#reviews') ?>">Login</a>
+                <a class="btn btn-outline-dark" href="/register/?return=<?= rawurlencode('/business/' . $slug . '/#reviews') ?>">Register</a>
               </div>
             <?php endif; ?>
           </div>
@@ -819,9 +1003,21 @@ ob_start();
                 </a>
               <?php endif; ?>
 
-              <button class="btn btn-outline-secondary btn-sm w-100" type="button" disabled title="Demo">
-                <i class="bi bi-heart me-1" aria-hidden="true"></i>Save to favourites
-              </button>
+              <?php if ($isLoggedIn && $bizGroupId !== ''): ?>
+                <form method="post" action="/business/">
+                  <input type="hidden" name="mci_fav_toggle" value="1" />
+                  <input type="hidden" name="business_slug" value="<?= htmlspecialchars($slug, ENT_QUOTES, 'UTF-8') ?>" />
+                  <button type="submit" class="btn <?= $isFavourited ? 'btn-danger' : 'btn-outline-secondary' ?> btn-sm w-100">
+                    <i class="bi <?= $isFavourited ? 'bi-heart-fill' : 'bi-heart' ?> me-1" aria-hidden="true"></i>
+                    <?= $isFavourited ? 'Remove from favourites' : 'Save to favourites' ?>
+                  </button>
+                </form>
+              <?php else: ?>
+                <a class="btn btn-outline-secondary btn-sm w-100"
+                   href="/login/?return=<?= rawurlencode('/business/' . $slug . '/') ?>">
+                  <i class="bi bi-heart me-1" aria-hidden="true"></i>Save to favourites
+                </a>
+              <?php endif; ?>
             </div>
           </div>
         </div>

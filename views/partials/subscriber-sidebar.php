@@ -1,12 +1,11 @@
 <?php
 // Subscriber sidebar partial.
-// Expects $subActive: dashboard | list-business | listings | leads | favourites | enquiries | reviews | '' (no highlight).
+// Expects $subActive: dashboard | list-business | listings | leads | favourites | reviews | '' (no highlight).
 $subActive = $subActive ?? 'dashboard';
 
 // Demo notification counts (replace with real DB queries when backend is ready)
 $subBadgeCounts = [
-    'leads'     => 2, // new leads
-    'enquiries' => 1, // unread enquiries
+    'leads' => 2, // new leads
 ];
 
 function subLinkClass(string $key, string $subActive): string
@@ -39,14 +38,6 @@ function subLinkClass(string $key, string $subActive): string
         <span><i class="bi bi-person-lines-fill" aria-hidden="true"></i> Leads</span>
         <?php if ($subBadgeCounts['leads'] > 0): ?>
           <span class="badge rounded-pill text-bg-danger" aria-label="<?= $subBadgeCounts['leads'] ?> new leads"><?= $subBadgeCounts['leads'] ?></span>
-        <?php endif; ?>
-      </span>
-    </a>
-    <a class="<?= subLinkClass('enquiries', $subActive) ?>" href="/subscriber/enquiries/">
-      <span class="d-flex align-items-center justify-content-between gap-1 w-100">
-        <span><i class="bi bi-chat-left-text" aria-hidden="true"></i> Enquiries</span>
-        <?php if ($subBadgeCounts['enquiries'] > 0): ?>
-          <span class="badge rounded-pill text-bg-danger" aria-label="<?= $subBadgeCounts['enquiries'] ?> new enquiries"><?= $subBadgeCounts['enquiries'] ?></span>
         <?php endif; ?>
       </span>
     </a>
