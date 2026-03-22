@@ -1,0 +1,19 @@
+-- =============================================================================
+-- My City Info — Master Seed: Tags
+-- File: database/seed/master/03_tags.sql
+--
+-- 90+ cross-category descriptive tags.
+--
+-- The canonical data file is: database/seed_tags.sql
+-- Run that file directly — it is idempotent (START TRANSACTION + ON DUPLICATE KEY).
+--
+-- Command line:
+--   mysql -u <user> -p <database> < database/seed_tags.sql
+--
+-- MySQL client:
+--   SOURCE database/seed_tags.sql;
+--
+-- Run order: after 02_categories.sql (no FK dependency, but keep consistent order)
+-- Full reset (if needed before re-seeding):
+--   SET foreign_key_checks=0; TRUNCATE TABLE mci_tags; SET foreign_key_checks=1;
+-- =============================================================================

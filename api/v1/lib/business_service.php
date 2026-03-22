@@ -578,3 +578,143 @@ function api_business_update_status(
 
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// Public listing functions (status=live only)
+// ---------------------------------------------------------------------------
+
+/**
+ * List live businesses for public pages.
+ *
+ * Filters (all optional):
+ *   category_id   int     — exact parent_category_id match
+ *   category_slug string  — match mci_categories.slug (parent category)
+ *   q             string  — LIKE match on business name
+ *   city          string  — LIKE match on branch city
+ *   price_range   string  — exact enum value
+ *   tag_slug         string  — business must have this tag slug
+ *   subcategory_slug string  — business must belong to this subcategory slug
+ *   page          int     — default 1
+ *   per_page      int     — default 12, max 100
+ *   sort          string  — 'newest' (default) | 'oldest'
+ *
+ * Returns:
+ *   ['businesses' => [...], 'total' => int, 'page' => int, 'per_page' => int, 'pages' => int]
+ *
+ * Each row: id, name, slug, tagline, logo_path, banner_path, price_range,
+ *           created_at, category_name, category_slug, city, phone_primary,
+ *           latitude, longitude
+ */
+function api_business_list_public(PDO $pdo, array $filters = []): array
+{
+    $page    = max(1, (int)($filters['page']     ?? 1));
+    $perPage = min(100, max(1, (int)($filters['per_page'] ?? 12)));
+    $offset  = ($page - 1) * $perPage;
+    $sort    = (($filters['sort'] ?? 'newest') === 'oldest') ? 'ASC' : 'DESC';
+
+    $where  = ["g.status = 'live'"];
+    $params = [];
+
+    if (!empty($filters['category_id'])) {
+        $where[]                 = 'g.parent_category_id = :category_id';
+        $params[':category_id']  = (int)$filters['category_id'];
+    }
+    if (!empty($filters['category_slug'])) {
+        $where[]                   = 'c.slug = :category_slug';
+        $params[':category_slug']  = (string)$filters['category_slug'];
+    }
+    if (!empty($filters['q'])) {
+        $where[]        = 'g.name LIKE :q';
+        $params[':q']   = '%' . $filters['q'] . '%';
+    }
+    if (!empty($filters['city'])) {
+        $where[]          = 'b.city LIKE :city';
+        $params[':city']  = '%' . $filters['city'] . '%';
+    }
+    if (!empty($filters['price_range'])) {
+        $where[]                  = 'g.price_range = :price_range';
+        $params[':price_range']   = (string)$filters['price_range'];
+    }
+    if (!empty($filters['tag_slug'])) {
+        $where[] = 'EXISTS (
+            SELECT 1 FROM mci_business_tags bt
+            JOIN mci_tags t ON t.id = bt.tag_id
+            WHERE bt.business_group_id = g.id AND t.slug = :tag_slug
+        )';
+        $params[':tag_slug'] = (string)$filters['tag_slug'];
+    }
+    if (!empty($filters['subcategory_slug'])) {
+        $where[] = 'EXISTS (
+            SELECT 1 FROM mci_business_subcategories bsc
+            JOIN mci_categories sc ON sc.id = bsc.category_id
+            WHERE bsc.business_group_id = g.id AND sc.slug = :subcategory_slug
+        )';
+        $params[':subcategory_slug'] = (string)$filters['subcategory_slug'];
+    }
+
+    $whereClause = implode(' AND ', $where);
+
+    $baseJoins = '
+        FROM mci_business_groups g
+        LEFT JOIN mci_categories c ON c.id = g.parent_category_id
+        LEFT JOIN mci_business_branches b
+               ON b.business_group_id = g.id
+              AND b.id = (
+                    SELECT b2.id FROM mci_business_branches b2
+                    WHERE b2.business_group_id = g.id
+                    ORDER BY b2.is_primary DESC, b2.created_at ASC
+                    LIMIT 1
+                  )
+    ';
+
+    $countStmt = $pdo->prepare("SELECT COUNT(DISTINCT g.id) $baseJoins WHERE $whereClause");
+    $countStmt->execute($params);
+    $total = (int)($countStmt->fetchColumn() ?? 0);
+    $pages = $total > 0 ? (int)ceil($total / $perPage) : 1;
+
+    $dataStmt = $pdo->prepare("
+        SELECT
+            g.id, g.name, g.slug, g.tagline,
+            g.logo_path, g.banner_path,
+            g.price_range, g.created_at,
+            c.name AS category_name,
+            c.slug AS category_slug,
+            b.city,
+            b.phone_primary,
+            b.latitude,
+            b.longitude
+        $baseJoins
+        WHERE $whereClause
+        ORDER BY g.created_at $sort
+        LIMIT :limit OFFSET :offset
+    ");
+    foreach ($params as $k => $v) {
+        $dataStmt->bindValue($k, $v);
+    }
+    $dataStmt->bindValue(':limit',  $perPage, PDO::PARAM_INT);
+    $dataStmt->bindValue(':offset', $offset,  PDO::PARAM_INT);
+    $dataStmt->execute();
+
+    return [
+        'businesses' => $dataStmt->fetchAll(PDO::FETCH_ASSOC) ?: [],
+        'total'      => $total,
+        'page'       => $page,
+        'per_page'   => $perPage,
+        'pages'      => $pages,
+    ];
+}
+
+/**
+ * Fetch a single live business by its slug (full denormalised record).
+ * Returns null if not found or not live.
+ */
+function api_business_fetch_by_slug(PDO $pdo, string $slug): ?array
+{
+    $stmt = $pdo->prepare("SELECT id FROM mci_business_groups WHERE slug = ? AND status = 'live' LIMIT 1");
+    $stmt->execute([$slug]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        return null;
+    }
+    return api_business_fetch($pdo, (string)$row['id']);
+}

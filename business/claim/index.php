@@ -25,35 +25,49 @@ $slug = trim((string) ($_GET['slug'] ?? ''));
 $flash = '';
 $submitted = false;
 
-// UI demo: hardcoded listing lookup by slug
-$demoListings = [
-    'property-852' => [
-        'title'    => 'Property 852',
-        'address'  => '12 Orchard Lane, Downtown',
-        'category' => 'Real Estate',
-        'claimed'  => false,
-    ],
-    'locker-shop-uk' => [
-        'title'    => 'Locker Shop UK Ltd',
-        'address'  => '88 Market Street, Central District',
-        'category' => 'Furniture Store',
-        'claimed'  => false,
-    ],
-    'jxf-painting' => [
-        'title'    => 'JXF Painting Service',
-        'address'  => '4 Riverside Avenue, West End',
-        'category' => 'Painter',
-        'claimed'  => true,
-    ],
-    'hunter-hill-physio' => [
-        'title'    => 'Hunter Hill Physiotherapy',
-        'address'  => '19 Hillcrest Road, Northside',
-        'category' => 'Health',
-        'claimed'  => false,
-    ],
-];
-
-$listing = $slug !== '' ? ($demoListings[$slug] ?? null) : null;
+// Load listing from DB
+require_once __DIR__ . '/../../api/v1/lib/db.php';
+require_once __DIR__ . '/../../api/v1/lib/uuid.php';
+$listing = null;
+if ($slug !== '') {
+    try {
+        $pdo  = api_db();
+        $stmt = $pdo->prepare("
+            SELECT
+                g.id,
+                g.name AS title,
+                g.claimed_by_user_id,
+                c.name AS category,
+                TRIM(CONCAT_WS(', ',
+                    NULLIF(b.address_line1, ''),
+                    NULLIF(b.city, ''),
+                    NULLIF(b.state, '')
+                )) AS address
+            FROM mci_business_groups g
+            LEFT JOIN mci_categories c ON c.id = g.parent_category_id
+            LEFT JOIN mci_business_branches b ON b.business_group_id = g.id
+                AND b.id = (
+                    SELECT b2.id FROM mci_business_branches b2
+                    WHERE b2.business_group_id = g.id
+                    ORDER BY b2.is_primary DESC, b2.created_at ASC
+                    LIMIT 1
+                )
+            WHERE g.slug = ? AND g.status != 'deleted'
+            LIMIT 1
+        ");
+        $stmt->execute([$slug]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            $listing = [
+                'id'       => (string)$row['id'],
+                'title'    => (string)$row['title'],
+                'address'  => (string)$row['address'],
+                'category' => (string)$row['category'],
+                'claimed'  => !empty($row['claimed_by_user_id']),
+            ];
+        }
+    } catch (Throwable $ignored) {}
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $csrfPost = trim((string) ($_POST['csrf_token'] ?? ''));
@@ -73,10 +87,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$agreedTerms) {
             $errors[] = 'You must agree to the terms to submit a claim.';
         }
+        if ($listing === null) {
+            $errors[] = 'Listing not found.';
+        } elseif ($listing['claimed']) {
+            $errors[] = 'This listing is already claimed.';
+        }
         if ($errors) {
             $flash = 'error:' . implode(' ', $errors);
         } else {
-            $submitted = true;
+            // Check for existing pending claim by this user
+            try {
+                $userId = (string)($_SESSION['mci_user_id'] ?? '');
+                $pdo2   = api_db();
+                $chk    = $pdo2->prepare(
+                    "SELECT id FROM mci_business_claims WHERE business_group_id = ? AND claimant_user_id = ? AND status = 'pending' LIMIT 1"
+                );
+                $chk->execute([$listing['id'], $userId]);
+                if ($chk->fetchColumn()) {
+                    $flash = 'error:You already have a pending claim for this business.';
+                } else {
+                    $claimId = api_uuid_v4();
+                    $pdo2->prepare(
+                        "INSERT INTO mci_business_claims
+                            (id, business_group_id, claimant_user_id, status, claim_message, created_by_user_id)
+                         VALUES (?, ?, ?, 'pending', ?, ?)"
+                    )->execute([
+                        $claimId,
+                        $listing['id'],
+                        $userId,
+                        $relationship . ' — ' . $details,
+                        $userId,
+                    ]);
+                    $submitted = true;
+                }
+            } catch (Throwable $e) {
+                $flash = 'error:Could not submit claim. Please try again.';
+            }
         }
     }
 }
@@ -91,7 +137,7 @@ ob_start();
     <ol class="breadcrumb small">
       <?php if ($listing !== null): ?>
         <li class="breadcrumb-item">
-          <a href="/business/?slug=<?= urlencode($slug) ?>">
+          <a href="/business/<?= urlencode($slug) ?>/">
             <?= htmlspecialchars($listing['title'], ENT_QUOTES, 'UTF-8') ?>
           </a>
         </li>
@@ -116,7 +162,7 @@ ob_start();
       </p>
       <div class="d-flex justify-content-center gap-2 flex-wrap">
         <?php if ($listing !== null): ?>
-          <a class="btn btn-outline-dark btn-sm" href="/business/?slug=<?= urlencode($slug) ?>">Back to listing</a>
+          <a class="btn btn-outline-dark btn-sm" href="/business/<?= urlencode($slug) ?>/">Back to listing</a>
         <?php endif; ?>
         <a class="btn btn-dark btn-sm" href="/subscriber/dashboard/">Go to dashboard</a>
       </div>
@@ -141,7 +187,7 @@ ob_start();
         already has a verified owner. If you believe you have a right to this listing, you can raise a dispute.
       </p>
       <div class="d-flex gap-2 flex-wrap">
-        <a class="btn btn-sm btn-outline-dark" href="/business/?slug=<?= urlencode($slug) ?>">Back to listing</a>
+        <a class="btn btn-sm btn-outline-dark" href="/business/<?= urlencode($slug) ?>/">Back to listing</a>
         <a class="btn btn-sm btn-dark" href="/business/dispute/?slug=<?= urlencode($slug) ?>">Raise a dispute</a>
       </div>
     </div>
@@ -232,7 +278,7 @@ ob_start();
           </div>
 
           <div class="d-flex gap-2">
-            <a class="btn btn-outline-secondary btn-sm" href="/business/?slug=<?= urlencode($slug) ?>">Cancel</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/business/<?= urlencode($slug) ?>/">Cancel</a>
             <button type="submit" class="btn btn-dark btn-sm">
               <i class="bi bi-send me-1" aria-hidden="true"></i>Submit claim
             </button>

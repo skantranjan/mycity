@@ -5,26 +5,45 @@ $subActive = 'dashboard';
 $hideCta = true;
 $appArea = 'subscriber';
 
-// UI demo data
-$demoStats = [
-    'total_listings'   => 4,
-    'pending_approval' => 1,
-    'live'             => 2,
-    'total_leads'      => 5,
-];
+require_once __DIR__ . '/../../includes/mci_session.php';
+require_once __DIR__ . '/../../api/v1/lib/db.php';
+require_once __DIR__ . '/../../api/v1/lib/business_service.php';
 
-$demoListings = [
-    ['slug' => 'property-852',   'title' => 'Property 852',        'address' => '12 Orchard Lane, Downtown',         'status' => 'Live',    'updated' => '2 days ago'],
-    ['slug' => 'locker-shop-uk', 'title' => 'Locker Shop UK Ltd',  'address' => '88 Market Street, Central District', 'status' => 'Pending', 'updated' => '1 day ago'],
-    ['slug' => 'jxf-painting',   'title' => 'JXF Painting Service','address' => '4 Riverside Avenue, West End',       'status' => 'Live',    'updated' => '5 days ago'],
-];
+$userId = (string)($_SESSION['mci_user_id'] ?? '');
 
-$demoLeads = [
-    ['listing' => 'Property 852',        'from' => 'James Harrington', 'when' => '2 hours ago',  'status' => 'New'],
-    ['listing' => 'JXF Painting Service','from' => 'Sara Mitchell',    'when' => 'Yesterday',     'status' => 'Contacted'],
-    ['listing' => 'Locker Shop UK Ltd',  'from' => 'School Admin',     'when' => '2 days ago',    'status' => 'Converted'],
-    ['listing' => 'Property 852',        'from' => 'Linda Farrow',     'when' => '5 days ago',    'status' => 'Closed'],
-    ['listing' => 'JXF Painting Service','from' => 'Oliver Brooks',    'when' => '8 days ago',    'status' => 'New'],
+// ── Real stats from DB ────────────────────────────────────────────────────────
+$stats = ['live' => 0, 'draft' => 0, 'suspended' => 0, 'total' => 0];
+$recentListings = [];
+
+if ($userId !== '') {
+    try {
+        $pdo = api_db();
+
+        // Status counts
+        $stmt = $pdo->prepare(
+            "SELECT status, COUNT(*) AS cnt FROM mci_business_groups
+             WHERE added_by_user_id = ? AND status != 'deleted'
+             GROUP BY status"
+        );
+        $stmt->execute([$userId]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $stats[(string)$row['status']] = (int)$row['cnt'];
+        }
+        $stats['total'] = array_sum($stats);
+
+        // Recent listings (up to 5)
+        $recentResult   = api_business_list_owner($pdo, $userId);
+        $recentListings = array_slice($recentResult['businesses'] ?? [], 0, 5);
+    } catch (Throwable $e) {
+        // Graceful degradation — stats stay 0
+    }
+}
+
+$statusBadgeMap = [
+    'live'      => 'text-bg-success',
+    'draft'     => 'text-bg-warning',
+    'rejected'  => 'text-bg-danger',
+    'suspended' => 'text-bg-secondary',
 ];
 
 ob_start();
@@ -57,16 +76,15 @@ ob_start();
       <div class="col-6 col-md-3">
         <a href="/subscriber/listings/" class="text-decoration-none">
           <div class="card border-0 shadow-sm text-center p-3 h-100">
-            <div class="fw-bold fs-4"><?= $demoStats['total_listings'] ?></div>
+            <div class="fw-bold fs-4"><?= $stats['total'] ?></div>
             <div class="text-muted small">Total Listings</div>
-            <div class="mt-1" style="font-size:var(--mci-text-micro);color:var(--mci-color-success);"><i class="bi bi-arrow-up-short" aria-hidden="true"></i>1 this month</div>
           </div>
         </a>
       </div>
       <div class="col-6 col-md-3">
         <a href="/subscriber/listings/?status=pending" class="text-decoration-none">
           <div class="card border-0 shadow-sm text-center p-3 h-100">
-            <div class="fw-bold fs-4 text-warning"><?= $demoStats['pending_approval'] ?></div>
+            <div class="fw-bold fs-4 text-warning"><?= $stats['draft'] ?></div>
             <div class="text-muted small">Pending Approval</div>
             <div class="mt-1" style="font-size:var(--mci-text-micro);color:var(--mci-color-warning);">Awaiting review</div>
           </div>
@@ -75,18 +93,18 @@ ob_start();
       <div class="col-6 col-md-3">
         <a href="/subscriber/listings/?status=live" class="text-decoration-none">
           <div class="card border-0 shadow-sm text-center p-3 h-100">
-            <div class="fw-bold fs-4 text-success"><?= $demoStats['live'] ?></div>
+            <div class="fw-bold fs-4 text-success"><?= $stats['live'] ?></div>
             <div class="text-muted small">Live</div>
-            <div class="mt-1" style="font-size:var(--mci-text-micro);color:var(--mci-color-success);"><i class="bi bi-arrow-up-short" aria-hidden="true"></i>Active &amp; visible</div>
+            <div class="mt-1" style="font-size:var(--mci-text-micro);color:var(--mci-color-success);">Active &amp; visible</div>
           </div>
         </a>
       </div>
       <div class="col-6 col-md-3">
         <a href="/subscriber/leads/" class="text-decoration-none">
           <div class="card border-0 shadow-sm text-center p-3 h-100">
-            <div class="fw-bold fs-4 text-primary"><?= $demoStats['total_leads'] ?></div>
+            <div class="fw-bold fs-4 text-primary">—</div>
             <div class="text-muted small">Total Leads</div>
-            <div class="mt-1" style="font-size:var(--mci-text-micro);color:var(--mci-color-success);"><i class="bi bi-arrow-up-short" aria-hidden="true"></i>2 new this week</div>
+            <div class="mt-1" style="font-size:var(--mci-text-micro);color:var(--mci-text-muted);">Coming soon</div>
           </div>
         </a>
       </div>
@@ -95,7 +113,7 @@ ob_start();
     <div class="row g-4">
 
       <!-- My Listings quick-access -->
-      <div class="col-12">
+      <div class="col-12 col-lg-8">
         <div class="card border-0 shadow-sm">
           <div class="card-body p-4">
             <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
@@ -109,40 +127,46 @@ ob_start();
                 <thead class="table-light">
                   <tr>
                     <th>Business</th>
+                    <th>Category</th>
                     <th>Status</th>
-                    <th>Updated</th>
                     <th style="min-width:220px;">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <?php foreach ($demoListings as $r): ?>
-                    <?php
-                    $badgeClass = match($r['status']) {
-                        'Live'     => 'text-bg-success',
-                        'Pending'  => 'text-bg-warning',
-                        'Rejected' => 'text-bg-danger',
-                        default    => 'text-bg-light border',
-                    };
-                    ?>
+                  <?php if (empty($recentListings)): ?>
                     <tr>
-                      <td>
-                        <div class="fw-semibold"><?= htmlspecialchars($r['title']) ?></div>
-                        <div class="text-muted small"><?= htmlspecialchars($r['address']) ?></div>
-                      </td>
-                      <td><span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($r['status']) ?></span></td>
-                      <td class="text-muted small"><?= htmlspecialchars($r['updated']) ?></td>
-                      <td>
-                        <div class="d-flex gap-2 flex-wrap">
-                          <a class="btn btn-sm btn-outline-dark" href="/business/?slug=<?= urlencode((string) $r['slug']) ?>" target="_blank" rel="noopener noreferrer" title="View public listing">
-                            <i class="bi bi-eye me-1" aria-hidden="true"></i>View <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
-                          </a>
-                          <a class="btn btn-sm btn-outline-secondary" href="/subscriber/listing-edit/?slug=<?= urlencode((string) $r['slug']) ?>">
-                            <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit
-                          </a>
-                        </div>
+                      <td colspan="4" class="text-center text-muted small py-4">
+                        No listings yet. <a href="/subscriber/list-business/">Add your first business</a>.
                       </td>
                     </tr>
-                  <?php endforeach; ?>
+                  <?php else: ?>
+                    <?php foreach ($recentListings as $r):
+                      $rowStatus  = strtolower((string)($r['status'] ?? ''));
+                      $badgeClass = $statusBadgeMap[$rowStatus] ?? 'text-bg-light border';
+                      $rowSlug    = (string)($r['slug'] ?? '');
+                    ?>
+                      <tr>
+                        <td>
+                          <div class="small fw-semibold"><?= htmlspecialchars((string)($r['name'] ?? '')) ?></div>
+                          <div class="text-muted small"><?= htmlspecialchars((string)($r['category_name'] ?? '')) ?></div>
+                        </td>
+                        <td class="small text-muted"><?= htmlspecialchars((string)($r['category_name'] ?? '—')) ?></td>
+                        <td><span class="badge <?= $badgeClass ?>"><?= htmlspecialchars(ucfirst($rowStatus)) ?></span></td>
+                        <td>
+                          <div class="d-flex gap-2 flex-wrap">
+                            <?php if ($rowSlug): ?>
+                              <a class="btn btn-sm btn-outline-dark" href="/business/<?= urlencode($rowSlug) ?>/" target="_blank" rel="noopener noreferrer" title="View public listing">
+                                <i class="bi bi-eye me-1" aria-hidden="true"></i>View <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
+                              </a>
+                              <a class="btn btn-sm btn-outline-secondary" href="/subscriber/listing-edit/?slug=<?= urlencode($rowSlug) ?>">
+                                <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit
+                              </a>
+                            <?php endif; ?>
+                          </div>
+                        </td>
+                      </tr>
+                    <?php endforeach; ?>
+                  <?php endif; ?>
                 </tbody>
               </table>
             </div>
@@ -150,8 +174,8 @@ ob_start();
         </div>
       </div>
 
-      <!-- Recent Leads + Quick Actions -->
-      <div class="col-12 col-lg-7">
+      <!-- Recent Leads -->
+      <div class="col-12 col-lg-4">
         <div class="card border-0 shadow-sm h-100">
           <div class="card-body p-4">
             <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
@@ -160,85 +184,9 @@ ob_start();
                 <i class="bi bi-person-lines-fill me-1" aria-hidden="true"></i>View all
               </a>
             </div>
-            <div class="d-flex flex-column gap-2">
-              <?php foreach (array_slice($demoLeads, 0, 5) as $lead):
-                $leadBadge = match($lead['status']) {
-                    'New'       => 'text-bg-primary',
-                    'Contacted' => 'text-bg-warning',
-                    'Converted' => 'text-bg-success',
-                    'Closed'    => 'text-bg-secondary',
-                    default     => 'text-bg-light border',
-                };
-              ?>
-                <div class="d-flex align-items-center justify-content-between gap-2 border rounded-2 p-2">
-                  <div>
-                    <div class="small fw-semibold"><?= htmlspecialchars($lead['from']) ?>
-                      <span class="text-muted fw-normal">· <?= htmlspecialchars($lead['listing']) ?></span>
-                    </div>
-                    <div class="text-muted small"><?= htmlspecialchars($lead['when']) ?></div>
-                  </div>
-                  <span class="badge <?= $leadBadge ?> text-nowrap"><?= htmlspecialchars($lead['status']) ?></span>
-                </div>
-              <?php endforeach; ?>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="col-12 col-lg-5">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body p-4">
-            <div class="fw-semibold mb-3">Quick Actions</div>
-            <div class="row g-2">
-              <div class="col-6">
-                <a href="/subscriber/list-business/" class="text-decoration-none">
-                  <div class="d-flex flex-column align-items-center justify-content-center gap-1 p-3 rounded-3 text-center h-100" style="background:var(--mci-color-primary-deep);color:#fff;min-height:80px;">
-                    <i class="bi bi-plus-circle fs-4" aria-hidden="true"></i>
-                    <span class="small fw-semibold">Add Business</span>
-                  </div>
-                </a>
-              </div>
-              <div class="col-6">
-                <a href="/subscriber/listings/" class="text-decoration-none">
-                  <div class="d-flex flex-column align-items-center justify-content-center gap-1 p-3 rounded-3 text-center h-100" style="background:var(--mci-color-primary-soft);color:var(--mci-color-primary-deep);min-height:80px;">
-                    <i class="bi bi-shop-window fs-4" aria-hidden="true"></i>
-                    <span class="small fw-semibold">My Listings</span>
-                  </div>
-                </a>
-              </div>
-              <div class="col-6">
-                <a href="/subscriber/leads/" class="text-decoration-none">
-                  <div class="d-flex flex-column align-items-center justify-content-center gap-1 p-3 rounded-3 text-center h-100" style="background:var(--mci-color-primary-soft);color:var(--mci-color-primary-deep);min-height:80px;">
-                    <i class="bi bi-person-lines-fill fs-4" aria-hidden="true"></i>
-                    <span class="small fw-semibold">Leads</span>
-                  </div>
-                </a>
-              </div>
-              <div class="col-6">
-                <a href="/subscriber/enquiries/" class="text-decoration-none">
-                  <div class="d-flex flex-column align-items-center justify-content-center gap-1 p-3 rounded-3 text-center h-100" style="background:var(--mci-color-primary-soft);color:var(--mci-color-primary-deep);min-height:80px;">
-                    <i class="bi bi-chat-left-text fs-4" aria-hidden="true"></i>
-                    <span class="small fw-semibold">Enquiries</span>
-                  </div>
-                </a>
-              </div>
-              <div class="col-6">
-                <a href="/subscriber/favourites/" class="text-decoration-none">
-                  <div class="d-flex flex-column align-items-center justify-content-center gap-1 p-3 rounded-3 text-center h-100" style="background:var(--mci-color-primary-soft);color:var(--mci-color-primary-deep);min-height:80px;">
-                    <i class="bi bi-heart-fill fs-4" aria-hidden="true"></i>
-                    <span class="small fw-semibold">Favourites</span>
-                  </div>
-                </a>
-              </div>
-              <div class="col-6">
-                <a href="/subscriber/profile/" class="text-decoration-none">
-                  <div class="d-flex flex-column align-items-center justify-content-center gap-1 p-3 rounded-3 text-center h-100" style="background:var(--mci-color-primary-soft);color:var(--mci-color-primary-deep);min-height:80px;">
-                    <i class="bi bi-person-circle fs-4" aria-hidden="true"></i>
-                    <span class="small fw-semibold">Profile</span>
-                  </div>
-                </a>
-              </div>
+            <div class="text-muted small py-3 text-center">
+              <i class="bi bi-hourglass-split fs-4 d-block mb-2 opacity-50" aria-hidden="true"></i>
+              Leads will appear here once the feature is live.
             </div>
           </div>
         </div>

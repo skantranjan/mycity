@@ -8,7 +8,6 @@ $appArea = 'subscriber';
 $csrfAction = 'subscriber_leads_status';
 require_once __DIR__ . '/../../includes/mci_csrf.php';
 $csrfToken = mci_csrf_token($csrfAction);
-$csrfOk = false;
 
 $statusFlash = '';
 $statusFilter = trim((string) ($_GET['status'] ?? 'all'));
@@ -130,15 +129,25 @@ if ($fromDateObj || $toDateObj) {
     }));
 }
 
-// Stats computed from original full dataset (before filters)
-$allLeads   = $leads; // after filters — counts shown in badges
-$totalAll   = 5; // always from full dataset
-$totalNew   = 2;
-$totalCont  = 1;
-$totalConv  = 1;
+$totalAll  = 5;
+$totalNew  = 2;
+$totalCont = 1;
+$totalConv = 1;
 
-// Determine open detail modal (from query string)
-$openDetail = trim((string) ($_GET['detail'] ?? ''));
+// JSON-encode leads for JS split panel
+$leadsJson = json_encode(
+    array_map(static fn(array $l) => [
+        'id'      => $l['id'],
+        'name'    => $l['name'],
+        'phone'   => $l['phone'],
+        'email'   => $l['email'],
+        'listing' => $l['listing'],
+        'message' => $l['message'],
+        'date'    => $l['date'],
+        'status'  => $l['status'],
+    ], $leads),
+    JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+);
 
 ob_start();
 ?>
@@ -177,193 +186,218 @@ ob_start();
       </div>
     </div>
 
-    <!-- Leads table -->
-    <div class="card border-0 shadow-sm bg-white">
-      <div class="card-body p-4">
-        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
-          <div>
-            <div class="fw-semibold">Leads</div>
-            <div class="text-muted small">Enquiries from customers interested in your listings.</div>
-          </div>
-          <span class="badge text-bg-light border px-3 py-2">Showing: <?= count($leads) ?></span>
-        </div>
+    <!-- Split-panel: table + detail panel -->
+    <div class="d-flex gap-3 align-items-start" id="mciLeadsSplit">
 
-        <?php if ($statusFlash !== ''): ?>
-          <?php [$flashType, $flashMsg] = explode(':', $statusFlash, 2); ?>
-          <div class="alert alert-<?= $flashType === 'error' ? 'danger' : 'success' ?> py-2 small mb-3" role="status">
-            <?= htmlspecialchars($flashMsg, ENT_QUOTES, 'UTF-8') ?>
+      <!-- Left: leads table card -->
+      <div class="card border-0 shadow-sm bg-white flex-grow-1 mci-leads-list-col" id="mciLeadsListCol">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
+            <div>
+              <div class="fw-semibold">Leads</div>
+              <div class="text-muted small">Enquiries from customers interested in your listings.</div>
+            </div>
+            <span class="badge text-bg-light border px-3 py-2">Showing: <?= count($leads) ?></span>
           </div>
-        <?php endif; ?>
 
-        <!-- Filter bar -->
-        <form method="get" class="mb-3">
-          <div class="row g-2 align-items-end">
-            <div class="col-6 col-lg-auto">
-              <label class="form-label small mb-1">Status</label>
-              <select name="status" class="form-select form-select-sm" aria-label="Filter by lead status">
-                <option value="all"      <?= $wantedStatus === 'all'       ? 'selected' : '' ?>>All</option>
-                <option value="new"      <?= $wantedStatus === 'New'       ? 'selected' : '' ?>>New</option>
-                <option value="contacted"<?= $wantedStatus === 'Contacted' ? 'selected' : '' ?>>Contacted</option>
-                <option value="converted"<?= $wantedStatus === 'Converted' ? 'selected' : '' ?>>Converted</option>
-                <option value="closed"   <?= $wantedStatus === 'Closed'    ? 'selected' : '' ?>>Closed</option>
-              </select>
+          <?php if ($statusFlash !== ''): ?>
+            <?php [$flashType, $flashMsg] = explode(':', $statusFlash, 2); ?>
+            <div class="alert alert-<?= $flashType === 'error' ? 'danger' : 'success' ?> py-2 small mb-3" role="status">
+              <?= htmlspecialchars($flashMsg, ENT_QUOTES, 'UTF-8') ?>
             </div>
-            <div class="col-6 col-lg-auto">
-              <label class="form-label small mb-1">Business</label>
-              <input type="text" name="business" class="form-control form-control-sm" placeholder="Search business…"
-                value="<?= htmlspecialchars($searchBusiness, ENT_QUOTES, 'UTF-8') ?>" style="min-width:130px;" />
-            </div>
-            <div class="col-6 col-lg-auto">
-              <label class="form-label small mb-1">From</label>
-              <input type="date" name="from_date" class="form-control form-control-sm"
-                value="<?= htmlspecialchars($fromDate, ENT_QUOTES, 'UTF-8') ?>" />
-            </div>
-            <div class="col-6 col-lg-auto">
-              <label class="form-label small mb-1">To</label>
-              <input type="date" name="to_date" class="form-control form-control-sm"
-                value="<?= htmlspecialchars($toDate, ENT_QUOTES, 'UTF-8') ?>" />
-            </div>
-            <div class="col-12 col-lg-auto d-flex gap-2">
-              <button type="submit" class="btn btn-sm btn-outline-dark">Filter</button>
-              <?php if ($statusFilter !== 'all' || $searchBusiness !== '' || $fromDate !== '' || $toDate !== ''): ?>
-                <a href="/subscriber/leads/" class="btn btn-sm btn-outline-secondary">Clear</a>
-              <?php endif; ?>
-            </div>
-          </div>
-        </form>
+          <?php endif; ?>
 
-        <?php if (count($leads) === 0): ?>
-          <div class="text-center py-5 text-muted">
-            <i class="bi bi-inbox fs-2 d-block mb-2" aria-hidden="true"></i>
-            <div class="fw-semibold">No leads found</div>
-            <div class="small mt-1">Try adjusting your filters, or <a href="/subscriber/listings/">manage your listings</a> to attract more enquiries.</div>
-          </div>
-        <?php else: ?>
-          <div class="table-responsive">
-            <table class="table table-bordered align-middle bg-white">
-              <thead class="table-light">
-                <tr>
-                  <th>Lead</th>
-                  <th>Listing</th>
-                  <th>Message</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th style="min-width:200px;">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach ($leads as $lead): ?>
+          <!-- Filter bar -->
+          <form method="get" class="mb-3">
+            <div class="row g-2 align-items-end">
+              <div class="col-6 col-lg-auto">
+                <label class="form-label small mb-1">Status</label>
+                <select name="status" class="form-select form-select-sm" aria-label="Filter by lead status">
+                  <option value="all"      <?= $wantedStatus === 'all'       ? 'selected' : '' ?>>All</option>
+                  <option value="new"      <?= $wantedStatus === 'New'       ? 'selected' : '' ?>>New</option>
+                  <option value="contacted"<?= $wantedStatus === 'Contacted' ? 'selected' : '' ?>>Contacted</option>
+                  <option value="converted"<?= $wantedStatus === 'Converted' ? 'selected' : '' ?>>Converted</option>
+                  <option value="closed"   <?= $wantedStatus === 'Closed'    ? 'selected' : '' ?>>Closed</option>
+                </select>
+              </div>
+              <div class="col-6 col-lg-auto">
+                <label class="form-label small mb-1">Business</label>
+                <input type="text" name="business" class="form-control form-control-sm" placeholder="Search business…"
+                  value="<?= htmlspecialchars($searchBusiness, ENT_QUOTES, 'UTF-8') ?>" style="min-width:130px;" />
+              </div>
+              <div class="col-6 col-lg-auto">
+                <label class="form-label small mb-1">From</label>
+                <input type="date" name="from_date" class="form-control form-control-sm"
+                  value="<?= htmlspecialchars($fromDate, ENT_QUOTES, 'UTF-8') ?>" />
+              </div>
+              <div class="col-6 col-lg-auto">
+                <label class="form-label small mb-1">To</label>
+                <input type="date" name="to_date" class="form-control form-control-sm"
+                  value="<?= htmlspecialchars($toDate, ENT_QUOTES, 'UTF-8') ?>" />
+              </div>
+              <div class="col-12 col-lg-auto d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-outline-dark">Filter</button>
+                <?php if ($statusFilter !== 'all' || $searchBusiness !== '' || $fromDate !== '' || $toDate !== ''): ?>
+                  <a href="/subscriber/leads/" class="btn btn-sm btn-outline-secondary">Clear</a>
+                <?php endif; ?>
+              </div>
+            </div>
+          </form>
+
+          <?php if (count($leads) === 0): ?>
+            <div class="text-center py-5 text-muted">
+              <i class="bi bi-inbox fs-2 d-block mb-2" aria-hidden="true"></i>
+              <div class="fw-semibold">No leads found</div>
+              <div class="small mt-1">Try adjusting your filters, or <a href="/subscriber/listings/">manage your listings</a> to attract more enquiries.</div>
+            </div>
+          <?php else: ?>
+            <div class="table-responsive">
+              <table class="table table-bordered table-hover align-middle bg-white mb-0">
+                <thead class="table-light">
                   <tr>
-                    <td>
-                      <div class="fw-semibold"><?= htmlspecialchars($lead['name']) ?></div>
-                      <div class="text-muted small"><?= htmlspecialchars($lead['phone']) ?></div>
-                      <?php if ($lead['email'] !== ''): ?>
-                        <div class="text-muted small"><?= htmlspecialchars($lead['email']) ?></div>
-                      <?php endif; ?>
-                    </td>
-                    <td class="small"><?= htmlspecialchars($lead['listing']) ?></td>
-                    <td class="small text-muted" style="max-width:220px;">
-                      <span class="d-block text-truncate" style="max-width:220px;" title="<?= htmlspecialchars($lead['message']) ?>">
-                        <?= htmlspecialchars($lead['message']) ?>
-                      </span>
-                      <button type="button" class="btn btn-link btn-sm p-0 mt-1 mci-lead-detail-btn"
-                        data-lead-id="<?= htmlspecialchars($lead['id']) ?>"
-                        data-bs-toggle="modal" data-bs-target="#leadDetailModal"
-                        data-name="<?= htmlspecialchars($lead['name'], ENT_QUOTES) ?>"
-                        data-phone="<?= htmlspecialchars($lead['phone'], ENT_QUOTES) ?>"
-                        data-email="<?= htmlspecialchars($lead['email'], ENT_QUOTES) ?>"
-                        data-listing="<?= htmlspecialchars($lead['listing'], ENT_QUOTES) ?>"
-                        data-message="<?= htmlspecialchars($lead['message'], ENT_QUOTES) ?>"
-                        data-date="<?= htmlspecialchars($lead['date'], ENT_QUOTES) ?>"
-                        data-status="<?= htmlspecialchars($lead['status'], ENT_QUOTES) ?>">
-                        View full
-                      </button>
-                    </td>
-                    <td class="small text-muted text-nowrap"><?= htmlspecialchars($lead['when']) ?></td>
-                    <td>
-                      <?php
-                      $badgeClass = match($lead['status']) {
-                          'New'       => 'text-bg-primary',
-                          'Contacted' => 'text-bg-warning',
-                          'Converted' => 'text-bg-success',
-                          'Closed'    => 'text-bg-secondary',
-                          default     => 'text-bg-light border',
-                      };
-                      ?>
-                      <span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($lead['status']) ?></span>
-                    </td>
-                    <td>
-                      <form method="post" action="" class="d-flex align-items-center gap-2">
-                        <input type="hidden" name="lead_id" value="<?= htmlspecialchars($lead['id']) ?>" />
-                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>" />
-                        <select name="new_status" class="form-select form-select-sm" aria-label="Update lead status" style="min-width:120px;">
-                          <?php foreach ($validStatuses as $vs): ?>
-                            <option value="<?= htmlspecialchars($vs) ?>" <?= $lead['status'] === $vs ? 'selected' : '' ?>>
-                              <?= htmlspecialchars($vs) ?>
-                            </option>
-                          <?php endforeach; ?>
-                        </select>
-                        <button type="submit" class="btn btn-sm btn-outline-dark text-nowrap">Update</button>
-                      </form>
-                    </td>
+                    <th>Lead</th>
+                    <th>Listing</th>
+                    <th>Date</th>
+                    <th>Status</th>
                   </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
+                </thead>
+                <tbody id="mciLeadsTableBody">
+                  <?php foreach ($leads as $lead):
+                    $badgeClass = match($lead['status']) {
+                        'New'       => 'text-bg-primary',
+                        'Contacted' => 'text-bg-warning',
+                        'Converted' => 'text-bg-success',
+                        'Closed'    => 'text-bg-secondary',
+                        default     => 'text-bg-light border',
+                    };
+                  ?>
+                    <tr class="mci-lead-row" style="cursor:pointer;"
+                      data-lead-id="<?= htmlspecialchars($lead['id'], ENT_QUOTES) ?>">
+                      <td>
+                        <div class="fw-semibold small"><?= htmlspecialchars($lead['name']) ?></div>
+                        <div class="text-muted small"><?= htmlspecialchars($lead['phone']) ?></div>
+                      </td>
+                      <td class="small"><?= htmlspecialchars($lead['listing']) ?></td>
+                      <td class="small text-muted text-nowrap"><?= htmlspecialchars($lead['when']) ?></td>
+                      <td><span class="badge <?= $badgeClass ?>"><?= htmlspecialchars($lead['status']) ?></span></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <!-- Right: detail panel (hidden until a row is clicked) -->
+      <div class="card border-0 shadow-sm bg-white mci-lead-detail-panel" id="mciLeadDetailPanel" hidden
+        style="width:340px;min-width:300px;flex-shrink:0;">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="fw-semibold">Lead Detail</div>
+            <button type="button" class="btn-close" id="mciLeadPanelClose" aria-label="Close detail"></button>
           </div>
-        <?php endif; ?>
+
+          <dl class="row mb-3">
+            <dt class="col-4 text-muted small">Name</dt>
+            <dd class="col-8 small" id="ldName">—</dd>
+            <dt class="col-4 text-muted small">Phone</dt>
+            <dd class="col-8 small" id="ldPhone">—</dd>
+            <dt class="col-4 text-muted small">Email</dt>
+            <dd class="col-8 small" id="ldEmail">—</dd>
+            <dt class="col-4 text-muted small">Listing</dt>
+            <dd class="col-8 small" id="ldListing">—</dd>
+            <dt class="col-4 text-muted small">Date</dt>
+            <dd class="col-8 small" id="ldDate">—</dd>
+            <dt class="col-4 text-muted small">Status</dt>
+            <dd class="col-8 small" id="ldStatus">—</dd>
+          </dl>
+
+          <div class="mb-3">
+            <div class="text-muted small mb-1">Message</div>
+            <div class="small border rounded p-2 bg-light" id="ldMessage" style="white-space:pre-wrap;word-break:break-word;">—</div>
+          </div>
+
+          <!-- Inline status update -->
+          <form method="post" action="" class="d-flex align-items-center gap-2 mt-3">
+            <input type="hidden" name="lead_id" id="ldUpdateId" value="" />
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>" />
+            <select name="new_status" id="ldUpdateStatus" class="form-select form-select-sm" aria-label="Update status" style="flex:1;">
+              <?php foreach ($validStatuses as $vs): ?>
+                <option value="<?= htmlspecialchars($vs) ?>"><?= htmlspecialchars($vs) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <button type="submit" class="btn btn-sm btn-dark text-nowrap">Update</button>
+          </form>
+        </div>
       </div>
-    </div>
+
+    </div><!-- /split -->
 
   </div>
 </div>
 
-<!-- Lead detail modal -->
-<div class="modal fade" id="leadDetailModal" tabindex="-1" aria-labelledby="leadDetailModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="leadDetailModalLabel">Lead Detail</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <dl class="row mb-0">
-          <dt class="col-4 text-muted small">Name</dt>
-          <dd class="col-8 small" id="ldName">—</dd>
-          <dt class="col-4 text-muted small">Phone</dt>
-          <dd class="col-8 small" id="ldPhone">—</dd>
-          <dt class="col-4 text-muted small">Email</dt>
-          <dd class="col-8 small" id="ldEmail">—</dd>
-          <dt class="col-4 text-muted small">Listing</dt>
-          <dd class="col-8 small" id="ldListing">—</dd>
-          <dt class="col-4 text-muted small">Date</dt>
-          <dd class="col-8 small" id="ldDate">—</dd>
-          <dt class="col-4 text-muted small">Status</dt>
-          <dd class="col-8 small" id="ldStatus">—</dd>
-          <dt class="col-4 text-muted small">Message</dt>
-          <dd class="col-8 small" id="ldMessage">—</dd>
-        </dl>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
+<style>
+#mciLeadsSplit { flex-wrap: nowrap; }
+.mci-lead-row.is-active { background: var(--mci-color-primary-soft, #eef2ff); }
+@media (max-width: 767px) {
+  #mciLeadsSplit { flex-wrap: wrap; }
+  .mci-lead-detail-panel { width: 100% !important; min-width: 0 !important; }
+}
+</style>
 
 <script>
 (function () {
-  document.querySelectorAll('.mci-lead-detail-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      document.getElementById('ldName').textContent    = btn.dataset.name    || '—';
-      document.getElementById('ldPhone').textContent   = btn.dataset.phone   || '—';
-      document.getElementById('ldEmail').textContent   = btn.dataset.email   || '—';
-      document.getElementById('ldListing').textContent = btn.dataset.listing || '—';
-      document.getElementById('ldDate').textContent    = btn.dataset.date    || '—';
-      document.getElementById('ldStatus').textContent  = btn.dataset.status  || '—';
-      document.getElementById('ldMessage').textContent = btn.dataset.message || '—';
+  var leadsData = <?= $leadsJson ?>;
+  var leadsMap  = {};
+  leadsData.forEach(function (l) { leadsMap[l.id] = l; });
+
+  var panel     = document.getElementById('mciLeadDetailPanel');
+  var closeBtn  = document.getElementById('mciLeadPanelClose');
+  var activeRow = null;
+
+  function setText(id, val) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = val || '—';
+  }
+
+  function openPanel(lead) {
+    setText('ldName',    lead.name);
+    setText('ldPhone',   lead.phone);
+    setText('ldEmail',   lead.email);
+    setText('ldListing', lead.listing);
+    setText('ldDate',    lead.date);
+    setText('ldStatus',  lead.status);
+    setText('ldMessage', lead.message);
+
+    var updId  = document.getElementById('ldUpdateId');
+    var updSel = document.getElementById('ldUpdateStatus');
+    if (updId)  updId.value  = lead.id;
+    if (updSel) updSel.value = lead.status;
+
+    panel.hidden = false;
+  }
+
+  function closePanel() {
+    panel.hidden = true;
+    if (activeRow) { activeRow.classList.remove('is-active'); activeRow = null; }
+  }
+
+  document.querySelectorAll('.mci-lead-row').forEach(function (row) {
+    row.addEventListener('click', function () {
+      var id   = row.dataset.leadId;
+      var lead = leadsMap[id];
+      if (!lead) return;
+
+      if (activeRow) activeRow.classList.remove('is-active');
+      row.classList.add('is-active');
+      activeRow = row;
+
+      openPanel(lead);
     });
   });
+
+  if (closeBtn) closeBtn.addEventListener('click', closePanel);
 }());
 </script>
 

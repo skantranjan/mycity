@@ -1,143 +1,198 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../includes/mci_directory_listings.php';
 require_once __DIR__ . '/../includes/mci_category_icons.php';
+require_once __DIR__ . '/../api/v1/lib/db.php';
+require_once __DIR__ . '/../api/v1/lib/business_service.php';
 
-$slug = trim((string) ($_GET['slug'] ?? ''));
-$slug = strtolower($slug);
+$slug = strtolower(trim((string)($_GET['slug'] ?? '')));
 
-$slugify = static function (string $value): string {
-    $value = strtolower(trim($value));
-    $value = preg_replace('/[^a-z0-9]+/', '-', $value) ?? '';
-    return trim($value, '-');
-};
-
-$pageTitle = 'Category - My City Info';
+$pageTitle  = 'Category - My City Info';
 $activePage = 'categories';
-$extraHead = <<<'HTML'
+$extraHead  = <<<'HTML'
 <link rel="stylesheet" href="/assets/css/home.css" />
+<link rel="stylesheet" href="/assets/css/listings.css" />
+<script src="/assets/js/listings-view.js" defer></script>
 HTML;
 
-$listingStats = [
-    'property-852' => ['rating' => 4.8, 'reviews' => 68, 'popular_score' => 96, 'added_on' => '2026-03-16'],
-    'locker-shop-uk' => ['rating' => 4.5, 'reviews' => 37, 'popular_score' => 82, 'added_on' => '2026-03-11'],
-    'jxf-painting' => ['rating' => 4.7, 'reviews' => 55, 'popular_score' => 90, 'added_on' => '2026-03-18'],
-    'hunter-hill-physio' => ['rating' => 4.6, 'reviews' => 44, 'popular_score' => 84, 'added_on' => '2026-03-09'],
-    'famous-veg-restaurant-bhopal' => ['rating' => 4.9, 'reviews' => 122, 'popular_score' => 98, 'added_on' => '2026-03-20'],
-    'chester-gym' => ['rating' => 4.4, 'reviews' => 31, 'popular_score' => 79, 'added_on' => '2026-03-08'],
-    'spark-electricals' => ['rating' => 4.3, 'reviews' => 28, 'popular_score' => 76, 'added_on' => '2026-03-12'],
-    'sunrise-hotel-rooms' => ['rating' => 4.2, 'reviews' => 19, 'popular_score' => 74, 'added_on' => '2026-03-15'],
-    'city-park-walks' => ['rating' => 4.1, 'reviews' => 16, 'popular_score' => 71, 'added_on' => '2026-03-10'],
-    'cafe-aroma' => ['rating' => 4.6, 'reviews' => 49, 'popular_score' => 86, 'added_on' => '2026-03-14'],
-    'quickcare-dentist' => ['rating' => 4.5, 'reviews' => 41, 'popular_score' => 81, 'added_on' => '2026-03-17'],
-    'urban-spa-house' => ['rating' => 4.7, 'reviews' => 52, 'popular_score' => 88, 'added_on' => '2026-03-19'],
-];
+// ── Load category from DB ─────────────────────────────────────────────────────
+$pdo         = api_db();
+$categoryRow = null;
+try {
+    $stmt = $pdo->prepare("SELECT id, name, slug, icon FROM mci_categories WHERE slug = ? AND parent_id IS NULL LIMIT 1");
+    $stmt->execute([$slug]);
+    $categoryRow = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+} catch (Throwable $ignored) {}
 
-$selectedCategoryName = '';
-$rows = [];
-foreach ($mciDirectoryListings as $row) {
-    $category = trim((string) ($row['category'] ?? ''));
-    if ($category === '') {
-        continue;
-    }
-    if ($slugify($category) !== $slug) {
-        continue;
-    }
-    $selectedCategoryName = $category;
-    $rows[] = $row;
-}
+$selectedCategoryName = $categoryRow ? (string)$categoryRow['name'] : '';
+$categorySlug         = $categoryRow ? (string)$categoryRow['slug'] : $slug;
+$categoryId           = $categoryRow ? (int)$categoryRow['id'] : 0;
 
-if ($selectedCategoryName === '') {
+if (!$categoryRow) {
     http_response_code(404);
     $pageTitle = 'Category Not Found - My City Info';
 } else {
-    $pageTitle = $selectedCategoryName . ' - Categories - My City Info';
+    $pageTitle = $selectedCategoryName . ' - My City Info';
 }
 
+// ── Subcategories for this parent ─────────────────────────────────────────────
+$subcategories = [];
+if ($categoryRow) {
+    try {
+        $subStmt = $pdo->prepare("
+            SELECT sc.name, sc.slug, sc.icon,
+                   COUNT(DISTINCT bsc.business_group_id) AS biz_count
+            FROM mci_categories sc
+            LEFT JOIN mci_business_subcategories bsc ON bsc.category_id = sc.id
+            LEFT JOIN mci_business_groups g ON g.id = bsc.business_group_id AND g.status = 'live'
+            WHERE sc.parent_id = ?
+            GROUP BY sc.id, sc.name, sc.slug, sc.icon
+            ORDER BY sc.sort_order, sc.name
+        ");
+        $subStmt->execute([$categoryId]);
+        $subcategories = $subStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $ignored) {}
+}
+
+// ── Filter params ─────────────────────────────────────────────────────────────
+// If no ?location= in URL, fall back to the cookie set by the city picker JS
+$selectedLocation  = trim((string)($_GET['location']    ?? ''));
+if ($selectedLocation === '') {
+    $selectedLocation = trim((string)(urldecode($_COOKIE['mci_active_city'] ?? '')));
+}
+$selectedSub       = trim((string)($_GET['subcategory'] ?? ''));
+$tag               = trim((string)($_GET['tag']         ?? ''));
+$priceRange        = trim((string)($_GET['price_range'] ?? ''));
+$sort              = trim((string)($_GET['sort']        ?? 'newest'));
+$curPage           = max(1, (int)($_GET['page']         ?? 1));
+
+if (!in_array($sort, ['newest', 'oldest'], true)) {
+    $sort = 'newest';
+}
+
+// Validate subcategory belongs to this parent
+$subSlugs = array_column($subcategories, 'slug');
+if ($selectedSub !== '' && !in_array($selectedSub, $subSlugs, true)) {
+    $selectedSub = '';
+}
+
+// ── Location options from live businesses in this category ────────────────────
 $locations = [];
-foreach ($mciDirectoryListings as $r) {
-    $loc = trim((string) ($r['location'] ?? ''));
-    if ($loc === '') {
-        continue;
-    }
-    $city = trim((string) explode(',', $loc)[0]);
-    if ($city !== '') {
-        $locations[$city] = true;
-    }
+if ($categoryRow) {
+    try {
+        $locStmt = $pdo->prepare("
+            SELECT DISTINCT b.city
+            FROM mci_business_branches b
+            INNER JOIN mci_business_groups g ON g.id = b.business_group_id AND g.status = 'live'
+            INNER JOIN mci_categories c ON c.id = g.parent_category_id AND c.slug = ?
+            WHERE b.city != ''
+            ORDER BY b.city
+        ");
+        $locStmt->execute([$categorySlug]);
+        $locations = array_column($locStmt->fetchAll(PDO::FETCH_ASSOC), 'city');
+    } catch (Throwable $ignored) {}
 }
-$locations = array_keys($locations);
-sort($locations, SORT_NATURAL | SORT_FLAG_CASE);
-
-$selectedLocation = trim((string) ($_GET['location'] ?? ''));
 if ($selectedLocation !== '' && !in_array($selectedLocation, $locations, true)) {
     $selectedLocation = '';
 }
 
-$sort = trim((string) ($_GET['sort'] ?? 'popular'));
-$sortAllowed = ['rating', 'popular', 'newest'];
-if (!in_array($sort, $sortAllowed, true)) {
-    $sort = 'popular';
+// ── Tags used in this category (for the tag filter hint) ─────────────────────
+$categoryTags = [];
+if ($categoryRow) {
+    try {
+        $tagStmt = $pdo->prepare("
+            SELECT DISTINCT t.name, t.slug
+            FROM mci_tags t
+            INNER JOIN mci_business_tags bt ON bt.tag_id = t.id
+            INNER JOIN mci_business_groups g ON g.id = bt.business_group_id AND g.status = 'live'
+            INNER JOIN mci_categories c ON c.id = g.parent_category_id AND c.slug = ?
+            ORDER BY t.name
+            LIMIT 30
+        ");
+        $tagStmt->execute([$categorySlug]);
+        $categoryTags = $tagStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    } catch (Throwable $ignored) {}
 }
 
-$filteredRows = $rows;
-if ($selectedLocation !== '') {
-    $filteredRows = array_values(array_filter($filteredRows, static function (array $r) use ($selectedLocation): bool {
-        $loc = strtolower(trim((string) ($r['location'] ?? '')));
-        $needle = strtolower(trim($selectedLocation));
-        return $needle !== '' && strpos($loc, $needle) !== false;
-    }));
+// ── Load businesses ───────────────────────────────────────────────────────────
+$listings = [];
+$total    = 0;
+$pages    = 1;
+
+if ($categoryRow) {
+    try {
+        $filters = [
+            'category_slug' => $categorySlug,
+            'per_page'      => 12,
+            'page'          => $curPage,
+            'sort'          => $sort,
+        ];
+        if ($selectedLocation !== '') { $filters['city']             = $selectedLocation; }
+        if ($selectedSub       !== '') { $filters['subcategory_slug'] = $selectedSub; }
+        if ($tag               !== '') { $filters['tag_slug']         = $tag; }
+        if ($priceRange        !== '') { $filters['price_range']      = $priceRange; }
+
+        $result = api_business_list_public($pdo, $filters);
+        $total  = (int)($result['total'] ?? 0);
+        $pages  = (int)($result['pages'] ?? 1);
+
+        foreach ($result['businesses'] as $row) {
+            $listings[] = [
+                'title'       => (string)($row['name']          ?? ''),
+                'category'    => (string)($row['category_name'] ?? ''),
+                'location'    => (string)($row['city']          ?? ''),
+                'address'     => (string)($row['city']          ?? ''),
+                'slug'        => (string)($row['slug']          ?? ''),
+                'image'       => !empty($row['logo_path'])
+                                   ? $row['logo_path']
+                                   : (!empty($row['banner_path'])
+                                       ? $row['banner_path']
+                                       : 'https://picsum.photos/seed/mci-' . ($row['slug'] ?? 'biz') . '/480/320'),
+                'price_range' => $row['price_range'] ?? null,
+                'tags'        => [],
+            ];
+        }
+    } catch (Throwable $ignored) {}
 }
 
-$enrichedRows = array_map(static function (array $r) use ($listingStats): array {
-    $slugItem = (string) ($r['slug'] ?? '');
-    $stats = $listingStats[$slugItem] ?? ['rating' => 0.0, 'reviews' => 0, 'popular_score' => 0, 'added_on' => '2026-01-01'];
-    return array_merge($r, $stats);
-}, $filteredRows);
+$activeFilterCount = ($selectedLocation !== '' ? 1 : 0) + ($selectedSub !== '' ? 1 : 0)
+                   + ($tag !== '' ? 1 : 0) + ($priceRange !== '' ? 1 : 0);
 
-usort($enrichedRows, static function (array $a, array $b) use ($sort): int {
-    if ($sort === 'rating') {
-        $r = ((float) $b['rating']) <=> ((float) $a['rating']);
-        if ($r !== 0) return $r;
-        return ((int) $b['reviews']) <=> ((int) $a['reviews']);
-    }
-    if ($sort === 'newest') {
-        return strcmp((string) $b['added_on'], (string) $a['added_on']);
-    }
-    $p = ((int) $b['popular_score']) <=> ((int) $a['popular_score']);
-    if ($p !== 0) return $p;
-    return ((float) $b['rating']) <=> ((float) $a['rating']);
-});
+// ── Base params helper for pagination / clear links ───────────────────────────
+$baseParams = ['slug' => $categorySlug];
+if ($selectedLocation !== '') { $baseParams['location']    = $selectedLocation; }
+if ($selectedSub       !== '') { $baseParams['subcategory'] = $selectedSub; }
+if ($tag               !== '') { $baseParams['tag']         = $tag; }
+if ($priceRange        !== '') { $baseParams['price_range'] = $priceRange; }
+if ($sort !== 'newest')        { $baseParams['sort']        = $sort; }
+
+function mci_cat_page_url(array $base, int $page): string {
+    $p = $base;
+    if ($page > 1) $p['page'] = $page;
+    return '/business-category/?' . http_build_query($p);
+}
 
 $extraJS = <<<'HTML'
 <script>
 (function () {
-  var STORAGE_KEY = 'mci_detected_city';
-  var LOCATION_KEY = 'mci_selected_location';
-  var url = new URL(window.location.href);
-
-  if (url.searchParams.has('location') && (url.searchParams.get('location') || '').trim() !== '') {
-    var loc = (url.searchParams.get('location') || '').trim();
-    try { sessionStorage.setItem(LOCATION_KEY, loc); } catch (e) {}
-    try { localStorage.setItem(LOCATION_KEY, loc); } catch (e) {}
-    return;
+  // Mobile filter toggle
+  var btn = document.getElementById('mciFilterToggle');
+  var panel = document.getElementById('mciFiltersPanel');
+  if (!btn || !panel) return;
+  function applyMobileState() {
+    if (window.innerWidth < 992) {
+      if (btn.getAttribute('aria-expanded') !== 'true') panel.style.display = 'none';
+    } else {
+      panel.style.display = '';
+    }
   }
-
-  var preferred = '';
-  try { preferred = (sessionStorage.getItem(LOCATION_KEY) || '').trim(); } catch (e) {}
-  if (!preferred) {
-    try { preferred = (localStorage.getItem(LOCATION_KEY) || '').trim(); } catch (e) {}
-  }
-  if (!preferred) {
-    try { preferred = (sessionStorage.getItem(STORAGE_KEY) || '').trim(); } catch (e) {}
-  }
-  if (!preferred) {
-    try { preferred = (localStorage.getItem(STORAGE_KEY) || '').trim(); } catch (e) {}
-  }
-  if (!preferred) return;
-
-  url.searchParams.set('location', preferred);
-  window.location.replace(url.toString());
+  applyMobileState();
+  window.addEventListener('resize', applyMobileState);
+  btn.addEventListener('click', function () {
+    var expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    panel.style.display = expanded ? 'none' : '';
+  });
 })();
 </script>
 HTML;
@@ -145,99 +200,273 @@ HTML;
 ob_start();
 ?>
 
-<div class="py-4 py-lg-5">
+<div class="py-4">
+
+  <!-- Page header -->
   <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-4">
     <div>
-      <h1 class="h3 mb-1"><?= htmlspecialchars((string) $selectedCategoryName) ?></h1>
-      <?php if ($selectedCategoryName !== ''): ?>
-        <div class="text-muted small">
-          <div class="d-flex align-items-center gap-2 flex-wrap">
-            <?= mci_render_category_icon(mci_category_icon($slug), 'fs-4') ?>
-            <?php if ($selectedLocation !== ''): ?>
-              <?= count($enrichedRows) ?> business<?= count($enrichedRows) === 1 ? '' : 'es' ?> in <strong><?= htmlspecialchars((string) $selectedLocation) ?></strong>.
-            <?php else: ?>
-              <?= count($enrichedRows) ?> business<?= count($enrichedRows) === 1 ? '' : 'es' ?> across all locations.
-            <?php endif; ?>
-          </div>
+      <?php if ($categoryRow): ?>
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <?= mci_render_category_icon((string)($categoryRow['icon'] ?: mci_category_icon($categorySlug)), 'fs-4') ?>
+          <h1 class="h3 mb-0"><?= htmlspecialchars($selectedCategoryName) ?></h1>
         </div>
+        <div class="text-muted small">
+          <?= number_format($total) ?> business<?= $total === 1 ? '' : 'es' ?>
+          <?= $selectedLocation !== '' ? ' in <strong>' . htmlspecialchars($selectedLocation) . '</strong>' : ' across all locations' ?>
+        </div>
+      <?php else: ?>
+        <h1 class="h3 mb-0">Category not found</h1>
       <?php endif; ?>
     </div>
-
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-      <a class="btn btn-sm btn-outline-dark" href="/business-category/">
-        <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>All categories
-      </a>
-      <a
-        class="btn btn-sm btn-outline-dark"
-        href="/business-listing/?category=<?= urlencode((string) $selectedCategoryName) ?>"
-        title="See all listings for this category"
-      >
-        <i class="bi bi-grid me-1" aria-hidden="true"></i>See all listings
-      </a>
-    </div>
+    <a class="btn btn-sm btn-outline-dark" href="/business-category/">
+      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>All categories
+    </a>
   </div>
 
-  <?php if ($selectedCategoryName === ''): ?>
+  <?php if (!$categoryRow): ?>
     <div class="card border-0 shadow-sm bg-white">
       <div class="card-body">
-        <div class="text-muted mb-3">Try browsing from the category list.</div>
+        <div class="text-muted mb-3">This category was not found.</div>
         <a class="btn btn-dark btn-sm" href="/business-category/">Browse categories</a>
       </div>
     </div>
   <?php else: ?>
-    <div class="card border-0 shadow-sm bg-white mb-4">
-      <div class="card-body">
-        <div class="d-flex align-items-end justify-content-between gap-3 flex-wrap">
-          <form method="get" action="" aria-label="Category filters" class="w-100 w-md-auto">
-            <div class="row g-2 align-items-end">
-              <div class="col-6 col-md-auto">
-                <label class="form-label small mb-1" for="categoryLocationDetail">Location</label>
-                <select id="categoryLocationDetail" name="location" class="form-select form-select-sm" aria-label="Filter by location">
-                  <option value="" <?= $selectedLocation === '' ? 'selected' : '' ?>>All locations</option>
-                  <?php foreach ($locations as $loc): ?>
-                    <option value="<?= htmlspecialchars($loc, ENT_QUOTES, 'UTF-8') ?>" <?= $selectedLocation === $loc ? 'selected' : '' ?>>
-                      <?= htmlspecialchars($loc, ENT_QUOTES, 'UTF-8') ?>
-                    </option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-              <div class="col-6 col-md-auto">
-                <label class="form-label small mb-1" for="categorySortDetail">Sort by</label>
-                <select id="categorySortDetail" name="sort" class="form-select form-select-sm" aria-label="Sort listings">
-                  <option value="popular" <?= $sort === 'popular' ? 'selected' : '' ?>>Popular first</option>
-                  <option value="rating" <?= $sort === 'rating' ? 'selected' : '' ?>>Top rated</option>
-                  <option value="newest" <?= $sort === 'newest' ? 'selected' : '' ?>>Newly added</option>
-                </select>
-              </div>
-              <div class="col-12 col-md-auto">
-                <button type="submit" class="btn btn-sm btn-dark w-100 w-md-auto">
-                  <i class="bi bi-sliders me-1" aria-hidden="true"></i>Apply
-                </button>
-              </div>
-            </div>
-          </form>
 
+    <!-- ── Subcategory cards ─────────────────────────────────────────────── -->
+    <?php if (!empty($subcategories)): ?>
+    <div class="mb-4">
+      <div class="fw-semibold small text-uppercase mb-2" style="letter-spacing:.06em;color:var(--mci-color-primary-deep)">
+        Subcategories
+      </div>
+      <div class="row g-2">
+        <?php foreach ($subcategories as $sc):
+          $scActive = ($selectedSub === (string)$sc['slug']);
+          $scParams = ['slug' => $categorySlug, 'subcategory' => $sc['slug']];
+          if ($selectedLocation !== '') $scParams['location'] = $selectedLocation;
+          if ($tag !== '')              $scParams['tag']      = $tag;
+          if ($priceRange !== '')       $scParams['price_range'] = $priceRange;
+        ?>
+          <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+            <a href="/business-category/?<?= htmlspecialchars(http_build_query($scActive
+                  ? array_diff_key($baseParams, ['subcategory' => ''])
+                  : $scParams)) ?>"
+               class="text-decoration-none">
+              <div class="home-category-tile w-100 text-center flex-column gap-1 py-3 <?= $scActive ? 'home-category-tile--active' : '' ?>"
+                   style="<?= $scActive ? 'border-color:var(--mci-color-primary);background:var(--mci-color-primary-soft);' : '' ?>">
+                <span class="home-category-icon">
+                  <?= mci_render_category_icon((string)($sc['icon'] ?: mci_category_icon((string)$sc['slug'])), '') ?>
+                </span>
+                <span class="small fw-semibold"><?= htmlspecialchars((string)$sc['name']) ?></span>
+                <?php if ((int)$sc['biz_count'] > 0): ?>
+                  <span class="text-muted" style="font-size:.7rem"><?= (int)$sc['biz_count'] ?></span>
+                <?php endif; ?>
+              </div>
+            </a>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- ── Listings (sidebar + main) ────────────────────────────────────── -->
+    <div class="row g-4">
+
+      <!-- Filter toggle (mobile) -->
+      <div class="col-12 d-lg-none">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+          <button class="btn btn-sm btn-outline-dark" type="button"
+                  id="mciFilterToggle" aria-expanded="false" aria-controls="mciFiltersPanel">
+            <i class="bi bi-sliders me-1" aria-hidden="true"></i>Filters
+            <?php if ($activeFilterCount > 0): ?>
+              <span class="badge text-bg-dark ms-1"><?= $activeFilterCount ?></span>
+            <?php endif; ?>
+          </button>
           <div class="text-muted small">
-            Showing <strong><?= count($enrichedRows) ?></strong> business<?= count($enrichedRows) === 1 ? '' : 'es' ?>.
+            Showing <?= count($listings) ?> of <?= number_format($total) ?>
           </div>
         </div>
       </div>
-    </div>
 
-    <?php if (count($enrichedRows) === 0): ?>
-      <div class="text-center py-5">
-        <div class="mb-3" style="font-size:3rem;" aria-hidden="true">🏙️</div>
-        <div class="fw-semibold mb-1">No businesses found</div>
-        <div class="text-muted small mb-3">Try a different location or clear the filters.</div>
-        <a href="/business-category/<?= urlencode($slug) ?>" class="btn btn-sm btn-dark">Clear filters</a>
+      <!-- Sidebar filters -->
+      <div class="col-12 col-lg-3" id="mciFiltersPanel">
+        <div class="card border-0 shadow-sm bg-white">
+          <div class="card-body">
+            <div class="fw-semibold mb-3">Filters</div>
+            <form method="get" action="/business-category/">
+              <input type="hidden" name="slug" value="<?= htmlspecialchars($categorySlug) ?>" />
+
+              <!-- Location -->
+              <div class="mb-3">
+                <label class="form-label">Location</label>
+                <?php if (!empty($locations)): ?>
+                  <select class="form-select" name="location">
+                    <option value="">All locations</option>
+                    <?php foreach ($locations as $loc): ?>
+                      <option value="<?= htmlspecialchars($loc, ENT_QUOTES, 'UTF-8') ?>"
+                              <?= $selectedLocation === $loc ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($loc) ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </select>
+                <?php else: ?>
+                  <input class="form-control" type="text" name="location"
+                         value="<?= htmlspecialchars($selectedLocation) ?>" placeholder="City or area" />
+                <?php endif; ?>
+              </div>
+
+              <!-- Subcategory chips -->
+              <?php if (!empty($subcategories)): ?>
+              <div class="mb-3">
+                <label class="form-label">Subcategory</label>
+                <div class="d-flex flex-wrap gap-2">
+                  <?php foreach ($subcategories as $sc): ?>
+                    <label class="d-flex align-items-center gap-1 btn btn-sm <?= $selectedSub === (string)$sc['slug'] ? 'btn-dark' : 'btn-outline-secondary' ?> py-1 px-2" style="cursor:pointer;font-size:.78rem;">
+                      <input type="radio" name="subcategory"
+                             value="<?= htmlspecialchars((string)$sc['slug'], ENT_QUOTES) ?>"
+                             <?= $selectedSub === (string)$sc['slug'] ? 'checked' : '' ?>
+                             style="display:none" onchange="this.form.submit()" />
+                      <?= htmlspecialchars((string)$sc['name']) ?>
+                    </label>
+                  <?php endforeach; ?>
+                  <?php if ($selectedSub !== ''): ?>
+                    <a href="/business-category/?<?= htmlspecialchars(http_build_query(array_diff_key($baseParams, ['subcategory' => '']))) ?>"
+                       class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:.78rem;">
+                      <i class="bi bi-x me-1" aria-hidden="true"></i>All
+                    </a>
+                  <?php endif; ?>
+                </div>
+              </div>
+              <?php endif; ?>
+
+              <!-- Tag -->
+              <div class="mb-3">
+                <label class="form-label">Tag</label>
+                <input class="form-control" type="text" name="tag"
+                       value="<?= htmlspecialchars($tag) ?>"
+                       placeholder="e.g. vegetarian, walk-ins" autocomplete="off" list="mciCatTagList" />
+                <?php if (!empty($categoryTags)): ?>
+                  <datalist id="mciCatTagList">
+                    <?php foreach ($categoryTags as $ct): ?>
+                      <option value="<?= htmlspecialchars((string)$ct['slug'], ENT_QUOTES) ?>">
+                        <?= htmlspecialchars((string)$ct['name']) ?>
+                      </option>
+                    <?php endforeach; ?>
+                  </datalist>
+                <?php endif; ?>
+              </div>
+
+              <!-- Price range -->
+              <div class="mb-3">
+                <label class="form-label">Price range</label>
+                <select class="form-select" name="price_range">
+                  <option value="">Any</option>
+                  <option value="free"     <?= $priceRange === 'free'     ? 'selected' : '' ?>>₹ — Inexpensive</option>
+                  <option value="moderate" <?= $priceRange === 'moderate' ? 'selected' : '' ?>>₹₹ — Moderate</option>
+                  <option value="pricey"   <?= $priceRange === 'pricey'   ? 'selected' : '' ?>>₹₹₹ — Pricey</option>
+                  <option value="ultra"    <?= $priceRange === 'ultra'    ? 'selected' : '' ?>>₹₹₹₹ — Ultra High</option>
+                </select>
+              </div>
+
+              <!-- Sort -->
+              <div class="mb-3">
+                <label class="form-label">Sort by</label>
+                <select class="form-select" name="sort">
+                  <option value="newest" <?= $sort === 'newest' ? 'selected' : '' ?>>Newly added</option>
+                  <option value="oldest" <?= $sort === 'oldest' ? 'selected' : '' ?>>Established first</option>
+                </select>
+              </div>
+
+              <button class="btn btn-outline-dark w-100" type="submit">
+                <i class="bi bi-sliders me-1" aria-hidden="true"></i>Apply filters
+              </button>
+              <?php if ($activeFilterCount > 0): ?>
+                <a href="/business-category/?slug=<?= urlencode($categorySlug) ?>"
+                   class="btn btn-outline-secondary w-100 mt-2">Clear filters</a>
+              <?php endif; ?>
+            </form>
+          </div>
+        </div>
       </div>
-    <?php else: ?>
-      <div class="row g-3 g-lg-4">
-        <?php foreach ($enrichedRows as $listing): ?>
-          <?php $variant = 'home'; include __DIR__ . '/../views/components/listing-card.php'; ?>
-        <?php endforeach; ?>
+
+      <!-- Main listing area -->
+      <div class="col-12 col-lg-9">
+        <div class="bg-white border-0 shadow-sm rounded-4 p-3">
+          <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
+            <div class="fw-semibold">
+              <?= htmlspecialchars($selectedCategoryName) ?> businesses
+              <?php if ($selectedSub !== ''): ?>
+                <span class="text-muted fw-normal">
+                  &rsaquo; <?= htmlspecialchars(
+                    (string)(array_column($subcategories, 'name', 'slug')[$selectedSub] ?? $selectedSub)
+                  ) ?>
+                </span>
+              <?php endif; ?>
+            </div>
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+              <div class="btn-group listings-view-toggle" role="group" aria-label="Choose layout">
+                <button type="button" class="btn btn-outline-dark btn-sm listings-view-toggle__btn active"
+                        id="listingsViewGrid" aria-pressed="true" aria-label="Grid view" title="Grid view">
+                  <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="btn btn-outline-dark btn-sm listings-view-toggle__btn"
+                        id="listingsViewList" aria-pressed="false" aria-label="List view" title="List view">
+                  <i class="bi bi-list-ul" aria-hidden="true"></i>
+                </button>
+              </div>
+              <div class="text-muted small d-none d-lg-block">
+                Showing <?= count($listings) ?> of <?= number_format($total) ?> listings
+              </div>
+            </div>
+          </div>
+
+          <?php if (count($listings) === 0): ?>
+            <div class="text-center py-5">
+              <div class="mb-3" style="font-size:3rem;" aria-hidden="true">🏙️</div>
+              <div class="fw-semibold mb-1">No businesses found</div>
+              <div class="text-muted small mb-3">Try adjusting or clearing your filters.</div>
+              <a href="/business-category/?slug=<?= urlencode($categorySlug) ?>"
+                 class="btn btn-sm btn-dark">Clear filters</a>
+            </div>
+          <?php else: ?>
+            <div id="listingsGridView" class="row g-3">
+              <?php foreach ($listings as $listing): ?>
+                <?php $size = 'md'; include __DIR__ . '/../views/components/listing-card.php'; ?>
+              <?php endforeach; ?>
+            </div>
+
+            <div id="listingsListView" class="row g-3 d-none">
+              <?php foreach ($listings as $listing): ?>
+                <?php include __DIR__ . '/../views/components/listing-row.php'; ?>
+              <?php endforeach; ?>
+            </div>
+
+            <!-- Pagination -->
+            <?php if ($pages > 1): ?>
+              <nav class="mt-4 d-flex justify-content-center" aria-label="Category listing pages">
+                <ul class="pagination pagination-sm mb-0">
+                  <li class="page-item <?= $curPage <= 1 ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars(mci_cat_page_url($baseParams, $curPage - 1)) ?>">
+                      <i class="bi bi-chevron-left" aria-hidden="true"></i>
+                    </a>
+                  </li>
+                  <?php for ($p = max(1, $curPage - 2); $p <= min($pages, $curPage + 2); $p++): ?>
+                    <li class="page-item <?= $p === $curPage ? 'active' : '' ?>">
+                      <a class="page-link" href="<?= htmlspecialchars(mci_cat_page_url($baseParams, $p)) ?>"><?= $p ?></a>
+                    </li>
+                  <?php endfor; ?>
+                  <li class="page-item <?= $curPage >= $pages ? 'disabled' : '' ?>">
+                    <a class="page-link" href="<?= htmlspecialchars(mci_cat_page_url($baseParams, $curPage + 1)) ?>">
+                      <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                    </a>
+                  </li>
+                </ul>
+              </nav>
+            <?php endif; ?>
+          <?php endif; ?>
+        </div>
       </div>
-    <?php endif; ?>
+    </div><!-- /row -->
+
   <?php endif; ?>
 </div>
 

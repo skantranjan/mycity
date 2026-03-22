@@ -5,31 +5,41 @@ $subActive = 'favourites';
 $hideCta = true;
 $appArea = 'subscriber';
 
-$csrfAction = 'subscriber_favourites_remove';
+require_once __DIR__ . '/../../includes/mci_session.php';
+require_once __DIR__ . '/../../includes/mci_require_session.php';
 require_once __DIR__ . '/../../includes/mci_csrf.php';
-$csrfToken = mci_csrf_token($csrfAction);
+require_once __DIR__ . '/../../includes/mci_favourites.php';
+require_once __DIR__ . '/../../api/v1/lib/db.php';
 
+mci_require_subscriber_session();
+
+$userId    = (string)($_SESSION['mci_user_id'] ?? '');
+$csrfAction = 'subscriber_favourites_remove';
+$csrfToken  = mci_csrf_token($csrfAction);
 $flash = '';
-$removeSlug = trim((string) ($_POST['remove_slug'] ?? ''));
 
-$rows = [
-    ['slug' => 'property-852', 'title' => 'Property 852', 'address' => '12 Orchard Lane, Downtown', 'category' => 'Real Estate', 'saved_on' => '2026-03-18'],
-    ['slug' => 'locker-shop-uk', 'title' => 'Locker Shop UK Ltd', 'address' => '88 Market Street, Central District', 'category' => 'Furniture Store', 'saved_on' => '2026-03-16'],
-    ['slug' => 'jxf-painting', 'title' => 'JXF Painting Service', 'address' => '4 Riverside Avenue, West End', 'category' => 'Painter', 'saved_on' => '2026-03-12'],
-];
+$pdo = api_db();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $removeSlug !== '') {
-    $csrfPost = trim((string) ($_POST['csrf_token'] ?? ''));
+// ── Handle remove POST ────────────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $csrfPost    = trim((string)($_POST['csrf_token']   ?? ''));
+    $removeGroup = trim((string)($_POST['remove_group'] ?? ''));
     if (!mci_csrf_verify($csrfAction, $csrfPost)) {
-        $flash = 'Invalid request token. Please refresh and try again.';
-        $removeSlug = '';
-    } else {
-    $rows = array_values(array_filter($rows, static function (array $r) use ($removeSlug): bool {
-        return (string) ($r['slug'] ?? '') !== $removeSlug;
-    }));
-    $flash = 'Listing removed from favourites.';
+        $flash = 'error:Invalid request token. Please refresh and try again.';
+    } elseif ($removeGroup !== '') {
+        try {
+            $pdo->prepare(
+                "DELETE FROM mci_user_favourites WHERE user_id = ? AND business_group_id = ?"
+            )->execute([$userId, $removeGroup]);
+            $flash = 'success:Listing removed from favourites.';
+        } catch (Throwable $ignored) {
+            $flash = 'error:Could not remove the listing. Please try again.';
+        }
     }
 }
+
+// ── Load favourites ───────────────────────────────────────────────────────────
+$rows = mci_favourites_list($pdo, $userId);
 
 ob_start();
 ?>
@@ -44,19 +54,22 @@ ob_start();
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
           <div>
             <div class="fw-semibold">Favourite listings</div>
-            <div class="text-muted small">Manage businesses you have saved as favourite.</div>
+            <div class="text-muted small">Businesses you have saved as favourites.</div>
           </div>
           <span class="badge text-bg-light border px-3 py-2">Saved: <?= count($rows) ?></span>
         </div>
 
         <?php if ($flash !== ''): ?>
-          <div class="alert alert-success py-2 small mb-3" role="status"><?= htmlspecialchars($flash, ENT_QUOTES, 'UTF-8') ?></div>
+          <?php [$flashType, $flashMsg] = explode(':', $flash, 2); ?>
+          <div class="alert alert-<?= $flashType === 'error' ? 'danger' : 'success' ?> py-2 small mb-3" role="status">
+            <?= htmlspecialchars($flashMsg, ENT_QUOTES, 'UTF-8') ?>
+          </div>
         <?php endif; ?>
 
         <?php if (count($rows) === 0): ?>
           <div class="border rounded-3 p-4 text-center bg-light">
             <div class="fw-semibold mb-1">No favourites yet</div>
-            <div class="text-muted small mb-3">Save businesses from listing details and they will appear here.</div>
+            <div class="text-muted small mb-3">Save businesses from their listing page and they will appear here.</div>
             <a class="btn btn-sm btn-dark" href="/business-listing/">Explore listings</a>
           </div>
         <?php else: ?>
@@ -71,22 +84,42 @@ ob_start();
                 </tr>
               </thead>
               <tbody>
-                <?php foreach ($rows as $r): ?>
+                <?php foreach ($rows as $r):
+                  $rSlug    = (string)($r['slug']          ?? '');
+                  $rName    = (string)($r['name']          ?? '');
+                  $rCat     = (string)($r['category_name'] ?? '');
+                  $rCity    = (string)($r['city']          ?? '');
+                  $rAddr    = trim(implode(', ', array_filter([
+                                (string)($r['address_line1'] ?? ''),
+                                $rCity,
+                                (string)($r['state']   ?? ''),
+                                (string)($r['pincode'] ?? ''),
+                              ])));
+                  $rSavedAt = (string)($r['saved_at'] ?? '');
+                  $rDate    = $rSavedAt !== '' ? date('M j, Y', strtotime($rSavedAt)) : '—';
+                  $rGroupId = (string)($r['business_group_id'] ?? '');
+                ?>
                   <tr>
                     <td>
-                      <div class="fw-semibold"><?= htmlspecialchars($r['title']) ?></div>
-                      <div class="text-muted small"><?= htmlspecialchars($r['address']) ?></div>
+                      <div class="fw-semibold small"><?= htmlspecialchars($rName) ?></div>
+                      <?php if ($rAddr !== ''): ?>
+                        <div class="text-muted" style="font-size:var(--mci-text-xs)"><?= htmlspecialchars($rAddr) ?></div>
+                      <?php endif; ?>
                     </td>
-                    <td class="text-muted small"><?= htmlspecialchars($r['category']) ?></td>
-                    <td class="text-muted small"><?= htmlspecialchars($r['saved_on']) ?></td>
+                    <td class="text-muted small"><?= htmlspecialchars($rCat) ?></td>
+                    <td class="text-muted small text-nowrap"><?= htmlspecialchars($rDate) ?></td>
                     <td>
                       <div class="d-flex gap-2 flex-wrap">
-                        <a class="btn btn-sm btn-outline-dark" href="/business/?slug=<?= urlencode((string) $r['slug']) ?>" target="_blank" rel="noopener noreferrer" title="Open business page in a new window">
-                          <i class="bi bi-eye me-1" aria-hidden="true"></i>View <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
+                        <a class="btn btn-sm btn-outline-dark"
+                           href="/business/<?= urlencode($rSlug) ?>/"
+                           target="_blank" rel="noopener noreferrer"
+                           title="Open business page">
+                          <i class="bi bi-eye me-1" aria-hidden="true"></i>View
+                          <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
                         </a>
                         <form method="post" action="" class="d-inline">
-                          <input type="hidden" name="remove_slug" value="<?= htmlspecialchars((string) $r['slug'], ENT_QUOTES, 'UTF-8') ?>" />
-                          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>" />
+                          <input type="hidden" name="remove_group" value="<?= htmlspecialchars($rGroupId, ENT_QUOTES, 'UTF-8') ?>" />
+                          <input type="hidden" name="csrf_token"   value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>" />
                           <button type="submit" class="btn btn-sm btn-outline-danger">
                             <i class="bi bi-heartbreak me-1" aria-hidden="true"></i>Remove
                           </button>

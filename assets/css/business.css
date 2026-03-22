@@ -511,8 +511,6 @@
   .mci-business-sidebar-sticky {
     position: sticky;
     top: 5.5rem;
-    max-height: calc(100vh - 6rem);
-    overflow-y: auto;
   }
 }
 
@@ -539,7 +537,14 @@
   transition: transform 0.12s ease, color 0.12s ease;
 }
 
-.mci-star-picker__btn:hover,
+/* Highlight all stars up to and including the hovered one */
+#mciStarPicker:hover .mci-star-picker__btn {
+  color: #fbbf24;
+}
+#mciStarPicker:hover .mci-star-picker__btn:hover ~ .mci-star-picker__btn {
+  color: #94a3b8;
+}
+
 .mci-star-picker__btn:focus-visible {
   color: #fbbf24;
   transform: scale(1.08);

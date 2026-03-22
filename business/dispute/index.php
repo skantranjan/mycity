@@ -97,7 +97,7 @@ ob_start();
     <ol class="breadcrumb small">
       <?php if ($listing !== null): ?>
         <li class="breadcrumb-item">
-          <a href="/business/?slug=<?= urlencode($slug) ?>">
+          <a href="/business/<?= urlencode($slug) ?>/">
             <?= htmlspecialchars($listing['title'], ENT_QUOTES, 'UTF-8') ?>
           </a>
         </li>
@@ -122,7 +122,7 @@ ob_start();
       </p>
       <div class="d-flex justify-content-center gap-2 flex-wrap">
         <?php if ($listing !== null): ?>
-          <a class="btn btn-outline-dark btn-sm" href="/business/?slug=<?= urlencode($slug) ?>">Back to listing</a>
+          <a class="btn btn-outline-dark btn-sm" href="/business/<?= urlencode($slug) ?>/">Back to listing</a>
         <?php endif; ?>
         <a class="btn btn-dark btn-sm" href="/subscriber/dashboard/">Go to dashboard</a>
       </div>
@@ -147,7 +147,7 @@ ob_start();
         has no current owner, so there is nothing to dispute. You can claim it instead.
       </p>
       <div class="d-flex gap-2 flex-wrap">
-        <a class="btn btn-sm btn-outline-dark" href="/business/?slug=<?= urlencode($slug) ?>">Back to listing</a>
+        <a class="btn btn-sm btn-outline-dark" href="/business/<?= urlencode($slug) ?>/">Back to listing</a>
         <a class="btn btn-sm btn-dark" href="/business/claim/?slug=<?= urlencode($slug) ?>">Claim this business</a>
       </div>
     </div>
@@ -236,7 +236,7 @@ ob_start();
           </div>
 
           <div class="d-flex gap-2">
-            <a class="btn btn-outline-secondary btn-sm" href="/business/?slug=<?= urlencode($slug) ?>">Cancel</a>
+            <a class="btn btn-outline-secondary btn-sm" href="/business/<?= urlencode($slug) ?>/">Cancel</a>
             <button type="submit" class="btn btn-dark btn-sm">
               <i class="bi bi-flag me-1" aria-hidden="true"></i>Submit dispute
             </button>
