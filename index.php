@@ -18,6 +18,7 @@ $slugify = static function (string $value): string {
 // ── Load categories from DB ───────────────────────────────
 $categories = [];          // top-level only — for the grid
 $categoryTree = [];        // [ {parent, children:[]} ] — for the accordion
+$pdo = null;               // defined so later queries don't trigger "undefined variable"
 
 try {
     $pdo = api_db();
@@ -98,8 +99,13 @@ $popularListings = [];
 
 try {
     $cityFilter  = $activeCity !== '' ? ['city' => $activeCity] : [];
-    $recentRows  = api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'newest'])['businesses'] ?? [];
-    $popularRows = api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'oldest'])['businesses'] ?? [];
+    $recentRows  = [];
+    $popularRows = [];
+
+    if ($pdo instanceof PDO) {
+        $recentRows  = api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'newest'])['businesses'] ?? [];
+        $popularRows = api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'oldest'])['businesses'] ?? [];
+    }
 
     foreach ($recentRows  as $row) { $recentListings[]  = mci_listing_row_to_card($row); }
     foreach ($popularRows as $row) { $popularListings[] = mci_listing_row_to_card($row); }
