@@ -10,7 +10,7 @@ $cpActive = $cpActive ?? 'dashboard';
 $cpRole   = $cpRole   ?? (string) ($_SESSION['mci_cp_role'] ?? 'co_admin');
 
 // ── Real badge counts ────────────────────────────────────
-$cpBadgeCounts = ['listings' => 0, 'anonymous' => 0, 'errors' => 0];
+$cpBadgeCounts = ['listings' => 0, 'anonymous' => 0, 'errors' => 0, 'scraper' => 0];
 
 try {
     if (function_exists('api_db')) {
@@ -23,6 +23,10 @@ try {
         // Error log — entries in last 24 h
         $r = $pdo->query("SELECT COUNT(*) FROM mci_error_log WHERE created_at >= NOW() - INTERVAL 1 DAY");
         $cpBadgeCounts['errors'] = (int) ($r ? $r->fetchColumn() : 0);
+
+        // Scraper — pending review count
+        $r = $pdo->query("SELECT COUNT(*) FROM mci_scraped_businesses WHERE status = 'pending_review'");
+        $cpBadgeCounts['scraper'] = (int) ($r ? $r->fetchColumn() : 0);
     }
 } catch (Throwable $ignored) {
     // DB not ready yet — silently skip badge counts
@@ -119,6 +123,7 @@ $isSuperAdmin = ($cpRole === 'super_admin');
     <!-- ── Tools ────────────────────────────── -->
     <div class="mci-sidebar-group-label mt-2">Tools</div>
     <?php cpNavLink('add-business', '/cp/anonymous-business/', 'bi-plus-circle', 'Add business', $cpActive); ?>
+    <?php cpNavLink('scraper', '/cp/scraper/', 'bi-cloud-download', 'Business scraper', $cpActive, $cpBadgeCounts['scraper'] ?: null); ?>
 
     <!-- ── System (super_admin only) ────────── -->
     <?php if ($isSuperAdmin): ?>

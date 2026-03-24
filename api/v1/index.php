@@ -1077,9 +1077,29 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'businesses' && !isset($segme
     $auth = api_business_try_auth(); // optional — null for guests
     $data = api_request_data();
 
-    $res = api_business_create(api_db(), $data, $auth);
+    $pdo = api_db();
+    $res = api_business_create($pdo, $data, $auth);
     if (!$res['ok']) {
         api_error($res['error'], $res['status'] ?? 400);
+    }
+
+    // Set data_source after create based on submission context
+    $ctx = (string)($data['context'] ?? 'guest');
+    if ($ctx === 'cp_admin' && !empty($res['id'])) {
+        try {
+            $pdo->prepare('UPDATE mci_business_groups SET data_source = \'manual_cp\' WHERE id = ?')
+                ->execute([$res['id']]);
+        } catch (Throwable) {}
+    } elseif (($ctx === 'subscriber' || ($ctx === 'guest' && ($data['posting_type'] ?? '') === 'registered')) && !empty($res['id'])) {
+        try {
+            $pdo->prepare('UPDATE mci_business_groups SET data_source = \'user_submission\' WHERE id = ?')
+                ->execute([$res['id']]);
+        } catch (Throwable) {}
+    } elseif ($ctx === 'guest' && !empty($res['id'])) {
+        try {
+            $pdo->prepare('UPDATE mci_business_groups SET data_source = \'anonymous_submission\' WHERE id = ?')
+                ->execute([$res['id']]);
+        } catch (Throwable) {}
     }
 
     $out = ['ok' => true, 'id' => $res['id'], 'slug' => $res['slug'], 'branch_id' => $res['branch_id']];
@@ -1151,6 +1171,93 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'businesses' && !isset($segmen
     $auth = api_require_auth(['subscriber', 'super_admin', 'co_admin']);
     $pdo  = api_db();
     api_json(api_business_list_owner($pdo, $auth['user_id']));
+}
+
+// =============================================================================
+// CP — Scraper routes
+// All require super_admin or co_admin role.
+// =============================================================================
+if (($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'scraper') {
+    require_once __DIR__ . '/lib/scraper_service.php';
+
+    $auth = api_require_auth(['super_admin', 'co_admin']);
+    $pdo  = api_db();
+
+    // POST /api/v1/cp/scraper/search
+    if ($method === 'POST' && !isset($segments[2])) {
+        $body   = api_request_data();
+        $result = scraper_search($pdo, $body, $auth['user_id']);
+        if (!$result['ok']) {
+            api_error($result['error'], 422, array_filter(['source_used' => $result['source_used'] ?? null]));
+        }
+        api_json($result);
+    }
+
+    // GET /api/v1/cp/scraper/results
+    if ($method === 'GET' && ($segments[2] ?? '') === 'results' && !isset($segments[3])) {
+        $filters = [
+            'status'   => $_GET['status']   ?? null,
+            'source'   => $_GET['source']   ?? null,
+            'city'     => $_GET['city']     ?? null,
+            'q'        => $_GET['q']        ?? null,
+            'page'     => (int)($_GET['page']     ?? 1),
+            'per_page' => (int)($_GET['per_page'] ?? 25),
+        ];
+        api_json(scraper_list($pdo, $filters));
+    }
+
+    // GET /api/v1/cp/scraper/results/{id}
+    if ($method === 'GET' && ($segments[2] ?? '') === 'results' && isset($segments[3]) && !isset($segments[4])) {
+        $row = scraper_get($pdo, (string)$segments[3]);
+        if ($row === null) {
+            api_error('not_found', 404);
+        }
+        api_json($row);
+    }
+
+    // POST /api/v1/cp/scraper/results/{id}/update
+    if ($method === 'POST' && ($segments[2] ?? '') === 'results' && isset($segments[3]) && ($segments[4] ?? '') === 'update') {
+        $body    = api_request_data();
+        $payload = $body['payload'] ?? $body;
+        $ok      = scraper_update_payload($pdo, (string)$segments[3], $payload, $auth['user_id']);
+        if (!$ok) {
+            api_error('not_found_or_already_processed', 404);
+        }
+        api_json(['ok' => true]);
+    }
+
+    // POST /api/v1/cp/scraper/results/{id}/approve
+    if ($method === 'POST' && ($segments[2] ?? '') === 'results' && isset($segments[3]) && ($segments[4] ?? '') === 'approve') {
+        $body         = api_request_data();
+        $importStatus = in_array($body['status'] ?? 'live', ['live', 'draft'], true) ? $body['status'] : 'live';
+        $result       = scraper_approve($pdo, (string)$segments[3], $auth['user_id'], $importStatus);
+        if (!$result['ok']) {
+            $httpStatus = $result['error'] === 'not_found' ? 404 : 422;
+            api_error($result['error'], $httpStatus);
+        }
+        api_json($result);
+    }
+
+    // POST /api/v1/cp/scraper/results/{id}/reject
+    if ($method === 'POST' && ($segments[2] ?? '') === 'results' && isset($segments[3]) && ($segments[4] ?? '') === 'reject') {
+        $body   = api_request_data();
+        $reason = trim((string)($body['reason'] ?? '')) ?: null;
+        $ok     = scraper_reject($pdo, (string)$segments[3], $auth['user_id'], $reason);
+        if (!$ok) {
+            api_error('not_found_or_already_processed', 404);
+        }
+        api_json(['ok' => true]);
+    }
+
+    // GET /api/v1/cp/scraper/counts
+    if ($method === 'GET' && ($segments[2] ?? '') === 'counts') {
+        api_json(scraper_counts($pdo));
+    }
+
+    // GET /api/v1/cp/scraper/usage
+    if ($method === 'GET' && ($segments[2] ?? '') === 'usage') {
+        api_json(['adapters' => scraper_adapter_status($pdo)]);
+    }
 }
 
 // =============================================================================
