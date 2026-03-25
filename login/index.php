@@ -166,6 +166,11 @@ ob_start();
             </button>
           </div>
 
+          <div class="text-center mt-3 mb-1">
+            <span class="badge rounded-pill px-3 py-2" style="background:var(--mci-color-primary-soft);color:var(--mci-color-primary-deep);font-size:var(--mci-text-xs);font-weight:700;border:1px solid rgba(124,58,237,0.2);">
+              <i class="bi bi-shield-check me-1" aria-hidden="true"></i>Trusted by thousands of local businesses
+            </span>
+          </div>
           <div class="text-muted small text-center mt-auto pt-3">
             Don't have an account? <a href="/register/?return=<?= rawurlencode($returnUrl) ?>" class="text-decoration-none fw-semibold">Register</a>
           </div>
