@@ -846,3 +846,52 @@ iframe { max-width: 100%; }
   color: var(--mci-body-color, #0f172a);
   font-weight: var(--mci-weight-bold, 700);
 }
+
+/* ─── Dark mode — global token overrides ───────────────
+ * Activated automatically when OS/browser dark mode is on.
+ * Header (#0a0f1e) and sidebars are already dark — unchanged.
+ * ─────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --mci-body-bg:    #0a0f1e;
+    --mci-body-color: #f1f5f9;
+    --mci-surface:    #131929;
+    --mci-surface-2:  #1a2035;
+    --mci-border:     rgba(255, 255, 255, 0.1);
+    --mci-muted:      #94a3b8;
+
+    /* Bootstrap variable passthrough */
+    --bs-body-bg:      #0a0f1e;
+    --bs-body-color:   #f1f5f9;
+    --bs-border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Bootstrap cards and form controls */
+  .mci-body .card {
+    background-color: var(--mci-surface);
+    border-color: var(--mci-border);
+    color: var(--mci-body-color);
+  }
+
+  .mci-body .form-control,
+  .mci-body .form-select {
+    background-color: var(--mci-surface);
+    color: var(--mci-body-color);
+    border-color: var(--mci-border);
+  }
+
+  .mci-body .form-control::placeholder {
+    color: var(--mci-muted);
+  }
+
+  /* Table header violet tint stays readable */
+  .mci-body .table thead.table-light th {
+    background: rgba(124, 58, 237, 0.2) !important;
+    color: #c4b5fd !important;
+  }
+
+  /* bg-white utility overrides */
+  .mci-body .bg-white {
+    background-color: var(--mci-surface) !important;
+  }
+}
