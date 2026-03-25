@@ -38,7 +38,7 @@
           Have a question or need assistance? We are here to help.
         </div>
         <div class="d-flex flex-wrap gap-2 mt-3">
-          <a href="/contact/" class="btn btn-sm btn-outline-dark mci-footer__cta">
+          <a href="/contact/" class="btn btn-sm mci-footer__cta">
             <i class="bi bi-envelope-fill me-2" aria-hidden="true"></i>Contact us
           </a>
         </div>
