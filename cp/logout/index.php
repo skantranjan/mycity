@@ -49,7 +49,7 @@ ob_start();
 
         <div class="d-flex gap-2 flex-wrap">
           <a class="btn btn-outline-secondary" href="/cp/dashboard/">Cancel</a>
-          <a class="btn btn-dark" href="/cp/logout/?perform=1">Logout</a>
+          <a class="btn btn-outline-secondary" href="/cp/logout/?perform=1">Logout</a>
         </div>
       </div>
     </div>

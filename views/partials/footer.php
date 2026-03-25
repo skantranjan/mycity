@@ -8,7 +8,7 @@
       <div class="col-12 col-md-4 order-1 order-md-1">
         <a href="/" class="d-inline-block mb-2" title="My City Info">
           <img
-            src="https://www.mycityinfo.com/wp-content/uploads/2017/04/my-city-info-logo-t-3.png"
+            src="/assets/images/logo.png"
             alt="My City Info"
             class="site-logo site-logo--footer"
             loading="lazy"
@@ -38,7 +38,7 @@
           Have a question or need assistance? We are here to help.
         </div>
         <div class="d-flex flex-wrap gap-2 mt-3">
-          <a href="/contact/" class="btn btn-sm btn-outline-dark mci-footer__cta">
+          <a href="/contact/" class="btn btn-sm mci-footer__cta">
             <i class="bi bi-envelope-fill me-2" aria-hidden="true"></i>Contact us
           </a>
         </div>
@@ -69,5 +69,14 @@
       </div>
     </div>
   </div>
+  <button
+    type="button"
+    id="mciGoTop"
+    class="mci-go-top"
+    aria-label="Go to top"
+    hidden
+  >
+    <i class="bi bi-arrow-up" aria-hidden="true"></i>
+  </button>
 </footer>
 

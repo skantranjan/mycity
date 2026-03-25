@@ -132,21 +132,6 @@ ob_start();
             <?php endif; ?>
         <div class="mb-4">
           <div class="fw-bold fs-4">Sign in</div>
-          <div class="text-muted small mt-1">Uses the same logic as <code>POST /api/v1/auth/login</code> with <code>audience=subscriber</code> (in-process, no extra HTTP hop).</div>
-          <div class="alert alert-info small mt-3 mb-0 text-start">
-            <strong>Demo:</strong> Submitting this form signs you in so you can try features (e.g. anonymous business reviews). Full database + API integration is still in progress.
-          </div>
-          <div class="mt-3 p-3 rounded border bg-light text-start">
-            <div class="fw-semibold small mb-2">Dev test logins (plain text — copy/paste)</div>
-            <pre class="small mb-2 mb-md-3 p-2 bg-white rounded border font-monospace text-break" style="white-space: pre-wrap;">Subscriber — use this page (/login/); also subscriber2/3.dev@… work:
-subscriber1.dev@mycityinfo.local
-DevSubscriber123!
-
-Super admin — use /cp/login/; also superadmin2.dev@… works:
-superadmin.dev@mycityinfo.local
-DevSuperAdmin123!</pre>
-            <div class="text-muted small">Requires the dev seed SQL applied to your DB (see project_brain/DEV_TEST_ACCOUNTS.md). Remove this block when production auth is live.</div>
-          </div>
         </div>
 
         <form action="/login/" method="post" class="flex-grow-1 d-flex flex-column">
@@ -181,6 +166,11 @@ DevSuperAdmin123!</pre>
             </button>
           </div>
 
+          <div class="text-center mt-3 mb-1">
+            <span class="badge rounded-pill px-3 py-2" style="background:var(--mci-color-primary-soft);color:var(--mci-color-primary-deep);font-size:var(--mci-text-xs);font-weight:700;border:1px solid rgba(124,58,237,0.2);">
+              <i class="bi bi-shield-check me-1" aria-hidden="true"></i>Trusted by thousands of local businesses
+            </span>
+          </div>
           <div class="text-muted small text-center mt-auto pt-3">
             Don't have an account? <a href="/register/?return=<?= rawurlencode($returnUrl) ?>" class="text-decoration-none fw-semibold">Register</a>
           </div>

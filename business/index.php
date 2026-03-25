@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['mci_review_submit'])
         exit;
     }
     if (!$isLoggedIn) {
-        header('Location: /login/?return=' . rawurlencode('/business/' . $targetSlug . '/#reviews'));
+        header('Location: /login/?return=' . rawurlencode('/business/' . $targetSlug . '/#section-reviews'));
         exit;
     }
     $rating = (int) ($_POST['rating'] ?? 0);
@@ -41,10 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['mci_review_submit'])
     }
     if ($result['ok']) {
         $param = $isUpdate ? 'review_updated=1' : 'review_ok=1';
-        header('Location: /business/' . rawurlencode($targetSlug) . '/?' . $param . '#reviews');
+        header('Location: /business/' . rawurlencode($targetSlug) . '/?' . $param . '#section-reviews');
     } else {
         $err = $result['error'] ?? 'Something went wrong.';
-        header('Location: /business/' . rawurlencode($targetSlug) . '/?review_err=' . rawurlencode($err) . '#reviews');
+        header('Location: /business/' . rawurlencode($targetSlug) . '/?review_err=' . rawurlencode($err) . '#section-reviews');
     }
     exit;
 }
@@ -160,7 +160,8 @@ $listing = [
     'about'    => array_filter([
                       (string)($dbBiz['description'] ?? ''),
                   ]),
-    'services' => array_merge($serviceNames, $productNames),
+    'services' => $serviceNames,
+    'products' => $productNames,
     'tags'     => $tagNames,
     'faqs'     => $listingFaqs,
     'social_links' => $socialLinks,
@@ -439,6 +440,29 @@ $defaultListing = [
   ],
 ];
 
+// ── Business hours open/closed status ────────────────────────────────────────
+// Demo data — replace with $dbBiz['hours'] when available
+$demoHoursRows = [
+    ['day' => 'Mon – Fri', 'morning' => '9:00 – 13:00', 'evening' => '15:00 – 19:30'],
+    ['day' => 'Saturday',  'morning' => '10:00 – 16:00', 'evening' => '—'],
+    ['day' => 'Sunday',    'morning' => '—',             'evening' => '—', 'closed' => true],
+];
+// Simple open/closed check: Mon-Fri open 9-13 and 15-19:30, Sat 10-16
+$bizNow       = new DateTimeImmutable('now');
+$bizDow       = (int) $bizNow->format('N'); // 1=Mon … 7=Sun
+$bizHour      = (int) $bizNow->format('G');
+$bizMin       = (int) $bizNow->format('i');
+$bizTimeVal   = $bizHour * 60 + $bizMin;
+$bizIsOpen    = false;
+if ($bizDow >= 1 && $bizDow <= 5) {
+    $bizIsOpen = ($bizTimeVal >= 540 && $bizTimeVal < 780)
+              || ($bizTimeVal >= 900 && $bizTimeVal < 1170);
+} elseif ($bizDow === 6) {
+    $bizIsOpen = ($bizTimeVal >= 600 && $bizTimeVal < 960);
+}
+$bizStatusLabel = $bizIsOpen ? 'Open now' : 'Closed';
+$bizStatusClass = $bizIsOpen ? 'mci-biz-hours__status--open' : 'mci-biz-hours__status--closed';
+
 $extraHead = <<<'HTML'
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 <link rel="stylesheet" href="/assets/css/business.css" />
@@ -483,6 +507,62 @@ $extraJS = <<<'HTML'
   });
 })();
 </script>
+<script>
+(function () {
+  // Highlight active tab on scroll
+  var tabs = document.querySelectorAll('.mci-biz-tab');
+  var sections = ['section-about','section-services','section-products','section-faq','section-reviews']
+    .map(function (id) { return document.getElementById(id); })
+    .filter(Boolean);
+  if (!tabs.length || !sections.length) return;
+
+  function setActive(id) {
+    tabs.forEach(function (t) {
+      var href = t.getAttribute('href');
+      t.classList.toggle('is-active', href === '#' + id);
+    });
+  }
+
+  // Smooth scroll with offset for sticky bar
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function (e) {
+      var target = document.querySelector(tab.getAttribute('href'));
+      if (!target) return;
+      e.preventDefault();
+      var barH = document.querySelector('.mci-biz-tabs');
+      var offset = barH ? barH.offsetHeight + 8 : 8;
+      var top = target.getBoundingClientRect().top + window.pageYOffset - offset;
+      window.scrollTo({ top: top, behavior: 'smooth' });
+    });
+  });
+
+  // IntersectionObserver to highlight tab as sections scroll into view
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) setActive(entry.target.id);
+    });
+  }, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { observer.observe(s); });
+  setActive(sections[0].id); // default first tab active
+}());
+</script>
+<script>
+(function () {
+  var btn = document.querySelector('.mci-biz-hours__toggle');
+  var body = document.getElementById('mciBizHoursBody');
+  if (!btn || !body) return;
+  btn.addEventListener('click', function () {
+    var expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    if (expanded) {
+      body.setAttribute('hidden', '');
+    } else {
+      body.removeAttribute('hidden');
+    }
+  });
+}());
+</script>
 HTML;
 
 ob_start();
@@ -518,7 +598,24 @@ ob_start();
     />
   </div>
 
+  <!-- Breadcrumb -->
+  <nav class="mci-breadcrumb px-1 mb-1" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="mci-breadcrumb__sep" aria-hidden="true">›</span>
+    <a href="/business-listing/">Listings</a>
+    <span class="mci-breadcrumb__sep" aria-hidden="true">›</span>
+    <span class="mci-breadcrumb__current"><?= htmlspecialchars($listing['title']) ?></span>
+  </nav>
+
   <div class="px-1 px-sm-2">
+    <!-- Section tab bar -->
+    <nav class="mci-biz-tabs" aria-label="Jump to section">
+      <a class="mci-biz-tab" href="#section-about">About</a>
+      <a class="mci-biz-tab" href="#section-services">Services</a>
+      <a class="mci-biz-tab" href="#section-products">Products</a>
+      <a class="mci-biz-tab" href="#section-faq">FAQ</a>
+      <a class="mci-biz-tab" href="#section-reviews">Ratings &amp; Reviews</a>
+    </nav>
     <div class="row g-4 align-items-start">
       <div class="col-12 col-lg-8">
         <div class="mci-business-title-block mb-3 pb-lg-1">
@@ -585,7 +682,7 @@ ob_start();
 
         <div class="card mci-business-card border-0 bg-white mb-4">
           <div class="card-body">
-            <div class="mci-business-section-title mb-3">
+            <div id="section-about" class="mci-business-section-title mb-3">
               <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
               About
             </div>
@@ -595,36 +692,33 @@ ob_start();
               <?php endforeach; ?>
             </div>
 
-            <div class="mci-business-section-title mt-4 mb-3">
+            <div id="section-services" class="mci-business-section-title mt-4 mb-3">
               <i class="bi bi-stars" aria-hidden="true"></i>
-              Services &amp; highlights
+              Services
             </div>
-            <div class="d-flex flex-wrap gap-2">
-              <?php foreach ($listing['services'] as $svc): ?>
-                <span class="mci-business-chip"><?= htmlspecialchars($svc) ?></span>
-              <?php endforeach; ?>
-            </div>
+            <?php if (!empty($listing['services'])): ?>
+              <div class="d-flex flex-wrap gap-2">
+                <?php foreach ($listing['services'] as $svc): ?>
+                  <span class="mci-business-chip"><?= htmlspecialchars($svc) ?></span>
+                <?php endforeach; ?>
+              </div>
+            <?php else: ?>
+              <p class="mci-business-empty-state">No services listed yet.</p>
+            <?php endif; ?>
 
-            <div class="mci-business-section-title mt-4 mb-3">
-              <i class="bi bi-clock-fill" aria-hidden="true"></i>
-              Business hours <span class="text-muted fw-normal fs-6">(demo)</span>
+            <div id="section-products" class="mci-business-section-title mt-4 mb-3">
+              <i class="bi bi-box-seam" aria-hidden="true"></i>
+              Products
             </div>
-            <div class="mci-business-hours-wrap">
-              <table class="table table-sm table-bordered align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th>Day</th>
-                    <th>Morning</th>
-                    <th>Evening</th>
-                  </tr>
-                </thead>
-                <tbody class="small">
-                  <tr><td class="fw-semibold">Mon – Fri</td><td>9:00 – 13:00</td><td>15:00 – 19:30</td></tr>
-                  <tr><td class="fw-semibold">Saturday</td><td>10:00 – 16:00</td><td>—</td></tr>
-                  <tr><td class="fw-semibold">Sunday</td><td colspan="2" class="text-muted">Closed (demo)</td></tr>
-                </tbody>
-              </table>
-            </div>
+            <?php if (!empty($listing['products'])): ?>
+              <div class="d-flex flex-wrap gap-2">
+                <?php foreach ($listing['products'] as $prd): ?>
+                  <span class="mci-business-chip"><?= htmlspecialchars($prd) ?></span>
+                <?php endforeach; ?>
+              </div>
+            <?php else: ?>
+              <p class="mci-business-empty-state">No products listed yet.</p>
+            <?php endif; ?>
 
             <?php if (!empty($galleryImages)): ?>
             <div class="mci-business-section-title mt-4 mb-3">
@@ -657,7 +751,7 @@ ob_start();
             </div>
 
             <?php if (count($listingFaqs) > 0): ?>
-            <div class="mci-business-section-title mt-4 mb-3">
+            <div id="section-faq" class="mci-business-section-title mt-4 mb-3">
               <i class="bi bi-question-circle-fill" aria-hidden="true"></i>
               Frequently asked questions
             </div>
@@ -709,7 +803,7 @@ ob_start();
         </div>
 
         <?php if ($slug !== ''): ?>
-        <div class="card mci-business-card border-0 bg-white mb-4" id="reviews">
+        <div class="card mci-business-card border-0 bg-white mb-4" id="section-reviews">
           <div class="card-body">
             <div class="mci-business-section-title mb-2">
               <i class="bi bi-chat-heart-fill" aria-hidden="true"></i>
@@ -825,15 +919,15 @@ ob_start();
                 </div>
                 <div class="d-flex flex-wrap align-items-center gap-3">
                   <button type="submit" name="<?= $submitName ?>" value="1" class="btn btn-dark"><?= htmlspecialchars($submitBtn) ?></button>
-                  <a class="small text-muted" href="/logout/?return=<?= rawurlencode('/business/' . $slug . '/#reviews') ?>">Sign out</a>
+                  <a class="small text-muted" href="/logout/?return=<?= rawurlencode('/business/' . $slug . '/#section-reviews') ?>">Sign out</a>
                 </div>
               </form>
             <?php else: ?>
               <div class="border rounded-3 p-4 text-center" style="background: linear-gradient(180deg, #f8fafc 0%, #fff 100%); border-color: var(--mci-border) !important;">
                 <div class="fw-bold mb-2">Sign in to rate &amp; review</div>
                 <p class="text-muted small mb-3 mb-md-4">General users can rate any business. Reviews stay anonymous on the listing.</p>
-                <a class="btn btn-dark me-2" href="/login/?return=<?= rawurlencode('/business/' . $slug . '/#reviews') ?>">Login</a>
-                <a class="btn btn-outline-dark" href="/register/?return=<?= rawurlencode('/business/' . $slug . '/#reviews') ?>">Register</a>
+                <a class="btn btn-dark me-2" href="/login/?return=<?= rawurlencode('/business/' . $slug . '/#section-reviews') ?>">Login</a>
+                <a class="btn btn-outline-dark" href="/register/?return=<?= rawurlencode('/business/' . $slug . '/#section-reviews') ?>">Register</a>
               </div>
             <?php endif; ?>
           </div>
@@ -844,6 +938,41 @@ ob_start();
       <!-- Right panel: map + all contact details -->
       <div class="col-12 col-lg-4 mci-business-sidebar-sticky">
         <div class="card mci-business-side-card border-0 bg-white mb-4">
+          <!-- Business hours: collapsed by default -->
+          <div class="mci-biz-hours" id="mciBizHours">
+            <button
+              type="button"
+              class="mci-biz-hours__toggle"
+              aria-expanded="false"
+              aria-controls="mciBizHoursBody"
+            >
+              <span class="d-flex align-items-center gap-2 min-w-0">
+                <i class="bi bi-clock" aria-hidden="true"></i>
+                <span class="fw-semibold">Business Hours</span>
+                <span class="mci-biz-hours__status <?= htmlspecialchars($bizStatusClass) ?>">
+                  <?= htmlspecialchars($bizStatusLabel) ?>
+                </span>
+              </span>
+              <i class="bi bi-chevron-down mci-biz-hours__chevron" aria-hidden="true"></i>
+            </button>
+            <div class="mci-biz-hours__body" id="mciBizHoursBody" hidden>
+              <table class="table table-sm table-borderless align-middle mb-0">
+                <tbody class="small">
+                  <?php foreach ($demoHoursRows as $hr): ?>
+                    <tr>
+                      <td class="fw-semibold ps-0"><?= htmlspecialchars($hr['day']) ?></td>
+                      <?php if (!empty($hr['closed'])): ?>
+                        <td colspan="2" class="text-muted">Closed</td>
+                      <?php else: ?>
+                        <td><?= htmlspecialchars($hr['morning']) ?></td>
+                        <td><?= htmlspecialchars($hr['evening']) ?></td>
+                      <?php endif; ?>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          </div>
           <div class="mci-business-map-wrap">
             <div class="mci-business-map-actions">
               <a class="btn btn-dark btn-sm" href="<?= htmlspecialchars($directionsUrl) ?>" target="_blank" rel="noopener noreferrer">

@@ -70,7 +70,7 @@ if (!$__needsAppCss) {
   <body class="<?= htmlspecialchars($__mciBodyClass, ENT_QUOTES, 'UTF-8') ?>">
     <?php include __DIR__ . '/partials/header.php'; ?>
 
-    <main class="mci-main">
+    <main class="mci-main" id="mci-main-content">
       <div class="container px-3 px-sm-4">
         <?php
         // $content is expected to be a safe HTML string produced by templates.
@@ -111,6 +111,24 @@ if (!$__needsAppCss) {
       if (bsNav && nav.classList.contains('show')) bsNav.hide();
     });
   });
+}());
+    </script>
+    <script>
+(function () {
+  var btn = document.getElementById('mciGoTop');
+  if (!btn) return;
+  function syncBtn() {
+    if (window.pageYOffset > 300) {
+      btn.removeAttribute('hidden');
+    } else {
+      btn.setAttribute('hidden', '');
+    }
+  }
+  window.addEventListener('scroll', syncBtn, { passive: true });
+  btn.addEventListener('click', function () {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  syncBtn();
 }());
     </script>
   </body>

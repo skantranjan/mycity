@@ -1,14 +1,16 @@
-/* Listings page — 2025 refresh */
+/* Listings page — 2026 Bold & Vibrant */
 
 .mci-listing-row-card {
   border-radius: var(--mci-radius-lg, 1rem);
   border: 1.5px solid var(--mci-border, #e2e8f0);
-  transition: box-shadow 0.22s ease, transform 0.22s ease;
+  box-shadow: var(--mci-shadow-card);
+  transition: box-shadow 0.2s ease-out, transform 0.2s ease-out, border-color 0.2s ease-out;
 }
 
 .mci-listing-row-link:hover .mci-listing-row-card {
-  box-shadow: 0 14px 32px -6px rgba(15,23,42,0.1), 0 0 0 1.5px rgba(99,102,241,0.18) !important;
-  transform: translateY(-2px);
+  box-shadow: var(--mci-shadow-card-hover) !important;
+  transform: translateY(-4px);
+  border-color: rgba(124,58,237,0.2);
 }
 
 .mci-listing-row-img-wrap {
@@ -62,7 +64,7 @@
 }
 
 .listings-view-toggle .btn.active {
-  background: var(--mci-color-primary-dark, #6366f1) !important;
+  background: var(--mci-gradient-cta) !important;
   color: #fff !important;
   box-shadow: inset 0 -1px 0 rgba(0,0,0,0.12);
 }
@@ -70,40 +72,42 @@
 .listings-view-toggle .btn.active i { color: #fff; }
 
 .listings-view-toggle .btn:not(.active):hover {
-  background-color: var(--mci-color-primary-soft, #eef2ff);
-  color: var(--mci-color-primary-deep, #4f46e5) !important;
+  background-color: var(--mci-color-primary-soft, #f5f3ff);
+  color: var(--mci-color-primary-deep, #6d28d9) !important;
 }
 
 .listings-view-toggle .listings-view-toggle__btn:focus-visible {
-  outline: 2px solid rgba(79,70,229,0.45);
+  outline: 2px solid rgba(124,58,237,0.45);
   outline-offset: -2px;
   position: relative;
   z-index: 1;
 }
 
-/* ─── Grid cards (home.css not loaded here) ─────────── */
+/* ─── Grid cards (when home.css not loaded) ─────────── */
 .mci-listing-card {
   border-radius: var(--mci-radius-lg, 1rem) !important;
   overflow: hidden;
-  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, border-color 0.2s ease-out;
   border: 1.5px solid var(--mci-border, #e2e8f0) !important;
+  box-shadow: var(--mci-shadow-card, 0 4px 6px -1px rgba(0,0,0,.07));
 }
 
 .mci-listing-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 16px 36px -8px rgba(15,23,42,0.12), 0 0 0 1.5px rgba(99,102,241,0.2) !important;
+  transform: translateY(-6px);
+  box-shadow: var(--mci-shadow-card-hover, 0 20px 40px -8px rgba(124,58,237,.15)) !important;
+  border-color: rgba(124,58,237,0.2) !important;
 }
 
 .mci-listing-card .card-img-wrap {
   position: relative;
   overflow: hidden;
-  height: 180px;
+  height: 200px;
 }
 
 .mci-listing-card .card-img-top {
   height: 100% !important;
   object-fit: cover;
-  transition: transform 0.38s ease;
+  transition: transform 0.4s ease-out;
 }
 
 .mci-listing-card:hover .card-img-top { transform: scale(1.06); }
@@ -112,40 +116,85 @@
 .mci-listing-row-card .category-pill {
   font-size: var(--mci-text-micro, 0.68rem);
   font-weight: var(--mci-weight-bold, 700);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  padding: 0.25rem 0.55rem;
+  padding: 0.25rem 0.6rem;
   border-radius: 9999px;
-  background: var(--mci-color-primary-soft, #eef2ff);
-  color: var(--mci-color-primary-deep, #4f46e5);
+  background: rgba(15,23,42,0.6);
+  color: rgba(255,255,255,0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+/* Category pill in row card stays regular (not on dark image) */
+.mci-listing-row-card .category-pill {
+  background: var(--mci-color-primary-soft, #f5f3ff);
+  color: var(--mci-color-primary-deep, #6d28d9);
+  backdrop-filter: none;
+  border: 1px solid rgba(124,58,237,0.15);
 }
 
 .mci-listing-card .btn-view-pill {
   font-size: var(--mci-text-xs, 0.75rem);
   font-weight: var(--mci-weight-extrabold, 800);
-  padding: 0.35rem 0.75rem;
+  padding: 0.35rem 0.8rem;
   border-radius: 9999px;
-  background: linear-gradient(
-    135deg,
-    var(--mci-color-primary-dark, #6366f1) 0%,
-    var(--mci-color-primary-deep, #4f46e5) 100%
-  );
+  background: var(--mci-gradient-cta, linear-gradient(90deg, #7c3aed, #d946ef));
   color: #fff;
   border: none;
-  box-shadow: 0 3px 10px rgba(99,102,241,0.3);
-  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 3px 10px rgba(124,58,237,0.3);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, filter 0.15s ease;
 }
 
 .mci-listing-card:hover .btn-view-pill {
-  background: linear-gradient(
-    135deg,
-    var(--mci-color-primary, #818cf8) 0%,
-    var(--mci-color-primary-dark, #6366f1) 100%
-  );
-  box-shadow: 0 6px 18px rgba(99,102,241,0.4);
+  filter: brightness(1.08);
+  box-shadow: 0 6px 18px rgba(124,58,237,0.45);
   transform: translateY(-1px);
 }
 
 .mci-listing-card__distance {
-  color: var(--mci-color-primary-deep, #4f46e5) !important;
+  color: var(--mci-color-primary-deep, #6d28d9) !important;
+}
+
+/* ─── "List your business" CTA button ───────────────── */
+.mci-btn-list-biz {
+  background: var(--mci-gradient-cta, linear-gradient(90deg, #7c3aed, #d946ef));
+  color: #fff;
+  border: none;
+  border-radius: 9999px;
+  padding: 0.45rem 1.1rem;
+  box-shadow: 0 4px 14px rgba(124,58,237,0.35);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+}
+.mci-btn-list-biz:hover,
+.mci-btn-list-biz:focus-visible {
+  color: #fff;
+  filter: brightness(1.08);
+  box-shadow: 0 6px 20px rgba(124,58,237,0.5);
+  transform: translateY(-1px);
+}
+.mci-btn-list-biz:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(124,58,237,0.35);
+}
+
+/* ─── Subcategory pills slide-in ─────────────────────── */
+#mciSubcategoryWrap {
+  animation: mci-subcat-in 0.18s ease-out both;
+}
+@keyframes mci-subcat-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Sticky filter panel (desktop only) ─────────────── */
+@media (min-width: 992px) {
+  .mci-listings-filter-sticky {
+    position: sticky;
+    top: 5rem;
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--mci-border, #e2e8f0) transparent;
+  }
 }

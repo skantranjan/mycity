@@ -35,7 +35,7 @@ $catSlugFn = static function (string $value): string {
 $catSlug = $catSlugFn($category);
 
 // Deterministic color dot for category (cycles through 6 brand-friendly hues)
-$dotColors = ['#6366f1','#14b8a6','#f59e0b','#f43f5e','#10b981','#8b5cf6'];
+$dotColors = ['#7c3aed','#14b8a6','#f59e0b','#f43f5e','#10b981','#8b5cf6'];
 $dotColor  = $catSlug !== '' ? $dotColors[crc32($catSlug) % 6] : $dotColors[0];
 // Ensure positive index
 $dotColor  = $dotColors[abs(crc32($catSlug)) % 6];

@@ -23,12 +23,16 @@ if ($appArea === '') {
     }
 }
 ?>
+<!-- Skip to main content — keyboard / screen-reader shortcut -->
+<a href="#mci-main-content" class="visually-hidden-focusable position-absolute top-0 start-0 p-2 m-1 rounded-2 fw-bold" style="z-index:9999;background:var(--mci-gradient-cta);color:#fff;text-decoration:none;">
+  Skip to main content
+</a>
 <header class="site-header sticky-top">
   <nav class="navbar navbar-expand-lg navbar-dark py-2" aria-label="Main navigation">
     <div class="container">
       <a class="navbar-brand d-flex align-items-center py-1 me-2" href="/" title="My City Info">
         <img
-          src="https://www.mycityinfo.com/wp-content/uploads/2017/04/my-city-info-logo-t-3.png"
+          src="/assets/images/logo.png"
           alt="My City Info"
           class="site-logo"
           loading="eager"

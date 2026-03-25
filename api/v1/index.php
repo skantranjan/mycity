@@ -1261,6 +1261,72 @@ if (($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'scraper') {
 }
 
 // =============================================================================
+// cp/url-import — URL list & directory crawler import tool
+// =============================================================================
+if (($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'url-import') {
+    require_once __DIR__ . '/lib/url_import_service.php';
+    $auth = api_require_auth(['super_admin', 'co_admin']);
+    $pdo  = api_db();
+
+    // POST /api/v1/cp/url-import/jobs
+    // Body: {mode:'url_list', urls:[...]} or {mode:'crawler', index_url:'...', pattern:'...', limit:20}
+    if ($method === 'POST' && ($segments[2] ?? '') === 'jobs' && !isset($segments[3])) {
+        $body = api_request_data();
+        $mode = trim((string)($body['mode'] ?? ''));
+        if (!in_array($mode, ['url_list', 'crawler'], true)) {
+            api_error('invalid_mode — must be url_list or crawler', 400);
+        }
+        if ($mode === 'url_list') {
+            $urls = array_values(array_filter(
+                array_map('trim', (array)($body['urls'] ?? [])),
+                fn($u) => $u !== '' && filter_var($u, FILTER_VALIDATE_URL) !== false
+            ));
+            if (empty($urls)) {
+                api_error('no_valid_urls', 400);
+            }
+            $config = ['urls' => $urls];
+        } else {
+            $indexUrl = trim((string)($body['index_url'] ?? ''));
+            if ($indexUrl === '' || filter_var($indexUrl, FILTER_VALIDATE_URL) === false) {
+                api_error('invalid_index_url', 400);
+            }
+            $config = [
+                'index_url' => $indexUrl,
+                'pattern'   => trim((string)($body['pattern'] ?? '')),
+                'limit'     => max(1, min(100, (int)($body['limit'] ?? 20))),
+            ];
+        }
+
+        $jobId = url_import_create_job($pdo, $auth['user_id'], $mode, $config);
+
+        // Read back the JWT from the request so the processor can auth itself
+        $jwt = '';
+        $hdr = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        if (preg_match('/^\s*Bearer\s+(\S+)/i', $hdr, $m)) {
+            $jwt = $m[1];
+        }
+        url_import_trigger_processor($jobId, $jwt);
+
+        api_json(['ok' => true, 'job_id' => $jobId]);
+    }
+
+    // GET /api/v1/cp/url-import/jobs/{id}
+    if ($method === 'GET' && ($segments[2] ?? '') === 'jobs' && isset($segments[3]) && !isset($segments[4])) {
+        $job = url_import_get_job($pdo, (string)$segments[3]);
+        if (!$job) {
+            api_error('job_not_found', 404);
+        }
+        api_json($job);
+    }
+
+    // POST /api/v1/cp/url-import/jobs/{id}/process  (internal — fire-and-forget target)
+    if ($method === 'POST' && ($segments[2] ?? '') === 'jobs' && isset($segments[3]) && ($segments[4] ?? '') === 'process') {
+        $result = url_import_run_job($pdo, (string)$segments[3], $auth['user_id']);
+        api_json($result);
+    }
+}
+
+// =============================================================================
 // 404 fallthrough
 // =============================================================================
 http_response_code(404);

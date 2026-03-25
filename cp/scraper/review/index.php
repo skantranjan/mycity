@@ -6,8 +6,12 @@ require_once __DIR__ . '/../../../includes/mci_session.php';
 require_once __DIR__ . '/../../../api/v1/lib/config.php';
 require_once __DIR__ . '/../../../api/v1/lib/db.php';
 require_once __DIR__ . '/../../../api/v1/lib/scraper_service.php';
+require_once __DIR__ . '/../../../api/v1/lib/jwt.php';
+require_once __DIR__ . '/../../../includes/mci_cp_jwt.php';
 
 mci_require_cp_session();
+
+$jwtForJs = mci_cp_ensure_jwt();
 
 $recordId = trim((string)($_GET['id'] ?? ''));
 if ($recordId === '') {
@@ -46,6 +50,7 @@ $sourceLabel = [
     'tomtom'        => 'TomTom Places',
     'here'          => 'HERE Places',
     'google_places' => 'Google Places',
+    'foursquare'    => 'Foursquare',
     'curl_scrape'   => 'cURL / HTML',
 ][$record['source']] ?? ucfirst($record['source']);
 
@@ -461,6 +466,8 @@ ob_start();
   'use strict';
 
   const API      = '/api/v1/cp/scraper';
+  const JWT      = <?= json_encode($jwtForJs) ?>;
+  const AUTH     = JWT ? { 'Authorization': 'Bearer ' + JWT } : {};
   const recordId = document.getElementById('mciRecordId').value;
 
   // ── Hours: toggle disabled on closed checkbox ───────────────────────────
@@ -565,7 +572,7 @@ ob_start();
     try {
       const res  = await fetch(`${API}/results/${encodeURIComponent(recordId)}/update`, {
         method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH },
         body: JSON.stringify({ payload: buildPayload() }),
       });
       const json = await res.json();
@@ -594,7 +601,7 @@ ob_start();
     try {
       await fetch(`${API}/results/${encodeURIComponent(recordId)}/update`, {
         method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH },
         body: JSON.stringify({ payload: buildPayload() }),
       });
     } catch (_) {}
@@ -602,7 +609,7 @@ ob_start();
     try {
       const res  = await fetch(`${API}/results/${encodeURIComponent(recordId)}/approve`, {
         method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH },
         body: JSON.stringify({ status }),
       });
       const json = await res.json();
@@ -633,7 +640,7 @@ ob_start();
     try {
       const res  = await fetch(`${API}/results/${encodeURIComponent(recordId)}/reject`, {
         method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH },
         body: JSON.stringify({ reason }),
       });
       const json = await res.json();

@@ -5,9 +5,12 @@ require_once __DIR__ . '/../../../includes/mci_require_session.php';
 require_once __DIR__ . '/../../../includes/mci_session.php';
 require_once __DIR__ . '/../../../api/v1/lib/config.php';
 require_once __DIR__ . '/../../../api/v1/lib/db.php';
+require_once __DIR__ . '/../../../api/v1/lib/jwt.php';
+require_once __DIR__ . '/../../../includes/mci_cp_jwt.php';
 
 mci_require_cp_session();
 
+$jwtForJs = mci_cp_ensure_jwt();
 $pageTitle = 'Scraper Review Queue — My City Info CP';
 $cpActive  = 'scraper';
 $hideCta   = true;
@@ -82,6 +85,7 @@ ob_start();
               <option value="tomtom">TomTom</option>
               <option value="here">HERE</option>
               <option value="google_places">Google Places</option>
+              <option value="foursquare">Foursquare</option>
               <option value="curl_scrape">cURL / HTML</option>
             </select>
           </div>
@@ -159,7 +163,9 @@ ob_start();
 (function () {
   'use strict';
 
-  const API = '/api/v1/cp/scraper';
+  const API  = '/api/v1/cp/scraper';
+  const JWT  = <?= json_encode($jwtForJs) ?>;
+  const AUTH = JWT ? { 'Authorization': 'Bearer ' + JWT } : {};
   let currentPage   = 1;
   let currentStatus = '';
   let totalPages    = 1;
@@ -213,7 +219,7 @@ ob_start();
     document.getElementById('mciQueuePager').classList.add('d-none');
 
     try {
-      const res  = await fetch(API + '/results?' + params, { credentials: 'include' });
+      const res  = await fetch(API + '/results?' + params, { credentials: 'include', headers: AUTH });
       const json = await res.json();
 
       document.getElementById('mciQueueLoading').classList.add('d-none');
@@ -241,7 +247,7 @@ ob_start();
 
   async function loadCounts() {
     try {
-      const res  = await fetch(API + '/counts', { credentials: 'include' });
+      const res  = await fetch(API + '/counts', { credentials: 'include', headers: AUTH });
       const json = await res.json();
       document.getElementById('tabCountAll').textContent     = json.total        || 0;
       document.getElementById('tabCountPending').textContent = json.pending_review || 0;
@@ -255,6 +261,7 @@ ob_start();
     tomtom:        '<span class="badge text-bg-primary">TomTom</span>',
     here:          '<span class="badge" style="background:#0acc85;color:#fff;">HERE</span>',
     google_places: '<span class="badge text-bg-warning">Google</span>',
+    foursquare:    '<span class="badge" style="background:#f94877;color:#fff;">4sq</span>',
     curl_scrape:   '<span class="badge text-bg-secondary">cURL</span>',
   };
   const STATUS_BADGES = {
@@ -320,7 +327,7 @@ ob_start();
       const res  = await fetch(`${API}/results/${encodeURIComponent(rejectTargetId)}/reject`, {
         method:      'POST',
         credentials: 'include',
-        headers:     { 'Content-Type': 'application/json' },
+        headers:     { 'Content-Type': 'application/json', ...AUTH },
         body:        JSON.stringify({ reason }),
       });
       const json = await res.json();

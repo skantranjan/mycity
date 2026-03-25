@@ -16,8 +16,11 @@ function subLinkClass(string $key, string $subActive): string
 
 <div class="mci-app-sidebar">
   <div class="mci-app-sidebar__head">
-    <div class="mci-app-sidebar__title">My account</div>
-    <div class="mci-app-sidebar__sub">Manage your listings — use the top bar for profile &amp; logout.</div>
+    <div class="d-flex align-items-center justify-content-between gap-2">
+      <div class="mci-app-sidebar__title">My account</div>
+      <i class="bi bi-chevron-down mci-sidebar-toggle-icon" aria-hidden="true"></i>
+    </div>
+    <div class="mci-app-sidebar__sub d-none d-lg-block">Manage your listings — use the top bar for profile &amp; logout.</div>
   </div>
 
   <nav class="mci-app-sidebar__nav" aria-label="Subscriber navigation">
@@ -46,3 +49,18 @@ function subLinkClass(string $key, string $subActive): string
     </a>
   </nav>
 </div>
+
+<script>
+(function () {
+  var sidebars = document.querySelectorAll('.mci-app-sidebar');
+  sidebars.forEach(function (sidebar) {
+    var head = sidebar.querySelector('.mci-app-sidebar__head');
+    if (head && window.matchMedia('(max-width: 991.98px)').matches) {
+      head.addEventListener('click', function (e) {
+        if (e.target.closest('a')) return;
+        sidebar.classList.toggle('mci-sidebar-open');
+      });
+    }
+  });
+}());
+</script>
