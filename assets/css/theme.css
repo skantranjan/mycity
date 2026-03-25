@@ -901,7 +901,7 @@ iframe { max-width: 100%; }
   position: fixed;
   bottom: 1.5rem;
   right: 1.5rem;
-  z-index: 1050;
+  z-index: 1045;
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 50%;
