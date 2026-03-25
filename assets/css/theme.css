@@ -895,3 +895,48 @@ iframe { max-width: 100%; }
     background-color: var(--mci-surface) !important;
   }
 }
+
+/* ——— Go to top button (universal) ——— */
+.mci-go-top {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 1050;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  border: none;
+  background: var(--mci-color-primary-dark, #7c3aed);
+  color: #fff;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(124,58,237,0.35);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(0.5rem);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+.mci-go-top:not([hidden]) {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.mci-go-top:hover {
+  background: var(--mci-color-primary-deep, #6d28d9);
+  box-shadow: 0 6px 20px rgba(124,58,237,0.45);
+}
+
+@media (max-width: 575px) {
+  .mci-go-top {
+    bottom: 1rem;
+    right: 1rem;
+    width: 2.4rem;
+    height: 2.4rem;
+    font-size: 1rem;
+  }
+}

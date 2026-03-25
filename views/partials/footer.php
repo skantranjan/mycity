@@ -69,5 +69,14 @@
       </div>
     </div>
   </div>
+  <button
+    type="button"
+    id="mciGoTop"
+    class="mci-go-top"
+    aria-label="Go to top"
+    hidden
+  >
+    <i class="bi bi-arrow-up" aria-hidden="true"></i>
+  </button>
 </footer>
 

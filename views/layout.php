@@ -113,6 +113,24 @@ if (!$__needsAppCss) {
   });
 }());
     </script>
+    <script>
+(function () {
+  var btn = document.getElementById('mciGoTop');
+  if (!btn) return;
+  function syncBtn() {
+    if (window.pageYOffset > 300) {
+      btn.removeAttribute('hidden');
+    } else {
+      btn.setAttribute('hidden', '');
+    }
+  }
+  window.addEventListener('scroll', syncBtn, { passive: true });
+  btn.addEventListener('click', function () {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  syncBtn();
+}());
+    </script>
   </body>
 </html>
 
