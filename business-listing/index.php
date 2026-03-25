@@ -164,7 +164,7 @@ ob_start();
     </div>
   </div>
 
-  <div class="col-12 col-lg-4" id="mciFiltersPanel">
+  <div class="col-12 col-lg-4 mci-listings-filter-sticky" id="mciFiltersPanel">
     <div class="card border-0 shadow-sm bg-white">
       <div class="card-body">
         <div class="fw-semibold mb-3">Filters</div>
