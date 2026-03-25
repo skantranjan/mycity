@@ -484,6 +484,46 @@ $extraJS = <<<'HTML'
   });
 })();
 </script>
+<script>
+(function () {
+  // Highlight active tab on scroll
+  var tabs = document.querySelectorAll('.mci-biz-tab');
+  var sections = ['section-about','section-services','section-products','section-faq','section-reviews']
+    .map(function (id) { return document.getElementById(id); })
+    .filter(Boolean);
+  if (!tabs.length || !sections.length) return;
+
+  function setActive(id) {
+    tabs.forEach(function (t) {
+      var href = t.getAttribute('href');
+      t.classList.toggle('is-active', href === '#' + id);
+    });
+  }
+
+  // Smooth scroll with offset for sticky bar
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function (e) {
+      var target = document.querySelector(tab.getAttribute('href'));
+      if (!target) return;
+      e.preventDefault();
+      var barH = document.querySelector('.mci-biz-tabs');
+      var offset = barH ? barH.offsetHeight + 8 : 8;
+      var top = target.getBoundingClientRect().top + window.pageYOffset - offset;
+      window.scrollTo({ top: top, behavior: 'smooth' });
+    });
+  });
+
+  // IntersectionObserver to highlight tab as sections scroll into view
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) setActive(entry.target.id);
+    });
+  }, { rootMargin: '-30% 0px -60% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { observer.observe(s); });
+  setActive(sections[0].id); // default first tab active
+}());
+</script>
 HTML;
 
 ob_start();
@@ -529,6 +569,14 @@ ob_start();
   </nav>
 
   <div class="px-1 px-sm-2">
+    <!-- Section tab bar -->
+    <nav class="mci-biz-tabs" aria-label="Jump to section">
+      <a class="mci-biz-tab" href="#section-about">About</a>
+      <a class="mci-biz-tab" href="#section-services">Services</a>
+      <a class="mci-biz-tab" href="#section-products">Products</a>
+      <a class="mci-biz-tab" href="#section-faq">FAQ</a>
+      <a class="mci-biz-tab" href="#section-reviews">Ratings &amp; Reviews</a>
+    </nav>
     <div class="row g-4 align-items-start">
       <div class="col-12 col-lg-8">
         <div class="mci-business-title-block mb-3 pb-lg-1">

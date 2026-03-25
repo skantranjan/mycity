@@ -598,3 +598,47 @@
 .mci-business-faq .accordion-body {
   background: #fff;
 }
+
+/* ——— Section tab bar ——— */
+.mci-biz-tabs {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: 0;
+  background: #fff;
+  border-bottom: 2px solid var(--mci-border, #e2e8f0);
+  border-radius: var(--mci-radius-md, 0.75rem) var(--mci-radius-md, 0.75rem) 0 0;
+  margin-bottom: 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+}
+
+.mci-biz-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.mci-biz-tab {
+  flex-shrink: 0;
+  padding: 0.7rem 1.1rem;
+  font-size: var(--mci-text-sm, 0.875rem);
+  font-weight: var(--mci-weight-semibold, 600);
+  color: var(--mci-muted, #64748b);
+  text-decoration: none !important;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.mci-biz-tab:hover {
+  color: var(--mci-color-primary-dark, #7c3aed);
+  border-bottom-color: rgba(124,58,237,0.4);
+}
+
+.mci-biz-tab.is-active {
+  color: var(--mci-color-primary-deep, #6d28d9);
+  border-bottom-color: var(--mci-color-primary-dark, #7c3aed);
+}
