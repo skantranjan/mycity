@@ -200,6 +200,15 @@ HTML;
 ob_start();
 ?>
 
+<!-- Breadcrumb -->
+<nav class="mci-breadcrumb mb-3" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <span class="mci-breadcrumb__sep" aria-hidden="true">›</span>
+  <a href="/business-category/">Categories</a>
+  <span class="mci-breadcrumb__sep" aria-hidden="true">›</span>
+  <span class="mci-breadcrumb__current"><?= htmlspecialchars($categoryRow['name'] ?? '') ?></span>
+</nav>
+
 <div class="py-4">
 
   <!-- Page header -->

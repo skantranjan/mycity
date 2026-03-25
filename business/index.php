@@ -518,6 +518,15 @@ ob_start();
     />
   </div>
 
+  <!-- Breadcrumb -->
+  <nav class="mci-breadcrumb px-1 mb-1" aria-label="Breadcrumb">
+    <a href="/">Home</a>
+    <span class="mci-breadcrumb__sep" aria-hidden="true">›</span>
+    <a href="/business-listing/">Listings</a>
+    <span class="mci-breadcrumb__sep" aria-hidden="true">›</span>
+    <span class="mci-breadcrumb__current"><?= htmlspecialchars($listing['title']) ?></span>
+  </nav>
+
   <div class="px-1 px-sm-2">
     <div class="row g-4 align-items-start">
       <div class="col-12 col-lg-8">

@@ -133,6 +133,12 @@ ob_start();
   <div class="col-12">
     <div class="d-flex align-items-end justify-content-between gap-3 flex-wrap">
       <div>
+        <!-- Breadcrumb -->
+        <nav class="mci-breadcrumb mb-2" aria-label="Breadcrumb">
+          <a href="/">Home</a>
+          <span class="mci-breadcrumb__sep" aria-hidden="true">›</span>
+          <span class="mci-breadcrumb__current">Listings<?php if ($category !== ''): ?> — <?= htmlspecialchars(ucfirst(str_replace('-', ' ', $category))) ?><?php endif; ?></span>
+        </nav>
         <h1 class="h4 fw-bold mb-1">Listings</h1>
         <div class="text-muted small">
           <?php if ($category !== ''): ?>
