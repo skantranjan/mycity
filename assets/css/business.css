@@ -314,6 +314,12 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  background: var(--mci-color-primary-soft, #f5f3ff);
+  border-left: 3px solid var(--mci-color-primary-dark, #7c3aed);
+  border-radius: var(--mci-radius-sm, 0.5rem);
+  padding: 0.55rem 0.85rem;
+  margin-left: -0.85rem;
+  margin-right: -0.85rem;
 }
 
 .mci-business-section-title i {
