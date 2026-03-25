@@ -65,11 +65,12 @@ $isSuperAdmin = ($cpRole === 'super_admin');
         <?php if ($isSuperAdmin): ?>
           Control panel <span class="mci-app-badge">Super admin</span>
         <?php else: ?>
-          Control panel <span class="mci-app-badge" style="background:rgba(99,102,241,0.12);color:#4f46e5;">Co-admin</span>
+          Control panel <span class="mci-app-badge" style="background:rgba(124,58,237,0.15);color:#c4b5fd;">Co-admin</span>
         <?php endif; ?>
       </div>
+      <i class="bi bi-chevron-down mci-sidebar-toggle-icon" aria-hidden="true"></i>
     </div>
-    <div class="mci-app-sidebar__sub mt-1">Profile &amp; sign-out are in the top bar.</div>
+    <div class="mci-app-sidebar__sub mt-1 d-none d-lg-block">Profile &amp; sign-out are in the top bar.</div>
   </div>
 
   <nav class="mci-app-sidebar__nav" aria-label="Admin navigation">
@@ -140,6 +141,19 @@ $isSuperAdmin = ($cpRole === 'super_admin');
 </div>
 
 <script>
+(function () {
+  // Mobile sidebar collapse toggle
+  var sidebar = document.querySelector('.mci-app-sidebar');
+  var sidebarHead = sidebar ? sidebar.querySelector('.mci-app-sidebar__head') : null;
+  if (sidebarHead && window.matchMedia('(max-width: 991.98px)').matches) {
+    sidebarHead.addEventListener('click', function (e) {
+      // Don't fire if a link inside head was clicked
+      if (e.target.closest('a')) return;
+      sidebar.classList.toggle('mci-sidebar-open');
+    });
+  }
+}());
+
 (function () {
   var head = document.querySelector('[data-mci-toggle="listings-group"]');
   var body = document.getElementById('listingsGroup');

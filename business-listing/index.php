@@ -37,14 +37,75 @@ $extraJS = <<<'HTML'
     panel.style.display = expanded ? 'none' : '';
   });
 })();
-// Clear subcategory hidden input when category changes
+
+// Subcategory dynamic loader
 (function () {
-  var sel = document.getElementById('mciCategorySelect');
-  if (!sel) return;
+  var sel   = document.getElementById('mciCategorySelect');
+  var wrap  = document.getElementById('mciSubcategoryWrap');
+  var pills = document.getElementById('mciSubcategoryPills');
+  var input = document.getElementById('mciSubcategoryInput');
+  if (!sel || !wrap || !pills || !input) return;
+
+  // Cache fetched subcategories per category slug
+  var cache = {};
+
+  // Preloaded from server for the initial category (avoids a round-trip on page load)
+  var preloaded = JSON.parse(wrap.dataset.preload || '[]');
+  var initCat = sel.value;
+  if (initCat && preloaded.length) {
+    cache[initCat] = preloaded;
+    renderPills(preloaded, input.value);
+  }
+
   sel.addEventListener('change', function () {
-    var hidden = document.querySelector('input[name="subcategory"]');
-    if (hidden) hidden.remove();
+    var slug = sel.value;
+    input.value = '';
+    wrap.style.display = 'none';
+    pills.innerHTML = '';
+    if (!slug) return;
+    if (cache[slug]) {
+      renderPills(cache[slug], '');
+      return;
+    }
+    // Fetch from public categories endpoint
+    fetch('/api/v1/public/categories')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var cats = data.categories || [];
+        var match = cats.find(function (c) { return c.slug === slug; });
+        var subs = (match && match.children) ? match.children : [];
+        cache[slug] = subs;
+        renderPills(subs, '');
+      })
+      .catch(function () { /* silently ignore */ });
   });
+
+  function renderPills(subs, activeSub) {
+    pills.innerHTML = '';
+    if (!subs.length) { wrap.style.display = 'none'; return; }
+    // "All" pill
+    pills.appendChild(makePill('All', '', activeSub === ''));
+    subs.forEach(function (sc) {
+      pills.appendChild(makePill(sc.name, sc.slug, sc.slug === activeSub));
+    });
+    wrap.style.display = '';
+  }
+
+  function makePill(label, slug, active) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm ' + (active ? 'btn-dark' : 'btn-outline-secondary');
+    btn.textContent = label;
+    btn.addEventListener('click', function () {
+      input.value = slug;
+      // Update active state
+      pills.querySelectorAll('.btn').forEach(function (b) {
+        b.className = 'btn btn-sm btn-outline-secondary';
+      });
+      btn.className = 'btn btn-sm btn-dark';
+    });
+    return btn;
+  }
 })();
 </script>
 HTML;
@@ -165,7 +226,9 @@ ob_start();
         <button class="btn btn-sm btn-outline-dark d-lg-none" type="button" id="mciFilterToggle" aria-expanded="false" aria-controls="mciFiltersPanel">
           <i class="bi bi-sliders me-1" aria-hidden="true"></i>Filters<?php if ($activeFilterCount > 0): ?> <span class="badge text-bg-dark ms-1"><?= $activeFilterCount ?></span><?php endif; ?>
         </button>
-        <a class="btn btn-sm btn-dark" href="/submit-business-listing/">List your business</a>
+        <a class="btn btn-sm mci-btn-list-biz fw-semibold" href="/submit-business-listing/">
+          <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>List your business
+        </a>
       </div>
     </div>
   </div>
@@ -202,37 +265,20 @@ ob_start();
             </select>
           </div>
 
-          <?php if (!empty($dbSubcategories)): ?>
-          <div class="mb-3">
+          <!-- Subcategory pills — populated by JS on category change -->
+          <?php
+          $preloadSubs = json_encode(
+              array_map(fn($sc) => ['name' => $sc['name'], 'slug' => $sc['slug']], $dbSubcategories),
+              JSON_HEX_TAG | JSON_HEX_QUOT
+          );
+          ?>
+          <div class="mb-3" id="mciSubcategoryWrap"
+            data-preload="<?= $preloadSubs ?>"
+            style="<?= empty($dbSubcategories) ? 'display:none;' : '' ?>">
             <label class="form-label">Subcategory</label>
-            <div class="d-flex flex-wrap gap-2">
-              <?php
-              // Build base params without subcategory for "All" link
-              $subBaseParams = [];
-              if ($what !== '')       $subBaseParams['what']        = $what;
-              if ($where !== '')      $subBaseParams['where']       = $where;
-              if ($category !== '')   $subBaseParams['category']    = $category;
-              if ($tag !== '')        $subBaseParams['tag']         = $tag;
-              if ($priceRange !== '') $subBaseParams['price_range'] = $priceRange;
-              ?>
-              <a href="/business-listing/?<?= htmlspecialchars(http_build_query($subBaseParams)) ?>"
-                 class="btn btn-sm <?= $subcategory === '' ? 'btn-dark' : 'btn-outline-secondary' ?>">
-                All
-              </a>
-              <?php foreach ($dbSubcategories as $sc):
-                $scParams = $subBaseParams + ['subcategory' => $sc['slug']];
-              ?>
-                <a href="/business-listing/?<?= htmlspecialchars(http_build_query($scParams)) ?>"
-                   class="btn btn-sm <?= $subcategory === $sc['slug'] ? 'btn-dark' : 'btn-outline-secondary' ?>">
-                  <?= htmlspecialchars($sc['name']) ?>
-                </a>
-              <?php endforeach; ?>
-            </div>
-            <?php if ($subcategory !== ''): ?>
-              <input type="hidden" name="subcategory" value="<?= htmlspecialchars($subcategory) ?>" />
-            <?php endif; ?>
+            <div class="d-flex flex-wrap gap-2" id="mciSubcategoryPills"></div>
+            <input type="hidden" name="subcategory" id="mciSubcategoryInput" value="<?= htmlspecialchars($subcategory) ?>" />
           </div>
-          <?php endif; ?>
 
           <div class="mb-3">
             <label class="form-label">Price range</label>

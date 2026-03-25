@@ -156,6 +156,37 @@
   color: var(--mci-color-primary-deep, #6d28d9) !important;
 }
 
+/* ─── "List your business" CTA button ───────────────── */
+.mci-btn-list-biz {
+  background: var(--mci-gradient-cta, linear-gradient(90deg, #7c3aed, #d946ef));
+  color: #fff;
+  border: none;
+  border-radius: 9999px;
+  padding: 0.45rem 1.1rem;
+  box-shadow: 0 4px 14px rgba(124,58,237,0.35);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+}
+.mci-btn-list-biz:hover,
+.mci-btn-list-biz:focus-visible {
+  color: #fff;
+  filter: brightness(1.08);
+  box-shadow: 0 6px 20px rgba(124,58,237,0.5);
+  transform: translateY(-1px);
+}
+.mci-btn-list-biz:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 10px rgba(124,58,237,0.35);
+}
+
+/* ─── Subcategory pills slide-in ─────────────────────── */
+#mciSubcategoryWrap {
+  animation: mci-subcat-in 0.18s ease-out both;
+}
+@keyframes mci-subcat-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ─── Sticky filter panel (desktop only) ─────────────── */
 @media (min-width: 992px) {
   .mci-listings-filter-sticky {
