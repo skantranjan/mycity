@@ -703,3 +703,12 @@
 .mci-biz-hours__body {
   padding: 0.25rem 1.15rem 0.85rem;
 }
+
+/* ——— Empty state message for sections with no data ——— */
+.mci-business-empty-state {
+  color: var(--mci-muted, #64748b);
+  font-size: var(--mci-text-sm, 0.875rem);
+  font-style: italic;
+  margin: 0;
+  padding: 0.25rem 0;
+}
