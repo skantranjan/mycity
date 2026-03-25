@@ -115,10 +115,6 @@ ob_start();
         <?php endif; ?>
         <div class="mb-4">
           <div class="fw-bold fs-4">Control panel sign in</div>
-          <div class="text-muted small mt-1">Super admin or co-admin. Same logic as <code>POST /api/v1/auth/login</code> with <code>audience=cp</code>.</div>
-          <div class="alert alert-info small mt-3 mb-0 text-start">
-            <strong>Dev:</strong> Accounts are seeded by <code>001_create_core_tables.sql</code>; see <code>project_brain/DEV_TEST_ACCOUNTS.md</code>.
-          </div>
         </div>
 
         <form action="/cp/login/" method="post" class="flex-grow-1 d-flex flex-column">

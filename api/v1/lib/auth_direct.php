@@ -81,7 +81,7 @@ function api_direct_subscriber_login(string $email, string $password): array
     $upd = $pdo->prepare('UPDATE mci_users SET last_login_at = NOW(6), is_logged_in = 1, last_update_ip = ? WHERE id = ?');
     $upd->execute([$ip, $userId]);
 
-    $exp = time() + 900;
+    $exp = time() + 28800;
     $jwt = api_jwt_sign(['sub' => $userId, 'role' => $role, 'iat' => time(), 'exp' => $exp]);
 
     return [
@@ -151,7 +151,7 @@ function api_direct_cp_login(string $email, string $password): array
     $upd = $pdo->prepare('UPDATE mci_users SET last_login_at = NOW(6), is_logged_in = 1, last_update_ip = ? WHERE id = ?');
     $upd->execute([$ip, $userId]);
 
-    $exp = time() + 900;
+    $exp = time() + 28800;
     $jwt = api_jwt_sign(['sub' => $userId, 'role' => $role, 'iat' => time(), 'exp' => $exp]);
 
     return [
@@ -239,7 +239,7 @@ function api_direct_subscriber_register(array $data): array
         $ip,
     ]);
 
-    $exp = time() + 900;
+    $exp = time() + 28800;
     $jwt = api_jwt_sign(['sub' => $userId, 'role' => $role, 'iat' => time(), 'exp' => $exp]);
 
     return [

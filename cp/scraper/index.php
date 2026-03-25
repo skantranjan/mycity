@@ -5,8 +5,19 @@ require_once __DIR__ . '/../../includes/mci_require_session.php';
 require_once __DIR__ . '/../../includes/mci_session.php';
 require_once __DIR__ . '/../../api/v1/lib/config.php';
 require_once __DIR__ . '/../../api/v1/lib/db.php';
+require_once __DIR__ . '/../../api/v1/lib/scraper_service.php';
+require_once __DIR__ . '/../../api/v1/lib/jwt.php';
+require_once __DIR__ . '/../../includes/mci_cp_jwt.php';
 
 mci_require_cp_session();
+
+$pdo            = api_db();
+$adapterStatus  = scraper_adapter_status($pdo);
+$scraperCounts  = scraper_counts($pdo);
+$adapterStatusJson = json_encode($adapterStatus, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+// Ensure a valid JWT exists (re-issues from session if cookie is missing/expired)
+$jwtForJs = mci_cp_ensure_jwt();
 
 $pageTitle = 'Business Scraper — My City Info CP';
 $cpActive  = 'scraper';
@@ -35,16 +46,26 @@ ob_start();
           <a href="/cp/scraper/results/" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1">
             <i class="bi bi-list-ul" aria-hidden="true"></i>
             <span>Review queue</span>
-            <span class="badge text-bg-warning ms-1 d-none" id="mciScraperPendingBadge"></span>
+            <?php if (($scraperCounts['pending_review'] ?? 0) > 0): ?>
+              <span class="badge text-bg-warning ms-1"><?= (int)$scraperCounts['pending_review'] ?></span>
+            <?php endif; ?>
           </a>
         </div>
 
-        <!-- Source status cards (rendered by JS) -->
+        <!-- Source status cards (collapsible accordion) -->
         <div class="mb-4">
-          <div class="fw-semibold small text-uppercase text-muted mb-2 ls-1">Data sources — this month's usage</div>
-          <div id="mciSourceCards" class="row g-2">
-            <div class="col-12 text-muted small py-3 text-center">
-              <span class="spinner-border spinner-border-sm me-1" role="status"></span> Loading usage…
+          <button class="btn btn-link p-0 text-decoration-none d-flex align-items-center gap-2 w-100 collapsed px-3 py-2 rounded"
+                  type="button" data-bs-toggle="collapse" data-bs-target="#mciSourceCardsCollapse"
+                  aria-expanded="false" aria-controls="mciSourceCardsCollapse"
+                  style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--bs-secondary-color);background:var(--bs-tertiary-bg);">
+            <span>Data sources — this month's usage</span>
+            <i class="bi bi-chevron-down ms-auto" style="font-size:0.7rem;transition:transform .2s;" id="mciSourceCardsChevron"></i>
+          </button>
+          <div class="collapse" id="mciSourceCardsCollapse">
+            <div id="mciSourceCards" class="row g-2 mt-2">
+              <div class="col-12 text-muted small py-3 text-center">
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span> Loading usage…
+              </div>
             </div>
           </div>
         </div>
@@ -124,28 +145,34 @@ ob_start();
   'use strict';
 
   const API = '/api/v1/cp/scraper';
+  const JWT = <?= json_encode($jwtForJs) ?>;
+  const AUTH = JWT ? { 'Authorization': 'Bearer ' + JWT } : {};
 
-  // ── Load usage + populate UI ────────────────────────────────────────────
-  async function loadUsage() {
+  // ── Adapter data injected server-side ──────────────────────────────────
+  const ADAPTER_DATA = <?= $adapterStatusJson ?>;
+
+  // ── Chevron rotation for source cards accordion ────────────────────────
+  document.getElementById('mciSourceCardsCollapse').addEventListener('show.bs.collapse', function () {
+    document.getElementById('mciSourceCardsChevron').style.transform = 'rotate(180deg)';
+  });
+  document.getElementById('mciSourceCardsCollapse').addEventListener('hide.bs.collapse', function () {
+    document.getElementById('mciSourceCardsChevron').style.transform = 'rotate(0deg)';
+  });
+
+  function loadUsage() {
+    renderSourceCards(ADAPTER_DATA);
+    populateSourceDropdown(ADAPTER_DATA);
+    renderAlerts(ADAPTER_DATA);
+  }
+
+  // Refresh usage after a search (re-fetch from API)
+  async function reloadUsage() {
     try {
-      const res  = await fetch(API + '/usage', { credentials: 'include' });
+      const res  = await fetch(API + '/usage', { credentials: 'include', headers: AUTH });
       const json = await res.json();
       renderSourceCards(json.adapters || []);
       populateSourceDropdown(json.adapters || []);
       renderAlerts(json.adapters || []);
-    } catch (e) {
-      document.getElementById('mciSourceCards').innerHTML =
-        '<div class="col-12 text-danger small">Failed to load usage data.</div>';
-    }
-  }
-
-  async function loadPendingCount() {
-    try {
-      const res  = await fetch(API + '/counts', { credentials: 'include' });
-      const json = await res.json();
-      const badge = document.getElementById('mciScraperPendingBadge');
-      const n = parseInt(json.pending_review || 0);
-      if (n > 0) { badge.textContent = n; badge.classList.remove('d-none'); }
     } catch (_) {}
   }
 
@@ -160,7 +187,8 @@ ob_start();
       osm:           { label: 'OpenStreetMap', tier: 'Free · Unlimited', icon: 'bi-geo-alt' },
       tomtom:        { label: 'TomTom Places', tier: 'Free · 75,000/mo', icon: 'bi-map' },
       here:          { label: 'HERE Places',   tier: 'Free · 250,000/mo', icon: 'bi-pin-map' },
-      google_places: { label: 'Google Places', tier: 'Paid · 28,500/mo', icon: 'bi-google' },
+      google_places: { label: 'Google Places', tier: 'Paid · 28,500/mo',  icon: 'bi-google' },
+      foursquare:    { label: 'Foursquare',    tier: 'Free · 30,000/mo', icon: 'bi-geo-alt-fill' },
       curl_scrape:   { label: 'cURL / HTML',   tier: 'Custom target',    icon: 'bi-code-slash' },
     };
 
@@ -227,9 +255,12 @@ ob_start();
     addOpt('auto', 'Auto (best available)', false);
 
     const SOURCE_LABELS = {
-      osm: 'OpenStreetMap (Free)', tomtom: 'TomTom Places (Free tier)',
-      here: 'HERE Places (Free tier)', google_places: 'Google Places (Paid)',
-      curl_scrape: 'cURL / HTML fallback',
+      osm:           'OpenStreetMap (Free)',
+      tomtom:        'TomTom Places (Free tier)',
+      here:          'HERE Places (Free tier)',
+      google_places: 'Google Places (Paid)',
+      foursquare:    'Foursquare (Free tier)',
+      curl_scrape:   'cURL / HTML fallback',
     };
 
     adapters.forEach(function (a) {
@@ -301,7 +332,7 @@ ob_start();
       const res  = await fetch(API + '/search', {
         method:      'POST',
         credentials: 'include',
-        headers:     { 'Content-Type': 'application/json' },
+        headers:     { 'Content-Type': 'application/json', ...AUTH },
         body:        JSON.stringify({ q, city, source }),
       });
       const json = await res.json();
@@ -337,7 +368,7 @@ ob_start();
         }
 
         // Refresh usage after search
-        loadUsage();
+        reloadUsage();
       }
     } catch (err) {
       resultsDiv.classList.remove('d-none');
@@ -355,7 +386,6 @@ ob_start();
 
   // ── Init ───────────────────────────────────────────────────────────────
   loadUsage();
-  loadPendingCount();
 }());
 </script>
 

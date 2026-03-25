@@ -8,7 +8,7 @@
       <div class="col-12 col-md-4 order-1 order-md-1">
         <a href="/" class="d-inline-block mb-2" title="My City Info">
           <img
-            src="https://www.mycityinfo.com/wp-content/uploads/2017/04/my-city-info-logo-t-3.png"
+            src="/assets/images/logo.png"
             alt="My City Info"
             class="site-logo site-logo--footer"
             loading="lazy"

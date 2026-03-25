@@ -28,7 +28,7 @@ if ($appArea === '') {
     <div class="container">
       <a class="navbar-brand d-flex align-items-center py-1 me-2" href="/" title="My City Info">
         <img
-          src="https://www.mycityinfo.com/wp-content/uploads/2017/04/my-city-info-logo-t-3.png"
+          src="/assets/images/logo.png"
           alt="My City Info"
           class="site-logo"
           loading="eager"

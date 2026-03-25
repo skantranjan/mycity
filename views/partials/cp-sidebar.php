@@ -124,6 +124,7 @@ $isSuperAdmin = ($cpRole === 'super_admin');
     <div class="mci-sidebar-group-label mt-2">Tools</div>
     <?php cpNavLink('add-business', '/cp/anonymous-business/', 'bi-plus-circle', 'Add business', $cpActive); ?>
     <?php cpNavLink('scraper', '/cp/scraper/', 'bi-cloud-download', 'Business scraper', $cpActive, $cpBadgeCounts['scraper'] ?: null); ?>
+    <?php cpNavLink('url-import', '/cp/url-import/', 'bi-link-45deg', 'Import from URLs', $cpActive); ?>
 
     <!-- ── System (super_admin only) ────────── -->
     <?php if ($isSuperAdmin): ?>

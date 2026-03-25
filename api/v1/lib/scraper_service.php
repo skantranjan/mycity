@@ -8,6 +8,7 @@ require_once __DIR__ . '/scraper_osm.php';
 require_once __DIR__ . '/scraper_tomtom.php';
 require_once __DIR__ . '/scraper_here.php';
 require_once __DIR__ . '/scraper_google_places.php';
+require_once __DIR__ . '/scraper_foursquare.php';
 require_once __DIR__ . '/scraper_curl_fallback.php';
 
 // ---------------------------------------------------------------------------
@@ -15,7 +16,7 @@ require_once __DIR__ . '/scraper_curl_fallback.php';
 // ---------------------------------------------------------------------------
 
 /**
- * Returns all registered adapters (all five sources).
+ * Returns all registered adapters (all six sources).
  * @return ScraperAdapter[]
  */
 function scraper_adapters(): array
@@ -27,6 +28,7 @@ function scraper_adapters(): array
             new ScraperTomTom(),
             new ScraperHere(),
             new ScraperGooglePlaces(),
+            new ScraperFoursquare(),
             new ScraperCurlFallback(),
         ];
     }
@@ -56,7 +58,7 @@ function scraper_adapter_by_name(string $name): ?ScraperAdapter
 function scraper_usage_increment(PDO $pdo, string $source, int $calls, int $results): void
 {
     $pdo->prepare('
-        INSERT INTO mci_scraper_usage (source, year_month, call_count, results_count)
+        INSERT INTO mci_scraper_usage (source, `year_month`, call_count, results_count)
         VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           call_count     = call_count     + VALUES(call_count),
@@ -66,15 +68,15 @@ function scraper_usage_increment(PDO $pdo, string $source, int $calls, int $resu
 
 /**
  * Get usage row for a source and month (defaults to current month).
- * Returns ['source', 'year_month', 'call_count', 'results_count'] or empty array.
+ * Returns ['source', '`year_month`', 'call_count', 'results_count'] or empty array.
  */
 function scraper_usage_get(PDO $pdo, string $source, ?string $yearMonth = null): array
 {
     $ym   = $yearMonth ?? date('Y-m');
     $stmt = $pdo->prepare('
-        SELECT source, year_month, call_count, results_count
+        SELECT source, `year_month`, call_count, results_count
         FROM   mci_scraper_usage
-        WHERE  source = ? AND year_month = ?
+        WHERE  source = ? AND `year_month` = ?
     ');
     $stmt->execute([$source, $ym]);
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -88,9 +90,9 @@ function scraper_usage_all(PDO $pdo, ?string $yearMonth = null): array
 {
     $ym   = $yearMonth ?? date('Y-m');
     $stmt = $pdo->prepare('
-        SELECT source, year_month, call_count, results_count
+        SELECT source, `year_month`, call_count, results_count
         FROM   mci_scraper_usage
-        WHERE  year_month = ?
+        WHERE  `year_month` = ?
     ');
     $stmt->execute([$ym]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
