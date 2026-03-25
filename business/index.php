@@ -949,7 +949,7 @@ ob_start();
               <span class="d-flex align-items-center gap-2 min-w-0">
                 <i class="bi bi-clock" aria-hidden="true"></i>
                 <span class="fw-semibold">Business Hours</span>
-                <span class="mci-biz-hours__status <?= $bizStatusClass ?>">
+                <span class="mci-biz-hours__status <?= htmlspecialchars($bizStatusClass) ?>">
                   <?= htmlspecialchars($bizStatusLabel) ?>
                 </span>
               </span>
