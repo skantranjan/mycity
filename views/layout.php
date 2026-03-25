@@ -70,7 +70,7 @@ if (!$__needsAppCss) {
   <body class="<?= htmlspecialchars($__mciBodyClass, ENT_QUOTES, 'UTF-8') ?>">
     <?php include __DIR__ . '/partials/header.php'; ?>
 
-    <main class="mci-main">
+    <main class="mci-main" id="mci-main-content">
       <div class="container px-3 px-sm-4">
         <?php
         // $content is expected to be a safe HTML string produced by templates.
