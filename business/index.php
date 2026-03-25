@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['mci_review_submit'])
         exit;
     }
     if (!$isLoggedIn) {
-        header('Location: /login/?return=' . rawurlencode('/business/' . $targetSlug . '/#reviews'));
+        header('Location: /login/?return=' . rawurlencode('/business/' . $targetSlug . '/#section-reviews'));
         exit;
     }
     $rating = (int) ($_POST['rating'] ?? 0);
@@ -41,10 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['mci_review_submit'])
     }
     if ($result['ok']) {
         $param = $isUpdate ? 'review_updated=1' : 'review_ok=1';
-        header('Location: /business/' . rawurlencode($targetSlug) . '/?' . $param . '#reviews');
+        header('Location: /business/' . rawurlencode($targetSlug) . '/?' . $param . '#section-reviews');
     } else {
         $err = $result['error'] ?? 'Something went wrong.';
-        header('Location: /business/' . rawurlencode($targetSlug) . '/?review_err=' . rawurlencode($err) . '#reviews');
+        header('Location: /business/' . rawurlencode($targetSlug) . '/?review_err=' . rawurlencode($err) . '#section-reviews');
     }
     exit;
 }
@@ -160,7 +160,8 @@ $listing = [
     'about'    => array_filter([
                       (string)($dbBiz['description'] ?? ''),
                   ]),
-    'services' => array_merge($serviceNames, $productNames),
+    'services' => $serviceNames,
+    'products' => $productNames,
     'tags'     => $tagNames,
     'faqs'     => $listingFaqs,
     'social_links' => $socialLinks,
@@ -594,7 +595,7 @@ ob_start();
 
         <div class="card mci-business-card border-0 bg-white mb-4">
           <div class="card-body">
-            <div class="mci-business-section-title mb-3">
+            <div id="section-about" class="mci-business-section-title mb-3">
               <i class="bi bi-info-circle-fill" aria-hidden="true"></i>
               About
             </div>
@@ -604,36 +605,33 @@ ob_start();
               <?php endforeach; ?>
             </div>
 
-            <div class="mci-business-section-title mt-4 mb-3">
+            <div id="section-services" class="mci-business-section-title mt-4 mb-3">
               <i class="bi bi-stars" aria-hidden="true"></i>
-              Services &amp; highlights
+              Services
             </div>
-            <div class="d-flex flex-wrap gap-2">
-              <?php foreach ($listing['services'] as $svc): ?>
-                <span class="mci-business-chip"><?= htmlspecialchars($svc) ?></span>
-              <?php endforeach; ?>
-            </div>
+            <?php if (!empty($listing['services'])): ?>
+              <div class="d-flex flex-wrap gap-2">
+                <?php foreach ($listing['services'] as $svc): ?>
+                  <span class="mci-business-chip"><?= htmlspecialchars($svc) ?></span>
+                <?php endforeach; ?>
+              </div>
+            <?php else: ?>
+              <p class="mci-business-empty-state">No services listed yet.</p>
+            <?php endif; ?>
 
-            <div class="mci-business-section-title mt-4 mb-3">
-              <i class="bi bi-clock-fill" aria-hidden="true"></i>
-              Business hours <span class="text-muted fw-normal fs-6">(demo)</span>
+            <div id="section-products" class="mci-business-section-title mt-4 mb-3">
+              <i class="bi bi-box-seam" aria-hidden="true"></i>
+              Products
             </div>
-            <div class="mci-business-hours-wrap">
-              <table class="table table-sm table-bordered align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th>Day</th>
-                    <th>Morning</th>
-                    <th>Evening</th>
-                  </tr>
-                </thead>
-                <tbody class="small">
-                  <tr><td class="fw-semibold">Mon – Fri</td><td>9:00 – 13:00</td><td>15:00 – 19:30</td></tr>
-                  <tr><td class="fw-semibold">Saturday</td><td>10:00 – 16:00</td><td>—</td></tr>
-                  <tr><td class="fw-semibold">Sunday</td><td colspan="2" class="text-muted">Closed (demo)</td></tr>
-                </tbody>
-              </table>
-            </div>
+            <?php if (!empty($listing['products'])): ?>
+              <div class="d-flex flex-wrap gap-2">
+                <?php foreach ($listing['products'] as $prd): ?>
+                  <span class="mci-business-chip"><?= htmlspecialchars($prd) ?></span>
+                <?php endforeach; ?>
+              </div>
+            <?php else: ?>
+              <p class="mci-business-empty-state">No products listed yet.</p>
+            <?php endif; ?>
 
             <?php if (!empty($galleryImages)): ?>
             <div class="mci-business-section-title mt-4 mb-3">
@@ -666,7 +664,7 @@ ob_start();
             </div>
 
             <?php if (count($listingFaqs) > 0): ?>
-            <div class="mci-business-section-title mt-4 mb-3">
+            <div id="section-faq" class="mci-business-section-title mt-4 mb-3">
               <i class="bi bi-question-circle-fill" aria-hidden="true"></i>
               Frequently asked questions
             </div>
@@ -718,7 +716,7 @@ ob_start();
         </div>
 
         <?php if ($slug !== ''): ?>
-        <div class="card mci-business-card border-0 bg-white mb-4" id="reviews">
+        <div class="card mci-business-card border-0 bg-white mb-4" id="section-reviews">
           <div class="card-body">
             <div class="mci-business-section-title mb-2">
               <i class="bi bi-chat-heart-fill" aria-hidden="true"></i>
@@ -834,15 +832,15 @@ ob_start();
                 </div>
                 <div class="d-flex flex-wrap align-items-center gap-3">
                   <button type="submit" name="<?= $submitName ?>" value="1" class="btn btn-dark"><?= htmlspecialchars($submitBtn) ?></button>
-                  <a class="small text-muted" href="/logout/?return=<?= rawurlencode('/business/' . $slug . '/#reviews') ?>">Sign out</a>
+                  <a class="small text-muted" href="/logout/?return=<?= rawurlencode('/business/' . $slug . '/#section-reviews') ?>">Sign out</a>
                 </div>
               </form>
             <?php else: ?>
               <div class="border rounded-3 p-4 text-center" style="background: linear-gradient(180deg, #f8fafc 0%, #fff 100%); border-color: var(--mci-border) !important;">
                 <div class="fw-bold mb-2">Sign in to rate &amp; review</div>
                 <p class="text-muted small mb-3 mb-md-4">General users can rate any business. Reviews stay anonymous on the listing.</p>
-                <a class="btn btn-dark me-2" href="/login/?return=<?= rawurlencode('/business/' . $slug . '/#reviews') ?>">Login</a>
-                <a class="btn btn-outline-dark" href="/register/?return=<?= rawurlencode('/business/' . $slug . '/#reviews') ?>">Register</a>
+                <a class="btn btn-dark me-2" href="/login/?return=<?= rawurlencode('/business/' . $slug . '/#section-reviews') ?>">Login</a>
+                <a class="btn btn-outline-dark" href="/register/?return=<?= rawurlencode('/business/' . $slug . '/#section-reviews') ?>">Register</a>
               </div>
             <?php endif; ?>
           </div>
