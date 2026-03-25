@@ -642,3 +642,64 @@
   color: var(--mci-color-primary-deep, #6d28d9);
   border-bottom-color: var(--mci-color-primary-dark, #7c3aed);
 }
+
+/* ——— Collapsible business hours widget (sidebar) ——— */
+.mci-biz-hours {
+  border-bottom: 1.5px solid var(--mci-border, #e2e8f0);
+}
+
+.mci-biz-hours__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.85rem 1.15rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: var(--mci-text-sm, 0.875rem);
+  color: var(--mci-body-color, #0f172a);
+  transition: background 0.15s ease;
+}
+
+.mci-biz-hours__toggle:hover {
+  background: var(--mci-color-primary-soft, #f5f3ff);
+}
+
+.mci-biz-hours__chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+  font-size: var(--mci-text-sm, 0.875rem);
+  color: var(--mci-muted, #64748b);
+}
+
+.mci-biz-hours__toggle[aria-expanded="true"] .mci-biz-hours__chevron {
+  transform: rotate(180deg);
+}
+
+.mci-biz-hours__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-size: var(--mci-text-micro, 0.68rem);
+  font-weight: var(--mci-weight-extrabold, 800);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.mci-biz-hours__status--open {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.mci-biz-hours__status--closed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.mci-biz-hours__body {
+  padding: 0.25rem 1.15rem 0.85rem;
+}

@@ -440,6 +440,29 @@ $defaultListing = [
   ],
 ];
 
+// ── Business hours open/closed status ────────────────────────────────────────
+// Demo data — replace with $dbBiz['hours'] when available
+$demoHoursRows = [
+    ['day' => 'Mon – Fri', 'morning' => '9:00 – 13:00', 'evening' => '15:00 – 19:30'],
+    ['day' => 'Saturday',  'morning' => '10:00 – 16:00', 'evening' => '—'],
+    ['day' => 'Sunday',    'morning' => '—',             'evening' => '—', 'closed' => true],
+];
+// Simple open/closed check: Mon-Fri open 9-13 and 15-19:30, Sat 10-16
+$bizNow       = new DateTimeImmutable('now');
+$bizDow       = (int) $bizNow->format('N'); // 1=Mon … 7=Sun
+$bizHour      = (int) $bizNow->format('G');
+$bizMin       = (int) $bizNow->format('i');
+$bizTimeVal   = $bizHour * 60 + $bizMin;
+$bizIsOpen    = false;
+if ($bizDow >= 1 && $bizDow <= 5) {
+    $bizIsOpen = ($bizTimeVal >= 540 && $bizTimeVal < 780)
+              || ($bizTimeVal >= 900 && $bizTimeVal < 1170);
+} elseif ($bizDow === 6) {
+    $bizIsOpen = ($bizTimeVal >= 600 && $bizTimeVal < 960);
+}
+$bizStatusLabel = $bizIsOpen ? 'Open now' : 'Closed';
+$bizStatusClass = $bizIsOpen ? 'mci-biz-hours__status--open' : 'mci-biz-hours__status--closed';
+
 $extraHead = <<<'HTML'
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 <link rel="stylesheet" href="/assets/css/business.css" />
@@ -522,6 +545,22 @@ $extraJS = <<<'HTML'
 
   sections.forEach(function (s) { observer.observe(s); });
   setActive(sections[0].id); // default first tab active
+}());
+</script>
+<script>
+(function () {
+  var btn = document.querySelector('.mci-biz-hours__toggle');
+  var body = document.getElementById('mciBizHoursBody');
+  if (!btn || !body) return;
+  btn.addEventListener('click', function () {
+    var expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    if (expanded) {
+      body.setAttribute('hidden', '');
+    } else {
+      body.removeAttribute('hidden');
+    }
+  });
 }());
 </script>
 HTML;
@@ -899,6 +938,41 @@ ob_start();
       <!-- Right panel: map + all contact details -->
       <div class="col-12 col-lg-4 mci-business-sidebar-sticky">
         <div class="card mci-business-side-card border-0 bg-white mb-4">
+          <!-- Business hours: collapsed by default -->
+          <div class="mci-biz-hours" id="mciBizHours">
+            <button
+              type="button"
+              class="mci-biz-hours__toggle"
+              aria-expanded="false"
+              aria-controls="mciBizHoursBody"
+            >
+              <span class="d-flex align-items-center gap-2 min-w-0">
+                <i class="bi bi-clock" aria-hidden="true"></i>
+                <span class="fw-semibold">Business Hours</span>
+                <span class="mci-biz-hours__status <?= $bizStatusClass ?>">
+                  <?= htmlspecialchars($bizStatusLabel) ?>
+                </span>
+              </span>
+              <i class="bi bi-chevron-down mci-biz-hours__chevron" aria-hidden="true"></i>
+            </button>
+            <div class="mci-biz-hours__body" id="mciBizHoursBody" hidden>
+              <table class="table table-sm table-borderless align-middle mb-0">
+                <tbody class="small">
+                  <?php foreach ($demoHoursRows as $hr): ?>
+                    <tr>
+                      <td class="fw-semibold ps-0"><?= htmlspecialchars($hr['day']) ?></td>
+                      <?php if (!empty($hr['closed'])): ?>
+                        <td colspan="2" class="text-muted">Closed</td>
+                      <?php else: ?>
+                        <td><?= htmlspecialchars($hr['morning']) ?></td>
+                        <td><?= htmlspecialchars($hr['evening']) ?></td>
+                      <?php endif; ?>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          </div>
           <div class="mci-business-map-wrap">
             <div class="mci-business-map-actions">
               <a class="btn btn-dark btn-sm" href="<?= htmlspecialchars($directionsUrl) ?>" target="_blank" rel="noopener noreferrer">
