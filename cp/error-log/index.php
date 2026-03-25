@@ -130,7 +130,7 @@ ob_start();
         $isActive = $levelFilter === $fKey;
       ?>
         <a href="?level=<?= urlencode($fKey) ?>"
-           class="btn btn-sm <?= $isActive ? 'btn-dark' : 'btn-outline-secondary' ?> d-flex align-items-center gap-1">
+           class="btn btn-sm <?= $isActive ? 'btn-secondary' : 'btn-outline-secondary' ?> d-flex align-items-center gap-1">
           <?= htmlspecialchars($filterLabels[$fKey]) ?>
           <?php if ($fCnt > 0): ?>
             <span class="badge rounded-pill <?= $isActive ? 'bg-white text-dark' : 'text-bg-secondary' ?>"><?= $fCnt ?></span>
