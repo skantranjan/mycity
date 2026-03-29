@@ -1148,6 +1148,9 @@ if ($method === 'PATCH' && ($segments[0] ?? '') === 'businesses' && ($segments[2
     require_once __DIR__ . '/lib/business_service.php';
 
     $groupId = (string)$segments[1];
+    if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $groupId)) {
+        api_error('not_found', 404);
+    }
     $data    = api_request_data();
 
     // Optional auth — nil UUID for anonymous
