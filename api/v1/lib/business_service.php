@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/uuid.php';
 require_once __DIR__ . '/business_helpers.php';
 require_once __DIR__ . '/auth_direct.php';
+require_once __DIR__ . '/location_service.php';
 
 // ---------------------------------------------------------------------------
 // Create
@@ -100,6 +101,8 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
     // -----------------------------------------------------------------------
     // 7) Transaction
     // -----------------------------------------------------------------------
+    $branchState   = '';
+    $branchCountry = 'India';
     $pdo->beginTransaction();
     try {
         // --- mci_business_groups ---
@@ -163,29 +166,37 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
         }
 
         // --- mci_business_branches ---
+        $branchState   = mb_substr(trim((string)($branch['state']   ?? '')), 0, 100) ?: '';
+        $branchCountry = mb_substr(trim((string)($branch['country'] ?? 'India')), 0, 100);
+        if ($branchCountry === '') { $branchCountry = 'India'; }
+
         $pdo->prepare('
             INSERT INTO mci_business_branches
-              (id, business_group_id, slug, full_address, city,
-               latitude, longitude,
-               phone, whatsapp, email_contact, website,
+              (id, business_group_id, slug, address_line1, address_line2, city, state, country,
+               pincode, latitude, longitude,
+               phone_primary, phone_secondary, whatsapp_number, website,
                status, created_by_user_id)
             VALUES
-              (?, ?, ?, ?, ?,
-               ?, ?,
+              (?, ?, ?, ?, ?, ?, ?, ?,
+               ?, ?, ?,
                ?, ?, ?, ?,
                \'active\', ?)
         ')->execute([
             $branchId,
             $groupId,
             $branchSlug,
-            trim((string)($branch['full_address'] ?? '')) ?: null,
+            trim((string)($branch['full_address']    ?? '')) ?: '',     // address_line1 is NOT NULL; empty string is safe
+            trim((string)($branch['address_line2']   ?? '')) ?: null,
             $city !== '' ? $city : null,
-            trim((string)($branch['latitude'] ?? ''))  ?: null,
-            trim((string)($branch['longitude'] ?? '')) ?: null,
-            trim((string)($branch['phone'] ?? ''))          ?: null,
-            trim((string)($branch['whatsapp'] ?? ''))       ?: null,
-            trim((string)($branch['email_contact'] ?? ''))  ?: null,
-            trim((string)($branch['website'] ?? ''))        ?: null,
+            $branchState  !== '' ? $branchState  : null,
+            $branchCountry,
+            trim((string)($branch['pincode']         ?? '')) ?: null,
+            trim((string)($branch['latitude']        ?? '')) ?: null,
+            trim((string)($branch['longitude']       ?? '')) ?: null,
+            trim((string)($branch['phone']           ?? '')) ?: null,  // JS sends as 'phone'; maps to phone_primary
+            trim((string)($branch['phone_secondary'] ?? '')) ?: null,
+            trim((string)($branch['whatsapp']        ?? '')) ?: null,  // JS sends as 'whatsapp'; maps to whatsapp_number
+            trim((string)($branch['website']         ?? '')) ?: null,
             $actorId,
         ]);
 
@@ -359,6 +370,11 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
         error_log('api_business_create error: ' . $e->getMessage());
         return ['ok' => false, 'error' => 'server_error', 'status' => 500];
     }
+
+    // Sync to mci_locations — outside transaction; failure must never block listing
+    try {
+        api_locations_upsert($pdo, $branchCountry, $branchState, $city);
+    } catch (Throwable $ignored) {}
 
     $result = [
         'ok'        => true,

@@ -621,6 +621,113 @@ $(function () {
     fileInput.addEventListener('change', function () { uploadGalleryFiles(fileInput.files); });
   }
 
+  // ── Location cascade: country → state ────────────────────────────
+  var _mciCountryOptions = []; // cache from API
+
+  function mciLoadCountries() {
+    fetch('/api/v1/locations/countries')
+      .then(function (r) { return r.ok ? r.json() : { countries: [] }; })
+      .then(function (data) {
+        _mciCountryOptions = data.countries || [];
+        $('.mci-country-select').each(function () {
+          mciPopulateCountrySelect($(this));
+        });
+      })
+      .catch(function () { /* silent — user can type */ });
+  }
+
+  function mciPopulateCountrySelect($sel) {
+    var current = $sel.val() || 'India';
+    $sel.empty().append('<option value="">Select country</option>');
+    _mciCountryOptions.forEach(function (c) {
+      $sel.append($('<option>').val(c).text(c));
+    });
+    $sel.append('<option value="other">Other (type below)</option>');
+    if (current) { $sel.val(current); }
+  }
+
+  function mciLoadStates($branchBlock, country) {
+    var $stateSel = $branchBlock.find('.mci-state-select');
+    $stateSel.empty().append('<option value="">Loading\u2026</option>');
+    fetch('/api/v1/locations/states?country=' + encodeURIComponent(country))
+      .then(function (r) { return r.ok ? r.json() : { states: [] }; })
+      .then(function (data) {
+        var states = data.states || [];
+        $stateSel.empty().append('<option value="">Select or type below</option>');
+        states.forEach(function (s) {
+          $stateSel.append($('<option>').val(s).text(s));
+        });
+        $stateSel.append('<option value="other">Other (type below)</option>');
+      })
+      .catch(function () {
+        $stateSel.empty().append('<option value="">Select or type below</option>');
+      });
+  }
+
+  /**
+   * Merge country_other / state_select values into the canonical country[] / state[]
+   * hidden inputs before buildPayload() reads them.
+   */
+  function mciSyncLocationFields() {
+    $('#branchList .mci-branch-block').each(function () {
+      var $b = $(this);
+
+      // Country
+      var $countrySel    = $b.find('.mci-country-select');
+      var $countryOther  = $b.find('input[name="country_other[]"]');
+      var $countryHidden = $b.find('input[name="country[]"]');
+      var countryVal = $countrySel.val();
+      if (countryVal === 'other' || countryVal === '') {
+        var typed = $countryOther.val().trim();
+        $countryHidden.val(typed !== '' ? typed : 'India');
+      } else {
+        $countryHidden.val(countryVal || 'India');
+      }
+
+      // State
+      var $stateSel   = $b.find('.mci-state-select');
+      var $stateInput = $b.find('input[name="state[]"]');
+      var stateSelVal = $stateSel.val();
+      if (stateSelVal && stateSelVal !== 'other') {
+        $stateInput.val(stateSelVal);
+      }
+      // If "other" or empty, leave $stateInput as whatever the user typed
+    });
+  }
+
+  // Wire country→state cascade on country select change
+  $(document).on('change', '.mci-country-select', function () {
+    var $sel = $(this);
+    var $block = $sel.closest('.mci-branch-block');
+    var $countryOther = $block.find('input[name="country_other[]"]');
+    var val = $sel.val();
+
+    if (val === 'other') {
+      $countryOther.removeClass('d-none');
+      $block.find('.mci-state-select').empty()
+        .append('<option value="">Select or type below</option>');
+    } else {
+      $countryOther.addClass('d-none').val('');
+      if (val) { mciLoadStates($block, val); }
+    }
+  });
+
+  // Wire state select → state text input sync
+  $(document).on('change', '.mci-state-select', function () {
+    var $sel = $(this);
+    var $block = $sel.closest('.mci-branch-block');
+    var $stateInput = $block.find('input[name="state[]"]');
+    var val = $sel.val();
+    if (val && val !== 'other') {
+      $stateInput.val(val);
+    } else if (val === 'other') {
+      $stateInput.val('').focus();
+    }
+  });
+
+  // Load countries on page load
+  mciLoadCountries();
+
   // ── Multi-branch: add / remove ────────────────────────────────────
   var branchTmpl = document.getElementById('branchTemplate');
   $('#addBranchBtn').on('click', function () {
@@ -630,6 +737,11 @@ $(function () {
     clone.setAttribute('data-branch-index', idx);
     clone.innerHTML = clone.innerHTML.replace(/__INDEX__/g, idx).replace(/__NUM__/g, idx + 1);
     $('#branchList').append(clone);
+    // Wire up country/state cascade for the new branch
+    var $newBlock = $('#branchList .mci-branch-block').last();
+    if (_mciCountryOptions.length > 0) {
+      mciPopulateCountrySelect($newBlock.find('.mci-country-select'));
+    }
   });
   $(document).on('click', '.mci-remove-branch-btn', function () {
     $(this).closest('.mci-branch-block').remove();
@@ -687,6 +799,7 @@ $(function () {
 
   // ── Build submit payload ──────────────────────────────────────────
   function buildPayload() {
+    mciSyncLocationFields();
     var products = [];
     $('#productItems .mci-item-row').each(function () {
       var name = $(this).find('input[name="product_name[]"]').val().trim();
@@ -742,6 +855,7 @@ $(function () {
         address_line2:   $b.find('input[name="address_line2[]"]').val().trim(),
         city:            $b.find('input[name="city[]"]').val().trim(),
         state:           $b.find('input[name="state[]"]').val().trim(),
+        country:         $b.find('input[name="country[]"]').val().trim() || 'India',
         pincode:         $b.find('input[name="pincode[]"]').val().trim(),
         latitude:        $b.find('input[name="latitude[]"]').val().trim(),
         longitude:       $b.find('input[name="longitude[]"]').val().trim(),

@@ -1327,6 +1327,38 @@ if (($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'url-import') {
 }
 
 // =============================================================================
+// Locations — public lookup endpoints (no auth)
+// GET  /api/v1/locations/countries
+// GET  /api/v1/locations/states?country=India
+// =============================================================================
+
+if ($method === 'GET' && ($segments[0] ?? '') === 'locations' && ($segments[1] ?? '') === 'countries') {
+    require_once __DIR__ . '/lib/location_service.php';
+    $pdo = api_db();
+    $rows = $pdo->query(
+        "SELECT DISTINCT country FROM mci_locations ORDER BY country"
+    )->fetchAll(PDO::FETCH_COLUMN);
+    api_json(['ok' => true, 'countries' => array_values($rows)]);
+}
+
+if ($method === 'GET' && ($segments[0] ?? '') === 'locations' && ($segments[1] ?? '') === 'states') {
+    require_once __DIR__ . '/lib/location_service.php';
+    $country = mb_substr(trim((string)($_GET['country'] ?? '')), 0, 100);
+    if ($country === '') {
+        api_json(['ok' => true, 'states' => []]);
+    }
+    $pdo  = api_db();
+    $stmt = $pdo->prepare(
+        "SELECT DISTINCT state FROM mci_locations
+         WHERE country = ? AND state != ''
+         ORDER BY state"
+    );
+    $stmt->execute([$country]);
+    $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    api_json(['ok' => true, 'states' => array_values($rows)]);
+}
+
+// =============================================================================
 // 404 fallthrough
 // =============================================================================
 http_response_code(404);

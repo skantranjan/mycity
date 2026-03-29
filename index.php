@@ -290,14 +290,19 @@ ob_start();
 <?php
 // ── Site index accordion — built from DB category tree ─────────────────────
 
-$siteIndexLocations = [
-  'India'         => ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Chennai', 'Kolkata', 'Pune', 'Ahmedabad', 'Jaipur', 'Lucknow', 'Bhopal', 'Patna', 'Surat', 'Indore', 'Nagpur', 'Vadodara', 'Agra', 'Varanasi', 'Guwahati', 'Chandigarh'],
-  'UK'            => ['London', 'Manchester', 'Birmingham', 'Leeds', 'Sheffield', 'Bristol', 'Liverpool', 'Glasgow', 'Edinburgh', 'Chester', 'Cardiff', 'Leicester', 'Nottingham', 'Southampton', 'Oxford', 'Cambridge', 'Bath', 'York', 'Brighton', 'Newcastle'],
-  'Australia'     => ['Sydney', 'Melbourne', 'Brisbane', 'Perth', 'Adelaide', 'Gold Coast', 'Canberra', 'Darwin', 'Hobart', 'Newcastle NSW', 'Wollongong', 'Geelong', 'Townsville', 'Cairns', 'Toowoomba', 'Ballarat', 'Bendigo', 'Albury', 'Launceston', 'Mackay'],
-  'Canada'        => ['Toronto', 'Vancouver', 'Montreal', 'Calgary', 'Ottawa', 'Edmonton', 'Winnipeg', 'Quebec City', 'Hamilton', 'Kitchener', 'London ON', 'Halifax', 'Victoria BC', 'Saskatoon', 'Regina', 'Windsor', 'Oshawa', 'Barrie', 'Kelowna', 'Abbotsford'],
-  'USA'           => ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia', 'San Antonio', 'San Diego', 'Dallas', 'Austin', 'San Jose', 'Jacksonville', 'Fort Worth', 'Columbus', 'Charlotte', 'Indianapolis', 'Seattle', 'Denver', 'Boston', 'Miami'],
-  'Asia Pacific'  => ['Singapore', 'Hong Kong', 'Kuala Lumpur', 'Bangkok', 'Jakarta', 'Manila', 'Tokyo', 'Seoul', 'Shanghai', 'Beijing', 'Dubai', 'Abu Dhabi', 'Doha', 'Colombo', 'Dhaka', 'Kathmandu', 'Karachi', 'Lahore', 'Nairobi', 'Cape Town'],
-];
+$siteIndexLocations = [];
+try {
+    if ($pdo instanceof PDO) {
+        $locRows = $pdo->query(
+            "SELECT country, state, city FROM mci_locations ORDER BY country, state, city"
+        )->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($locRows as $locRow) {
+            $siteIndexLocations[$locRow['country']][$locRow['state']][] = $locRow['city'];
+        }
+    }
+} catch (Throwable $ignored) {
+    // Graceful degradation — accordion renders with no locations
+}
 ?>
 
 <div class="container px-3 px-sm-4 py-4 py-md-5" id="mciSiteIndex">
@@ -381,28 +386,46 @@ $siteIndexLocations = [
           <i class="bi bi-geo-alt me-2" aria-hidden="true"></i>
           Browse by city &amp; location
           <span class="ms-2 badge text-bg-secondary fw-normal" style="font-size:var(--mci-text-micro)">
-            <?= array_sum(array_map('count', $siteIndexLocations)) ?> cities
+            <?php
+            $totalCityCount = 0;
+            foreach ($siteIndexLocations as $_states) {
+                foreach ($_states as $_cities) {
+                    $totalCityCount += count($_cities);
+                }
+            }
+            ?>
+            <?= $totalCityCount ?> cities
           </span>
         </button>
       </h2>
       <div id="mciSiteIndexLocBody" class="accordion-collapse collapse" aria-labelledby="mciSiteIndexLocHead" data-bs-parent="#mciSiteIndexAccordion">
         <div class="accordion-body pt-3 pb-4 px-3 px-md-4">
-          <?php foreach ($siteIndexLocations as $region => $cities): ?>
-            <div class="mb-3">
-              <div class="fw-semibold small mb-2 text-uppercase" style="font-size:var(--mci-text-micro);letter-spacing:0.08em;color:var(--mci-color-primary-deep);">
-                <?= htmlspecialchars($region) ?>
-              </div>
-              <div class="d-flex flex-wrap gap-2">
-                <?php foreach ($cities as $city):
-                  $citySlug = strtolower(trim(preg_replace('/[^a-z0-9]+/', '-', $city) ?? '', '-'));
-                ?>
-                  <a href="/business-listing/?where=<?= urlencode($city) ?>" class="mci-site-index-tag">
-                    <?= htmlspecialchars($city) ?>
-                  </a>
+          <?php if (empty($siteIndexLocations)): ?>
+            <p class="text-muted small mb-0">No locations yet — they'll appear here as listings are added.</p>
+          <?php else: ?>
+            <?php foreach ($siteIndexLocations as $country => $stateMap): ?>
+              <div class="mb-4">
+                <div class="fw-semibold small mb-2 text-uppercase"
+                     style="font-size:var(--mci-text-micro);letter-spacing:0.08em;color:var(--mci-color-primary-deep);">
+                  <?= htmlspecialchars($country) ?>
+                </div>
+                <?php foreach ($stateMap as $state => $cities): ?>
+                  <?php if ($state !== ''): ?>
+                    <div class="text-muted mb-1 mt-2" style="font-size:var(--mci-text-xs);">
+                      <?= htmlspecialchars($state) ?>
+                    </div>
+                  <?php endif; ?>
+                  <div class="d-flex flex-wrap gap-2 mb-2">
+                    <?php foreach ($cities as $city): ?>
+                      <a href="/business-listing/?where=<?= urlencode($city) ?>" class="mci-site-index-tag">
+                        <?= htmlspecialchars($city) ?>
+                      </a>
+                    <?php endforeach; ?>
+                  </div>
                 <?php endforeach; ?>
               </div>
-            </div>
-          <?php endforeach; ?>
+            <?php endforeach; ?>
+          <?php endif; ?>
         </div>
       </div>
     </div>
