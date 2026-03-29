@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-29
 **Branch:** mci-13
-**Status:** Approved
+**Status:** Ready for Implementation (rev 2 — design complete, code changes pending)
 
 ---
 
@@ -56,16 +56,18 @@ Store empty string instead of NULL, matching the pattern already used for `addre
 $city !== '' ? $city : '',
 ```
 
-### Additional Hardening
+This is the complete fix. City can legitimately be left blank by an anonymous user; we do not block submission on it.
 
-Add a frontend validation check and a backend `city_required` validation error in `api_business_validate_minimum()` if city is empty, so the user gets a meaningful message instead of a generic 500. This is a UX improvement, not strictly required for the fix.
+### NOT NULL Column Audit
 
-Also audit all other `NOT NULL` branch columns to confirm no similar issues exist:
-- `address_line1` — already fixed (previous commit)
-- `city` — fixed by this task
+Confirm no other branch columns have the same issue:
+- `address_line1` — already fixed (previous commit), stores `''`
+- `city` — fixed by this task, stores `''`
 - `country` — has `DEFAULT 'India'`, safe
 - `slug` — generated server-side, safe
-- `status` — hardcoded `'active'`, safe
+- `status` — hardcoded `'active'` in SQL, safe
+
+No schema changes needed.
 
 ---
 
@@ -78,33 +80,38 @@ Image picked → immediately `POST /api/v1/upload/image` → server path stored 
 ### New Behaviour
 
 **During form fill:**
-- Image picked → stored as a `File` object (or cropped canvas `Blob`) in a JS slot map keyed by type: `logo`, `profile`, `banner`, `gallery[n]`, `product[n]`, `service[n]`
-- Preview shown using `URL.createObjectURL(file)` — no server call
-- Hidden path inputs remain empty (no server path yet)
+- Image picked → stored as a `File` object (or cropped canvas `Blob`) in a JS `pendingUploads` Map, keyed by slot. No server call.
+- Preview shown using `URL.createObjectURL(file)`.
+- Hidden path inputs remain empty — no server path yet.
 
 **On Submit:**
-1. Collect all pending `File`/`Blob` entries from the slot map
-2. `POST /api/v1/businesses` → receive `{ groupId, slug, branch_id }`
-3. Upload each pending file sequentially (or in small parallel batches) to `POST /api/v1/upload/image` with `business_id = groupId`
-4. Collect returned paths
-5. `PATCH /api/v1/businesses/{groupId}/images` with all paths
-6. Redirect to success page
+1. `POST /api/v1/businesses` (JSON payload, no image paths) → receive `{ ok, id, slug, branch_id }` — note: field is `id`, not `groupId`
+2. Upload each pending file to `POST /api/v1/upload/image` with `business_id = id` from step 1, collecting returned paths
+3. `PATCH /api/v1/businesses/{id}/images` with all collected paths + product/service row IDs (see Section 4)
+4. Redirect to success page
 
-**Cropper integration:** The cropped canvas blob replaces the raw `File` in the slot map. No change to the cropper UI logic — only the upload trigger moves from "after crop confirm" to "on submit".
+**Cropper integration:** The cropped canvas blob replaces the raw `File` in the slot map. Cropper UI is unchanged — only the upload trigger moves from "after crop confirm" to "on submit".
 
-**Submit button state:** Shows a multi-phase progress indicator:
+**Submit button state:** Multi-phase progress indicator:
 - "Submitting listing…"
 - "Uploading images… (2/5)"
 - "Finalising…"
 
-**Error handling:** If image upload or PATCH fails after business creation, the listing still exists (without images). The error message tells the user their listing was saved but images failed, and they can re-upload later (future feature). This avoids data loss.
+**Error handling:** If image upload or PATCH fails after business creation, the listing still exists (without images). User sees: "Your listing was saved, but some images failed to upload. You can add them later." — then redirect still happens. This avoids listing data loss.
+
+**Partial failure redirect:** Redirect to success page regardless. A `?images_failed=1` query param is appended if the image PATCH step fails, so the success page can show the appropriate notice.
+
+**Page refresh / data loss:** `File` objects in the JS Map are volatile — lost on page refresh or navigation. This is a **known accepted regression** vs the current behaviour (which uploads immediately). To mitigate: add a `window.beforeunload` warning when `pendingUploads.size > 0`, warning the user they have unsaved image selections. Persisting files across page refreshes via IndexedDB is out of scope.
 
 ### Slot Map Structure (JS)
 
 ```js
-// pendingUploads: Map<slotKey, { file: File|Blob, type: string, subtype?: string, index?: number }>
-// slotKey examples: 'logo', 'banner', 'profile', 'gallery_0', 'product_2', 'service_1'
+// pendingUploads: Map<slotKey, { file: File|Blob, type: string, subtype?: string, rowId?: string }>
+// slotKey examples: 'logo', 'banner', 'profile', 'gallery_0', 'product_<uuid>', 'service_<uuid>'
+// rowId: the UUID of the product/service row, obtained from the POST /api/v1/businesses response
 ```
+
+Products and services use `product_<uuid>` / `service_<uuid>` as slot keys so that the PATCH call can match images to the correct DB row by ID (not by sort_order — see Section 4).
 
 ---
 
@@ -122,45 +129,54 @@ Image picked → immediately `POST /api/v1/upload/image` → server path stored 
       gallery/
       services/
       products/
-  logo/          ← existing flat dirs kept for backward compat
+  logo/          ← existing flat dirs, kept for backward compat
   banner/
   gallery/
-  item_image/
+  item_image/    ← existing flat dir for item_image type, kept as-is
   profile/
 ```
+
+**Note on `item_image`:** For the flat-dir backward-compat path (no `business_id`), `type=item_image` continues to resolve to `/storage/uploads/item_image/` unchanged. When `business_id` is provided, the `subtype` param (`'services'` or `'products'`) selects the subfolder. If `subtype` is absent, defaults to `'products'`.
 
 ### Upload Endpoint Changes
 
 **Endpoint:** `POST /api/v1/upload/image` (same URL, extended params)
 
-**New params:**
-- `business_id` (optional) — UUID of the business group. If provided, files go into per-business dirs.
-- `subtype` (optional) — `'services'` or `'products'` when `type=item_image`. Determines subfolder under `businesses/{id}/`.
+**New params (multipart POST form fields):**
+- `business_id` (optional) — UUID v4 of the business group. If provided, triggers per-business dir routing.
+- `subtype` (optional) — `'services'` or `'products'`. Only relevant when `type=item_image` and `business_id` is set.
 
 **Routing logic:**
 ```
-if business_id provided and valid UUID format:
-    dir = /storage/uploads/businesses/{business_id}/{type}/
-    (for item_image: use subtype if provided, else 'products')
+if business_id provided AND matches UUID v4 regex:
+    if type == 'item_image':
+        folder = subtype ∈ ['services','products'] ? subtype : 'products'
+    else:
+        folder = type   (logo / banner / profile / gallery)
+    dir = /storage/uploads/businesses/{business_id}/{folder}/
 else:
-    dir = /storage/uploads/{type}/    ← backward compat
+    dir = /storage/uploads/{type}/    ← backward compat (item_image → item_image/)
 ```
 
 **Security:**
-- `business_id` validated as UUID v4 format (regex) — no DB lookup required
-- File type, size, MIME validation unchanged (2MB limit, jpeg/png/webp/gif only)
-- Filename: UUID v4 + extension (no change)
-- Directory created with `mkdir($dir, 0755, true)` if not exists
+- `business_id` validated against UUID v4 regex: `/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i`
+- No DB lookup on `business_id` at upload time — the business was created seconds earlier in the same submit flow
+- File type, size, MIME validation unchanged (2 MB limit, jpeg/png/webp/gif only)
+- Filename: UUID v4 + extension (no change, no conflicts possible)
+- Directories created on demand: `mkdir($dir, 0755, true)`
+- No schema changes — filesystem only
 
-**Response:** unchanged — `{ ok: true, path: "/storage/uploads/businesses/{id}/{type}/{uuid}.ext" }`
+**Known security trade-off:** Since `business_id` is not verified against the DB at upload time and the PATCH endpoint does not perform ownership verification (anonymous users have no account), a malicious actor who knows a victim's `groupId` (obtainable from public listing pages) could upload a file into that business's directory and then call PATCH to overwrite the victim's images. This is accepted as a low-risk gap for the current anonymous submission MVP. Mitigation (out of scope for this task): return a short-lived one-time `upload_token` from `POST /api/v1/businesses` and require it on both the upload and PATCH calls.
+
+**Response:** unchanged — `{ ok: true, path: "/storage/uploads/businesses/{id}/{folder}/{uuid}.ext" }`
 
 ---
 
 ## Section 4: New API Endpoint — PATCH Business Images
 
-**Endpoint:** `PATCH /api/v1/businesses/{groupId}/images`
+**Endpoint:** `PATCH /api/v1/businesses/{id}/images`
 
-**Auth:** Optional — same as `POST /api/v1/businesses` (anonymous allowed). No ownership check needed at this stage (anonymous users don't have accounts to verify against). Can be tightened later.
+**Auth:** Optional — same as `POST /api/v1/businesses`. Anonymous submissions allowed. No ownership check (see security trade-off note in Section 3).
 
 **Request body:**
 ```json
@@ -173,23 +189,42 @@ else:
     "/storage/uploads/businesses/{id}/gallery/uuid2.jpg"
   ],
   "product_images": [
-    { "index": 0, "path": "/storage/uploads/businesses/{id}/products/uuid.jpg" }
+    { "id": "<product-row-uuid>", "path": "/storage/uploads/businesses/{id}/products/uuid.jpg" }
   ],
   "service_images": [
-    { "index": 0, "path": "/storage/uploads/businesses/{id}/services/uuid.jpg" }
+    { "id": "<service-row-uuid>", "path": "/storage/uploads/businesses/{id}/services/uuid.jpg" }
   ]
 }
 ```
 
+All fields are optional. Only present fields are acted on.
+
+**Why `id` not `sort_order` for products/services:** `sort_order` is not unique in `mci_business_products` / `mci_business_services`. Matching by `id` (UUID) is unambiguous. The `POST /api/v1/businesses` response must be extended to return the created product and service row IDs so the frontend can build the correct PATCH payload.
+
+**Extended `POST /api/v1/businesses` response:**
+```json
+{
+  "ok": true,
+  "id": "<groupId>",
+  "slug": "...",
+  "branch_id": "<branchId>",
+  "product_ids": ["<uuid>", "<uuid>"],
+  "service_ids": ["<uuid>", "<uuid>"]
+}
+```
+IDs are returned in insertion order (matching the `products[]` / `services[]` array order sent in the request).
+
 **DB operations (all in a transaction):**
-1. `UPDATE mci_business_groups SET logo_path=?, profile_path=?, banner_path=? WHERE id=?` — only updates fields that are non-null in the payload
-2. `INSERT INTO mci_business_images (id, business_group_id, image_path, sort_order, ...)` for each gallery path
-3. For each `product_images` entry: `UPDATE mci_business_products SET image_path=? WHERE business_group_id=? AND sort_order=?`
-4. For each `service_images` entry: `UPDATE mci_business_services SET image_path=? WHERE business_group_id=? AND sort_order=?`
+1. If any of `logo_path`, `profile_path`, `banner_path` present: `UPDATE mci_business_groups SET logo_path=?, profile_path=?, banner_path=? WHERE id=?` (only set non-null fields)
+2. For each `gallery_paths` entry: `INSERT INTO mci_business_images (id, business_group_id, file_path, sort_order, uploaded_by_user_id, created_by_user_id) VALUES (...)` — column is `file_path` (not `image_path`). **Note:** the existing gallery INSERT in `api_business_create()` at `business_service.php:325` currently uses `image_path` — this is a latent bug that must also be fixed as part of this task (the DB schema column is `file_path`).
+   - `sort_order` = array index
+   - `uploaded_by_user_id` / `created_by_user_id` = nil UUID for anonymous, actual user ID for authenticated
+3. For each `product_images` entry: `UPDATE mci_business_products SET image_path=? WHERE id=? AND business_group_id=?`
+4. For each `service_images` entry: `UPDATE mci_business_services SET image_path=? WHERE id=? AND business_group_id=?`
+
+**Path validation:** All paths must start with `/storage/uploads/` — reject anything that does not match to prevent path injection.
 
 **Response:** `{ ok: true }`
-
-**Path validation:** All paths must match the pattern `/storage/uploads/...` — reject anything else to prevent path injection.
 
 ---
 
@@ -197,24 +232,26 @@ else:
 
 | File | Change |
 |------|--------|
-| `api/v1/lib/business_service.php` | Fix `city` null → `''`; add `api_business_patch_images()` function |
-| `api/v1/lib/business_helpers.php` | Add `city_required` validation to `api_business_validate_minimum()` |
-| `api/v1/index.php` | Extend upload endpoint for `business_id`/`subtype`; add `PATCH /businesses/{id}/images` route |
-| `assets/js/subscriber-list-business.js` | Refactor image pickers to deferred slot map; update submit flow |
+| `api/v1/lib/business_service.php` | Fix `city` null → `''`; fix latent `image_path` → `file_path` bug in gallery INSERT; add `api_business_patch_images()` function; extend `api_business_create()` response to include `product_ids` and `service_ids` |
+| `api/v1/index.php` | Extend upload endpoint for `business_id`/`subtype` params; add `PATCH /businesses/{id}/images` route |
+| `assets/js/subscriber-list-business.js` | Refactor image pickers to deferred slot map; add `beforeunload` warning; update submit flow to upload after create |
 
 ---
 
 ## Backward Compatibility
 
-- Existing flat-dir uploads (`/storage/uploads/logo/`, etc.) continue to work — paths stored in DB are not changed.
-- Upload endpoint still works without `business_id` — falls back to flat structure.
+- Existing flat-dir uploads (`/storage/uploads/logo/`, etc.) continue to work — DB paths not changed.
+- Upload endpoint without `business_id` falls back to flat structure.
 - No DB schema changes required.
+- No filesystem migration required.
 
 ---
 
 ## Non-Goals / Future Work
 
+- Ownership verification on the PATCH endpoint (upload token mechanism)
 - Re-uploading / replacing images after submission
 - Image CDN / cloud storage
 - Migrating existing flat-dir files to per-business dirs
 - Image compression / resizing server-side
+- Persisting pending image selections across page refreshes (IndexedDB)
