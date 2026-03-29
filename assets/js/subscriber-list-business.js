@@ -450,6 +450,19 @@ $(function () {
   var cropTarget      = null;
   var cropModal       = new bootstrap.Modal(document.getElementById('cropModal'), {});
 
+  // ── Deferred upload slot map ──────────────────────────────────────
+  // Holds File/Blob objects to be uploaded after business creation.
+  // Key: 'logo' | 'banner' | 'profile' | 'gallery_N' | 'product_N' | 'product_<uuid>' | 'service_N' | 'service_<uuid>'
+  // Value: { file: File|Blob, type: string, subtype?: string }
+  var pendingUploads = new Map();
+
+  window.addEventListener('beforeunload', function (e) {
+    if (pendingUploads.size > 0) {
+      e.preventDefault();
+      e.returnValue = 'You have images selected that haven\'t been uploaded yet. Leave anyway?';
+    }
+  });
+
   $(document).on('click', '.mci-img-upload-tile .mci-img-upload-tile__preview, .mci-img-upload-tile .mci-img-upload-btn', function (e) {
     e.stopPropagation();
     $(this).closest('.mci-img-upload-tile').find('.mci-img-file-input').trigger('click');
@@ -494,32 +507,22 @@ $(function () {
     var canvas = cropperInstance.getCroppedCanvas({ width: outW, height: outH, imageSmoothingQuality: 'high' });
     var type = cropTarget.type || 'logo';
 
-    // Upload to API and store returned path
     canvas.toBlob(function (blob) {
-      var fd = new FormData();
-      fd.append('type', type);
-      fd.append('file', blob, type + '.jpg');
-      fetch('/api/v1/upload/image', { method: 'POST', credentials: 'include', body: fd })
-        .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
-        .then(function (data) {
-          if (data.path) {
-            cropTarget.hiddenInput.value = data.path;
-            // Show preview thumbnail
-            var dataUrl = canvas.toDataURL('image/jpeg', 0.88);
-            var $preview = cropTarget.$tile.find('.mci-img-upload-tile__preview').first();
-            $preview.find('.mci-img-upload-tile__placeholder').hide();
-            $preview.find('.mci-img-tile-result').remove();
-            $('<img class="mci-img-tile-result" alt="preview" />').attr('src', dataUrl).appendTo($preview);
-            cropTarget.$tile.addClass('has-image');
-            if (cropTarget.isLogo) {
-              $('#previewPhotoImg').attr('src', dataUrl).removeClass('d-none');
-              $('#previewPhotoPlaceholder').addClass('d-none');
-            }
-          }
-        })
-        .catch(function () {
-          alert('Image upload failed. Please try again.');
-        });
+      // Store in slot map — upload happens at submit time
+      pendingUploads.set(type, { file: blob, type: type });
+
+      // Show local preview (no server call)
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+      var $preview = cropTarget.$tile.find('.mci-img-upload-tile__preview').first();
+      $preview.find('.mci-img-upload-tile__placeholder').hide();
+      $preview.find('.mci-img-tile-result').remove();
+      $('<img class="mci-img-tile-result" alt="preview" />').attr('src', dataUrl).appendTo($preview);
+      cropTarget.$tile.addClass('has-image');
+      cropTarget.hiddenInput.value = '';  // clear any stale server path
+      if (cropTarget.isLogo) {
+        $('#previewPhotoImg').attr('src', dataUrl).removeClass('d-none');
+        $('#previewPhotoPlaceholder').addClass('d-none');
+      }
     }, 'image/jpeg', 0.88);
     cropModal.hide();
   });
@@ -532,23 +535,17 @@ $(function () {
   $(document).on('change', '.mci-item-file-input', function () {
     var file = this.files[0];
     if (!file || !file.type.startsWith('image/')) return;
-    var $row   = $(this).closest('.mci-item-row');
-    var $input = $row.find('input[name$="_image_path[]"]');
-    var $label = $row.find('.mci-item-img-name');
-    var fd = new FormData();
-    fd.append('type', 'item_image');
-    fd.append('file', file);
-    $label.text('Uploading\u2026');
-    fetch('/api/v1/upload/image', { method: 'POST', credentials: 'include', body: fd })
-      .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
-      .then(function (data) {
-        $input.val(data.path || '');
-        $label.text(file.name);
-      })
-      .catch(function () {
-        $label.text('Upload failed');
-        $input.val('');
-      });
+    var $row    = $(this).closest('.mci-item-row');
+    var $input  = $row.find('input[name$="_image_path[]"]');
+    var $label  = $row.find('.mci-item-img-name');
+    var isProduct = $row.closest('#productItems').length > 0;
+    var subtype   = isProduct ? 'products' : 'services';
+    // Key by current DOM index — will be remapped to server UUID after create
+    var domIndex  = $row.closest('#productItems, #serviceItems').find('.mci-item-row').index($row);
+    var slotKey   = (isProduct ? 'product_' : 'service_') + domIndex;
+    pendingUploads.set(slotKey, { file: file, type: 'item_image', subtype: subtype });
+    $input.val('');
+    $label.text(file.name);
     this.value = '';
   });
 
@@ -559,17 +556,20 @@ $(function () {
 
   function uploadGalleryFiles(files) {
     if (!files || !files.length) return;
-    var paths = [];
-    var pending = 0;
+    // Clear any previous gallery slots
+    Array.from(pendingUploads.keys()).filter(function (k) {
+      return k.startsWith('gallery_');
+    }).forEach(function (k) { pendingUploads.delete(k); });
+
     preview.innerHTML = '';
     for (var i = 0; i < Math.min(files.length, 12); i++) {
       (function (f, idx) {
         if (!f.type || !f.type.startsWith('image/')) return;
-        pending++;
-        // Show local preview immediately
+        pendingUploads.set('gallery_' + idx, { file: f, type: 'gallery' });
+        // Show local preview
         var url = URL.createObjectURL(f);
         var wrap = document.createElement('div');
-        wrap.className = 'mci-photo-thumb mci-photo-thumb--uploading';
+        wrap.className = 'mci-photo-thumb';
         var img = document.createElement('img');
         img.src = url; img.alt = f.name;
         wrap.appendChild(img);
@@ -578,26 +578,9 @@ $(function () {
           $('#previewPhotoImg').attr('src', url).attr('alt', f.name).removeClass('d-none');
           $('#previewPhotoPlaceholder').addClass('d-none');
         }
-        var fd = new FormData();
-        fd.append('type', 'gallery');
-        fd.append('file', f);
-        fetch('/api/v1/upload/image', { method: 'POST', credentials: 'include', body: fd })
-          .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
-          .then(function (data) {
-            if (data.path) paths.push(data.path);
-            wrap.classList.remove('mci-photo-thumb--uploading');
-          })
-          .catch(function () {
-            wrap.classList.add('mci-photo-thumb--error');
-          })
-          .finally(function () {
-            pending--;
-            if (pending <= 0) {
-              $('#galleryPathsHidden').val(JSON.stringify(paths));
-            }
-          });
       })(files[i], i);
     }
+    $('#galleryPathsHidden').val('');  // clear hidden field — paths set via PATCH after submit
   }
 
   if (dropArea && fileInput) {
@@ -810,7 +793,7 @@ $(function () {
         price_min:   $(this).find('input[name="product_price_min[]"]').val() || null,
         price_max:   $(this).find('input[name="product_price_max[]"]').val() || null,
         price_unit:  'INR',
-        image_path:  $(this).find('input[name="product_image_path[]"]').val() || ''
+        image_path:  ''   // deferred — set via PATCH after create
       });
     });
 
@@ -824,7 +807,7 @@ $(function () {
         price_min:   $(this).find('input[name="service_price_min[]"]').val() || null,
         price_max:   $(this).find('input[name="service_price_max[]"]').val() || null,
         price_unit:  'INR',
-        image_path:  $(this).find('input[name="service_image_path[]"]').val() || ''
+        image_path:  ''   // deferred — set via PATCH after create
       });
     });
 
@@ -839,9 +822,6 @@ $(function () {
     $('#subcategoryContainer .mci-subcat-check:checked').each(function () {
       subcategoryIds.push(parseInt($(this).val()));
     });
-
-    var galleryPaths = [];
-    try { galleryPaths = JSON.parse($('#galleryPathsHidden').val() || '[]'); } catch (e) {}
 
     var tagIds = mciTagIdsPayload();
 
@@ -897,16 +877,16 @@ $(function () {
         tag_names:        mciTagNamesPayload(),
         price_range:      $('#price_range').val() || '',
         video_url:        $('#video_url').val().trim(),
-        logo_path:        $('input[name="img_logo"]').val()    || '',
-        profile_path:     $('input[name="img_profile"]').val() || '',
-        banner_path:      $('input[name="img_banner"]').val()  || ''
+        logo_path:        '',   // deferred — set via PATCH after create
+        profile_path:     '',   // deferred — set via PATCH after create
+        banner_path:      ''    // deferred — set via PATCH after create
       },
       branch:   primaryBranch,
       branches: branches,
       products:      products,
       services:      services,
       faqs:          faqs,
-      gallery_paths: galleryPaths
+      gallery_paths: []   // deferred — set via PATCH after create
     };
 
     // Guest with account
@@ -926,33 +906,170 @@ $(function () {
   $('#mciSubmitForm').on('submit', function (e) {
     e.preventDefault();
 
-    var $btn = $('#submitBtn');
-    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Submitting\u2026');
+    var $btn     = $('#submitBtn');
+    var btnLabel = '<i class="bi bi-check2-circle me-2" aria-hidden="true"></i>' + (window._mciSubmitBtnText || 'Submit');
 
+    function setPhase(msg) {
+      $btn.prop('disabled', true).html(
+        '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>' + msg
+      );
+    }
+    function resetBtn() {
+      $btn.prop('disabled', false).html(btnLabel);
+    }
+
+    setPhase('Submitting\u2026');
     var payload = buildPayload();
 
+    // ── Phase 1: Create business ─────────────────────────────────────
     fetch('/api/v1/businesses', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
-      .then(function (res) {
-        if (!res.ok || !res.data.ok) {
-          var msg = (res.data && res.data.error) ? res.data.error : 'Submission failed. Please try again.';
-          alert(msg);
-          $btn.prop('disabled', false).html('<i class="bi bi-check2-circle me-2" aria-hidden="true"></i>' + (window._mciSubmitBtnText || 'Submit'));
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+    .then(function (res) {
+      if (!res.ok || !res.data.ok) {
+        var msg = (res.data && res.data.error) ? res.data.error : 'Submission failed. Please try again.';
+        alert(msg);
+        resetBtn();
+        return;
+      }
+
+      var groupId    = res.data.id;
+      var productIds = res.data.product_ids || [];   // insertion-order UUIDs
+      var serviceIds = res.data.service_ids || [];
+
+      try { localStorage.removeItem('mci_listing_preview'); } catch (e2) {}
+
+      // ── Remap temp product/service keys → server UUIDs ───────────────
+      // Products: collect slot keys in Map insertion order (matches DOM order)
+      var productKeys = Array.from(pendingUploads.keys()).filter(function (k) {
+        return /^product_\d+$/.test(k);
+      });
+      productKeys.forEach(function (tempKey, idx) {
+        var realId = productIds[idx];
+        if (!realId) return;
+        var val = pendingUploads.get(tempKey);
+        pendingUploads.delete(tempKey);
+        pendingUploads.set('product_' + realId, val);
+      });
+
+      var serviceKeys = Array.from(pendingUploads.keys()).filter(function (k) {
+        return /^service_\d+$/.test(k);
+      });
+      serviceKeys.forEach(function (tempKey, idx) {
+        var realId = serviceIds[idx];
+        if (!realId) return;
+        var val = pendingUploads.get(tempKey);
+        pendingUploads.delete(tempKey);
+        pendingUploads.set('service_' + realId, val);
+      });
+
+      // ── Phase 2: Upload pending images ───────────────────────────────
+      var uploadEntries = Array.from(pendingUploads.entries());
+      var total = uploadEntries.length;
+
+      if (total === 0) {
+        pendingUploads.clear();
+        window.location.href = submitRedirect;
+        return;
+      }
+
+      var uploaded = 0;
+      var collectedPaths = {};  // slotKey → server path
+
+      function uploadNext(idx) {
+        if (idx >= uploadEntries.length) {
+          doPatch(collectedPaths);
           return;
         }
-        // If account was created, cookie is already set by API response header.
-        // Clear localStorage draft
-        try { localStorage.removeItem('mci_listing_preview'); } catch (e2) {}
-        window.location.href = submitRedirect;
-      })
-      .catch(function () {
-        alert('Network error. Please check your connection and try again.');
-        $btn.prop('disabled', false).html('<i class="bi bi-check2-circle me-2" aria-hidden="true"></i>' + (window._mciSubmitBtnText || 'Submit'));
-      });
+        var slotKey = uploadEntries[idx][0];
+        var entry   = uploadEntries[idx][1];
+        setPhase('Uploading images\u2026 (' + (uploaded + 1) + '/' + total + ')');
+
+        var fd = new FormData();
+        fd.append('type', entry.type);
+        fd.append('business_id', groupId);
+        if (entry.subtype) fd.append('subtype', entry.subtype);
+        fd.append('file', entry.file, slotKey + '.jpg');
+
+        fetch('/api/v1/upload/image', { method: 'POST', credentials: 'include', body: fd })
+          .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+          .then(function (data) {
+            if (data.path) collectedPaths[slotKey] = data.path;
+            uploaded++;
+            uploadNext(idx + 1);
+          })
+          .catch(function () {
+            // Non-fatal: skip failed upload, continue with rest
+            uploaded++;
+            uploadNext(idx + 1);
+          });
+      }
+
+      uploadNext(0);
+
+      // ── Phase 3: PATCH image paths ───────────────────────────────────
+      function doPatch(paths) {
+        setPhase('Finalising\u2026');
+
+        var patchBody = {};
+        var galleryPaths   = [];
+        var productImages  = [];
+        var serviceImages  = [];
+
+        Object.keys(paths).forEach(function (key) {
+          var p = paths[key];
+          if (key === 'logo')              { patchBody.logo_path    = p; }
+          else if (key === 'banner')       { patchBody.banner_path  = p; }
+          else if (key === 'profile')      { patchBody.profile_path = p; }
+          else if (key.startsWith('gallery_')) { galleryPaths.push(p); }
+          else if (key.startsWith('product_')) {
+            productImages.push({ id: key.replace('product_', ''), path: p });
+          }
+          else if (key.startsWith('service_')) {
+            serviceImages.push({ id: key.replace('service_', ''), path: p });
+          }
+        });
+
+        if (galleryPaths.length)  patchBody.gallery_paths  = galleryPaths;
+        if (productImages.length) patchBody.product_images = productImages;
+        if (serviceImages.length) patchBody.service_images = serviceImages;
+
+        // Clear pending map before redirect so beforeunload doesn't fire
+        pendingUploads.clear();
+
+        if (Object.keys(patchBody).length === 0) {
+          // All uploads failed or no paths to save
+          window.location.href = submitRedirect;
+          return;
+        }
+
+        fetch('/api/v1/businesses/' + groupId + '/images', {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patchBody)
+        })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (patchRes) {
+          var redirect = submitRedirect;
+          if (!patchRes.ok || !patchRes.data.ok) {
+            redirect += (redirect.indexOf('?') >= 0 ? '&' : '?') + 'images_failed=1';
+          }
+          window.location.href = redirect;
+        })
+        .catch(function () {
+          window.location.href = submitRedirect +
+            (submitRedirect.indexOf('?') >= 0 ? '&' : '?') + 'images_failed=1';
+        });
+      }
+    })
+    .catch(function () {
+      alert('Network error. Please check your connection and try again.');
+      resetBtn();
+    });
   });
 });
