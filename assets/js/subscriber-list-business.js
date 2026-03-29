@@ -416,7 +416,17 @@ $(function () {
     $('#productItems').append(clone);
   });
   $(document).on('click', '.removeProductBtn', function () {
-    $(this).closest('.mci-item-row').remove();
+    var $row = $(this).closest('.mci-item-row');
+    var domIndex = $row.closest('#productItems').find('.mci-item-row').index($row);
+    pendingUploads.delete('product_' + domIndex);
+    $row.remove();
+    // Re-index remaining product slots so keys stay in sync with DOM order
+    var remaining = [];
+    pendingUploads.forEach(function (val, key) {
+      if (/^product_\d+$/.test(key)) remaining.push([key, val]);
+    });
+    remaining.forEach(function (pair) { pendingUploads.delete(pair[0]); });
+    remaining.forEach(function (pair, newIdx) { pendingUploads.set('product_' + newIdx, pair[1]); });
   });
 
   // ── Services: add / remove ────────────────────────────────────────
@@ -429,7 +439,17 @@ $(function () {
     $('#serviceItems').append(clone);
   });
   $(document).on('click', '.removeServiceBtn', function () {
-    $(this).closest('.mci-item-row').remove();
+    var $row = $(this).closest('.mci-item-row');
+    var domIndex = $row.closest('#serviceItems').find('.mci-item-row').index($row);
+    pendingUploads.delete('service_' + domIndex);
+    $row.remove();
+    // Re-index remaining service slots so keys stay in sync with DOM order
+    var remaining = [];
+    pendingUploads.forEach(function (val, key) {
+      if (/^service_\d+$/.test(key)) remaining.push([key, val]);
+    });
+    remaining.forEach(function (pair) { pendingUploads.delete(pair[0]); });
+    remaining.forEach(function (pair, newIdx) { pendingUploads.set('service_' + newIdx, pair[1]); });
   });
 
   // ── FAQs: add / remove ────────────────────────────────────────────
@@ -944,26 +964,36 @@ $(function () {
       try { localStorage.removeItem('mci_listing_preview'); } catch (e2) {}
 
       // ── Remap temp product/service keys → server UUIDs ───────────────
-      // Products: collect slot keys in Map insertion order (matches DOM order)
-      var productKeys = Array.from(pendingUploads.keys()).filter(function (k) {
-        return /^product_\d+$/.test(k);
+      // DOM-driven remap: only rows with a non-empty name were sent in the
+      // payload, so we must walk the DOM with the same filter buildPayload()
+      // uses to align slot indices with the server-returned UUID list.
+      var productSlotRemap = [];
+      $('#productItems .mci-item-row').each(function (domIdx) {
+        var name = $(this).find('input[name="product_name[]"]').val().trim();
+        if (name !== '' && pendingUploads.has('product_' + domIdx)) {
+          productSlotRemap.push(domIdx);
+        }
       });
-      productKeys.forEach(function (tempKey, idx) {
-        var realId = productIds[idx];
+      productSlotRemap.forEach(function (originalDomIdx, payloadIdx) {
+        var realId = productIds[payloadIdx];
         if (!realId) return;
-        var val = pendingUploads.get(tempKey);
-        pendingUploads.delete(tempKey);
+        var val = pendingUploads.get('product_' + originalDomIdx);
+        pendingUploads.delete('product_' + originalDomIdx);
         pendingUploads.set('product_' + realId, val);
       });
 
-      var serviceKeys = Array.from(pendingUploads.keys()).filter(function (k) {
-        return /^service_\d+$/.test(k);
+      var serviceSlotRemap = [];
+      $('#serviceItems .mci-item-row').each(function (domIdx) {
+        var name = $(this).find('input[name="service_name[]"]').val().trim();
+        if (name !== '' && pendingUploads.has('service_' + domIdx)) {
+          serviceSlotRemap.push(domIdx);
+        }
       });
-      serviceKeys.forEach(function (tempKey, idx) {
-        var realId = serviceIds[idx];
+      serviceSlotRemap.forEach(function (originalDomIdx, payloadIdx) {
+        var realId = serviceIds[payloadIdx];
         if (!realId) return;
-        var val = pendingUploads.get(tempKey);
-        pendingUploads.delete(tempKey);
+        var val = pendingUploads.get('service_' + originalDomIdx);
+        pendingUploads.delete('service_' + originalDomIdx);
         pendingUploads.set('service_' + realId, val);
       });
 
