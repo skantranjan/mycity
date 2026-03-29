@@ -187,7 +187,7 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
             $branchSlug,
             trim((string)($branch['full_address']    ?? '')) ?: '',     // address_line1 is NOT NULL; empty string is safe
             trim((string)($branch['address_line2']   ?? '')) ?: null,
-            $city !== '' ? $city : null,
+            $city !== '' ? $city : '',
             $branchState  !== '' ? $branchState  : null,
             $branchCountry,
             trim((string)($branch['pincode']         ?? '')) ?: null,
@@ -322,7 +322,7 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
         if (is_array($galleryPaths)) {
             $imgStmt = $pdo->prepare('
                 INSERT INTO mci_business_images
-                  (id, business_group_id, image_path, sort_order,
+                  (id, business_group_id, file_path, sort_order,
                    uploaded_by_user_id, created_by_user_id)
                 VALUES (?, ?, ?, ?, ?, ?)
             ');
