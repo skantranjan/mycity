@@ -626,7 +626,7 @@ $(function () {
 
   function mciLoadCountries() {
     fetch('/api/v1/locations/countries')
-      .then(function (r) { return r.json(); })
+      .then(function (r) { return r.ok ? r.json() : { countries: [] }; })
       .then(function (data) {
         _mciCountryOptions = data.countries || [];
         $('.mci-country-select').each(function () {
@@ -650,7 +650,7 @@ $(function () {
     var $stateSel = $branchBlock.find('.mci-state-select');
     $stateSel.empty().append('<option value="">Loading\u2026</option>');
     fetch('/api/v1/locations/states?country=' + encodeURIComponent(country))
-      .then(function (r) { return r.json(); })
+      .then(function (r) { return r.ok ? r.json() : { states: [] }; })
       .then(function (data) {
         var states = data.states || [];
         $stateSel.empty().append('<option value="">Select or type below</option>');
