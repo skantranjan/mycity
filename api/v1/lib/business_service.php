@@ -185,7 +185,7 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
             $branchId,
             $groupId,
             $branchSlug,
-            trim((string)($branch['full_address']    ?? '')) ?: null,  // JS form field name; maps to address_line1
+            trim((string)($branch['full_address']    ?? '')) ?: '',     // address_line1 is NOT NULL; empty string is safe
             trim((string)($branch['address_line2']   ?? '')) ?: null,
             $city !== '' ? $city : null,
             $branchState  !== '' ? $branchState  : null,

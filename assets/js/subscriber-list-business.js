@@ -657,9 +657,7 @@ $(function () {
         states.forEach(function (s) {
           $stateSel.append($('<option>').val(s).text(s));
         });
-        if (states.length > 0) {
-          $stateSel.append('<option value="other">Other (type below)</option>');
-        }
+        $stateSel.append('<option value="other">Other (type below)</option>');
       })
       .catch(function () {
         $stateSel.empty().append('<option value="">Select or type below</option>');
