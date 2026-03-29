@@ -83,7 +83,9 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
     $profilePah = trim((string)($group['profile_path'] ?? ''));
     $bannerPah  = trim((string)($group['banner_path'] ?? ''));
 
-    $actorId = $ctx['added_by_user_id'];
+    $actorId    = $ctx['added_by_user_id'];
+    $productIds = [];   // ← add
+    $serviceIds = [];   // ← add
 
     // -----------------------------------------------------------------------
     // 5) Generate slugs
@@ -251,8 +253,10 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
                 if ($pName === '') {
                     continue;
                 }
+                $pid = api_uuid_v4();       // generate once
+                $productIds[] = $pid;       // collect only rows that are actually inserted
                 $prodStmt->execute([
-                    api_uuid_v4(), $groupId,
+                    $pid, $groupId,
                     $pName,
                     trim((string)($p['description'] ?? '')) ?: null,
                     is_numeric($p['price_min'] ?? '') ? (float)$p['price_min'] : null,
@@ -280,8 +284,10 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
                 if ($sName === '') {
                     continue;
                 }
+                $sid = api_uuid_v4();       // generate once
+                $serviceIds[] = $sid;       // collect only rows that are actually inserted
                 $svcStmt->execute([
-                    api_uuid_v4(), $groupId,
+                    $sid, $groupId,
                     $sName,
                     trim((string)($s['description'] ?? '')) ?: null,
                     is_numeric($s['price_min'] ?? '') ? (float)$s['price_min'] : null,
@@ -377,10 +383,12 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
     } catch (Throwable $ignored) {}
 
     $result = [
-        'ok'        => true,
-        'id'        => $groupId,
-        'slug'      => $groupSlug,
-        'branch_id' => $branchId,
+        'ok'          => true,
+        'id'          => $groupId,
+        'slug'        => $groupSlug,
+        'branch_id'   => $branchId,
+        'product_ids' => $productIds,
+        'service_ids' => $serviceIds,
     ];
     if (isset($newUserJwt)) {
         $result['token'] = $newUserJwt;
@@ -733,4 +741,109 @@ function api_business_fetch_by_slug(PDO $pdo, string $slug): ?array
         return null;
     }
     return api_business_fetch($pdo, (string)$row['id']);
+}
+
+// ---------------------------------------------------------------------------
+// Patch images — save uploaded image paths after business creation
+// ---------------------------------------------------------------------------
+
+/**
+ * Save uploaded image paths to a business group.
+ *
+ * $images keys (all optional):
+ *   logo_path       string
+ *   profile_path    string
+ *   banner_path     string
+ *   gallery_paths   string[]
+ *   product_images  array of {id: string, path: string}
+ *   service_images  array of {id: string, path: string}
+ *
+ * All paths validated to start with /storage/uploads/.
+ * Returns ['ok'=>true] or ['ok'=>false, 'error'=>string, 'status'=>int]
+ */
+function api_business_patch_images(PDO $pdo, string $groupId, array $images, string $actorId): array
+{
+    // Verify group exists
+    $stmt = $pdo->prepare('SELECT id FROM mci_business_groups WHERE id = ? LIMIT 1');
+    $stmt->execute([$groupId]);
+    if (!$stmt->fetch()) {
+        return ['ok' => false, 'error' => 'business_not_found', 'status' => 404];
+    }
+
+    // Path safety: all paths must start with /storage/uploads/
+    $safePath = function (mixed $v): ?string {
+        $s = trim((string)$v);
+        if ($s === '' || !str_starts_with($s, '/storage/uploads/')) {
+            return null;
+        }
+        return $s;
+    };
+
+    $logoPath    = $safePath($images['logo_path']    ?? '');
+    $profilePath = $safePath($images['profile_path'] ?? '');
+    $bannerPath  = $safePath($images['banner_path']  ?? '');
+    $galleryPaths  = array_values(array_filter(
+        array_map(fn($p) => $safePath($p), (array)($images['gallery_paths'] ?? []))
+    ));
+    $productImages = (array)($images['product_images'] ?? []);
+    $serviceImages = (array)($images['service_images'] ?? []);
+
+    $pdo->beginTransaction();
+    try {
+        // Update group: only set columns where a valid path was provided
+        $setClauses = [];
+        $setParams  = [];
+        if ($logoPath !== null)    { $setClauses[] = 'logo_path = ?';    $setParams[] = $logoPath; }
+        if ($profilePath !== null) { $setClauses[] = 'profile_path = ?'; $setParams[] = $profilePath; }
+        if ($bannerPath !== null)  { $setClauses[] = 'banner_path = ?';  $setParams[] = $bannerPath; }
+        if ($setClauses !== []) {
+            $setParams[] = $groupId;
+            $pdo->prepare('UPDATE mci_business_groups SET ' . implode(', ', $setClauses) . ' WHERE id = ?')
+                ->execute($setParams);
+        }
+
+        // Gallery: INSERT using file_path column (NOT image_path — schema uses file_path)
+        if ($galleryPaths !== []) {
+            $imgStmt = $pdo->prepare('
+                INSERT INTO mci_business_images
+                  (id, business_group_id, file_path, sort_order,
+                   uploaded_by_user_id, created_by_user_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ');
+            foreach ($galleryPaths as $i => $path) {
+                $imgStmt->execute([api_uuid_v4(), $groupId, $path, $i, $actorId, $actorId]);
+            }
+        }
+
+        // Products: match by row id + business_group_id for safety
+        // Note: mci_business_products uses image_path column (not file_path)
+        foreach ($productImages as $entry) {
+            $rowId = trim((string)($entry['id'] ?? ''));
+            $path  = $safePath($entry['path'] ?? '');
+            if ($rowId === '' || $path === null) {
+                continue;
+            }
+            $pdo->prepare('UPDATE mci_business_products SET image_path = ? WHERE id = ? AND business_group_id = ?')
+                ->execute([$path, $rowId, $groupId]);
+        }
+
+        // Services: same pattern
+        foreach ($serviceImages as $entry) {
+            $rowId = trim((string)($entry['id'] ?? ''));
+            $path  = $safePath($entry['path'] ?? '');
+            if ($rowId === '' || $path === null) {
+                continue;
+            }
+            $pdo->prepare('UPDATE mci_business_services SET image_path = ? WHERE id = ? AND business_group_id = ?')
+                ->execute([$path, $rowId, $groupId]);
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        error_log('api_business_patch_images error: ' . $e->getMessage());
+        return ['ok' => false, 'error' => 'server_error', 'status' => 500];
+    }
+
+    return ['ok' => true];
 }

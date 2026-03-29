@@ -977,7 +977,27 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'upload' && ($segments[1] ?? 
     }
     $extMap = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
     $ext    = $extMap[$mime] ?? 'jpg';
-    $dir    = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/') . '/storage/uploads/' . $type;
+    // ── Per-business folder routing ──────────────────────────────────
+    $businessId = trim((string)($_POST['business_id'] ?? ''));
+    $subtype    = trim((string)($_POST['subtype']     ?? ''));
+    $uuidV4Re   = '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i';
+    $docRoot    = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+
+    if ($businessId !== '' && preg_match($uuidV4Re, $businessId)) {
+        // Per-business path
+        $folder = $type;
+        if ($type === 'item_image') {
+            $folder = in_array($subtype, ['services', 'products'], true) ? $subtype : 'products';
+        }
+        $dir      = $docRoot . '/storage/uploads/businesses/' . $businessId . '/' . $folder;
+        $pathBase = '/storage/uploads/businesses/' . $businessId . '/' . $folder;
+    } else {
+        // Flat backward-compat path (item_image → /storage/uploads/item_image/)
+        $dir      = $docRoot . '/storage/uploads/' . $type;
+        $pathBase = '/storage/uploads/' . $type;
+    }
+    // ────────────────────────────────────────────────────────────────
+
     if (!is_dir($dir)) {
         mkdir($dir, 0755, true);
     }
@@ -987,7 +1007,7 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'upload' && ($segments[1] ?? 
     if (!move_uploaded_file($tmpPath, $dest)) {
         api_error('upload_failed', 500);
     }
-    $path = '/storage/uploads/' . $type . '/' . $filename;
+    $path = $pathBase . '/' . $filename;
     api_json(['ok' => true, 'path' => $path]);
 }
 
@@ -1102,7 +1122,14 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'businesses' && !isset($segme
         } catch (Throwable) {}
     }
 
-    $out = ['ok' => true, 'id' => $res['id'], 'slug' => $res['slug'], 'branch_id' => $res['branch_id']];
+    $out = [
+        'ok'          => true,
+        'id'          => $res['id'],
+        'slug'        => $res['slug'],
+        'branch_id'   => $res['branch_id'],
+        'product_ids' => $res['product_ids'] ?? [],
+        'service_ids' => $res['service_ids'] ?? [],
+    ];
     if (isset($res['token'])) {
         // Guest created an account at submit — return JWT so client can log in
         $out['token']     = $res['token'];
@@ -1110,6 +1137,29 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'businesses' && !isset($segme
         api_write_auth_token_cookie($res['token'], $res['token_exp']);
     }
     api_json($out, 201);
+}
+
+// =============================================================================
+// Business images — save uploaded paths after creation
+// PATCH /api/v1/businesses/{id}/images
+// =============================================================================
+if ($method === 'PATCH' && ($segments[0] ?? '') === 'businesses' && ($segments[2] ?? '') === 'images' && isset($segments[1])) {
+    require_once __DIR__ . '/lib/business_helpers.php';
+    require_once __DIR__ . '/lib/business_service.php';
+
+    $groupId = (string)$segments[1];
+    $data    = api_request_data();
+
+    // Optional auth — nil UUID for anonymous
+    $auth    = api_business_try_auth();
+    $actorId = $auth['user_id'] ?? '00000000-0000-0000-0000-000000000000';
+
+    $pdo = api_db();
+    $res = api_business_patch_images($pdo, $groupId, $data, $actorId);
+    if (!$res['ok']) {
+        api_error($res['error'], $res['status'] ?? 500);
+    }
+    api_json(['ok' => true]);
 }
 
 // =============================================================================
