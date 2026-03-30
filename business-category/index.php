@@ -101,8 +101,8 @@ try {
 $extraJS = <<<'HTML'
 <script>
 (function () {
-  var STORAGE_KEY = 'mci_detected_city';
-  var LOCATION_KEY = 'mci_selected_location';
+  var ACTIVE_KEY   = 'mci_active_city'; // set by header city-picker (mci-city.js)
+  var ALL_SENTINEL = '__all__';
   var select = document.getElementById('categoryLocation');
   var form = document.getElementById('categoryLocationForm');
   var editBtn = document.getElementById('categoryLocationEdit');
@@ -114,12 +114,9 @@ $extraJS = <<<'HTML'
 
   if (!urlLocation) {
     var preferred = '';
-    try { preferred = (sessionStorage.getItem(LOCATION_KEY) || '').trim(); } catch (e) {}
-    if (!preferred) { try { preferred = (localStorage.getItem(LOCATION_KEY) || '').trim(); } catch (e) {} }
-    if (!preferred) { try { preferred = (sessionStorage.getItem(STORAGE_KEY) || '').trim(); } catch (e) {} }
-    if (!preferred) { try { preferred = (localStorage.getItem(STORAGE_KEY) || '').trim(); } catch (e) {} }
-
-    if (preferred) {
+    try { preferred = (localStorage.getItem(ACTIVE_KEY) || '').trim(); } catch (e) {}
+    // If user explicitly chose "all locations" (sentinel) or nothing stored, stay unfiltered
+    if (preferred && preferred !== ALL_SENTINEL) {
       var option = Array.prototype.find.call(select.options, function (o) {
         return (o.value || '').toLowerCase() === preferred.toLowerCase();
       });
@@ -133,11 +130,6 @@ $extraJS = <<<'HTML'
     }
   }
 
-  if (urlLocation) {
-    try { sessionStorage.setItem(LOCATION_KEY, urlLocation); } catch (e) {}
-    try { localStorage.setItem(LOCATION_KEY, urlLocation); } catch (e) {}
-  }
-
   if (editBtn && editor) {
     editBtn.addEventListener('click', function () {
       editor.classList.toggle('d-none');
@@ -147,8 +139,18 @@ $extraJS = <<<'HTML'
 
   select.addEventListener('change', function () {
     var value = (select.value || '').trim();
-    try { sessionStorage.setItem(LOCATION_KEY, value); } catch (e) {}
-    try { localStorage.setItem(LOCATION_KEY, value); } catch (e) {}
+    // Keep the header city-picker in sync by writing to the shared active-city key
+    try {
+      if (value) {
+        localStorage.setItem(ACTIVE_KEY, value);
+        var maxAge = 365 * 24 * 60 * 60;
+        document.cookie = ACTIVE_KEY + '=' + encodeURIComponent(value) +
+          '; path=/; max-age=' + maxAge + '; SameSite=Lax';
+      } else {
+        localStorage.setItem(ACTIVE_KEY, '__all__');
+        document.cookie = ACTIVE_KEY + '=; path=/; max-age=0; SameSite=Lax';
+      }
+    } catch (e) {}
     form.submit();
   });
 })();

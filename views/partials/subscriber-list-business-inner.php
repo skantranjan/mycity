@@ -934,7 +934,7 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
           </div>
           <div class="form-check mb-4">
             <input class="form-check-input" type="checkbox" id="agreeTerms" required />
-            <label class="form-check-label" for="agreeTerms">I agree to the <a href="/terms-of-use/">Terms of Service</a> for listing on My City Info.</label>
+            <label class="form-check-label" for="agreeTerms">I agree to the <a href="/terms-of-use/">Terms of Service</a> for listing on My City Info. <span class="text-danger">*</span></label>
           </div>
           <button class="btn btn-dark btn-lg px-5 w-100" type="submit" id="submitBtn">
             <i class="bi bi-check2-circle me-2" aria-hidden="true"></i><?= htmlspecialchars((string) $step7SubmitText, ENT_QUOTES, 'UTF-8') ?>

@@ -5,15 +5,14 @@ $subActive = 'dashboard';
 $hideCta = true;
 $appArea = 'subscriber';
 
+require_once __DIR__ . '/../../includes/mci_config.php';
 require_once __DIR__ . '/../../includes/mci_session.php';
 require_once __DIR__ . '/../../api/v1/lib/db.php';
-require_once __DIR__ . '/../../api/v1/lib/business_service.php';
 
 $userId = (string)($_SESSION['mci_user_id'] ?? '');
 
 // ── Real stats from DB ────────────────────────────────────────────────────────
 $stats = ['live' => 0, 'draft' => 0, 'suspended' => 0, 'total' => 0];
-$recentListings = [];
 
 if ($userId !== '') {
     try {
@@ -30,21 +29,10 @@ if ($userId !== '') {
             $stats[(string)$row['status']] = (int)$row['cnt'];
         }
         $stats['total'] = array_sum($stats);
-
-        // Recent listings (up to 5)
-        $recentResult   = api_business_list_owner($pdo, $userId);
-        $recentListings = array_slice($recentResult['businesses'] ?? [], 0, 5);
     } catch (Throwable $e) {
         // Graceful degradation — stats stay 0
     }
 }
-
-$statusBadgeMap = [
-    'live'      => 'text-bg-success',
-    'draft'     => 'text-bg-warning',
-    'rejected'  => 'text-bg-danger',
-    'suspended' => 'text-bg-secondary',
-];
 
 ob_start();
 ?>
@@ -110,88 +98,20 @@ ob_start();
       </div>
     </div>
 
-    <div class="row g-4">
-
-      <!-- My Listings quick-access -->
-      <div class="col-12 col-lg-8">
-        <div class="card border-0 shadow-sm">
-          <div class="card-body p-4">
-            <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
-              <div class="fw-semibold">My Listings</div>
-              <a class="btn btn-sm btn-outline-dark" href="/subscriber/listings/">
-                <i class="bi bi-shop-window me-1" aria-hidden="true"></i>View all
-              </a>
-            </div>
-            <div class="table-responsive">
-              <table class="table table-bordered align-middle bg-white mb-0">
-                <thead class="table-light">
-                  <tr>
-                    <th>Business</th>
-                    <th>Category</th>
-                    <th>Status</th>
-                    <th style="min-width:220px;">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php if (empty($recentListings)): ?>
-                    <tr>
-                      <td colspan="4" class="text-center text-muted small py-4">
-                        No listings yet. <a href="/subscriber/list-business/">Add your first business</a>.
-                      </td>
-                    </tr>
-                  <?php else: ?>
-                    <?php foreach ($recentListings as $r):
-                      $rowStatus  = strtolower((string)($r['status'] ?? ''));
-                      $badgeClass = $statusBadgeMap[$rowStatus] ?? 'text-bg-light border';
-                      $rowSlug    = (string)($r['slug'] ?? '');
-                    ?>
-                      <tr>
-                        <td>
-                          <div class="small fw-semibold"><?= htmlspecialchars((string)($r['name'] ?? '')) ?></div>
-                          <div class="text-muted small"><?= htmlspecialchars((string)($r['category_name'] ?? '')) ?></div>
-                        </td>
-                        <td class="small text-muted"><?= htmlspecialchars((string)($r['category_name'] ?? '—')) ?></td>
-                        <td><span class="badge <?= $badgeClass ?>"><?= htmlspecialchars(ucfirst($rowStatus)) ?></span></td>
-                        <td>
-                          <div class="d-flex gap-2 flex-wrap">
-                            <?php if ($rowSlug): ?>
-                              <a class="btn btn-sm btn-outline-dark" href="/business/<?= urlencode($rowSlug) ?>/" target="_blank" rel="noopener noreferrer" title="View public listing">
-                                <i class="bi bi-eye me-1" aria-hidden="true"></i>View <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
-                              </a>
-                              <a class="btn btn-sm btn-outline-secondary" href="/subscriber/listing-edit/?slug=<?= urlencode($rowSlug) ?>">
-                                <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>Edit
-                              </a>
-                            <?php endif; ?>
-                          </div>
-                        </td>
-                      </tr>
-                    <?php endforeach; ?>
-                  <?php endif; ?>
-                </tbody>
-              </table>
-            </div>
-          </div>
+    <!-- Recent Leads -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
+          <div class="fw-semibold">Recent Leads</div>
+          <a class="btn btn-sm btn-outline-dark" href="/subscriber/leads/">
+            <i class="bi bi-person-lines-fill me-1" aria-hidden="true"></i>View all
+          </a>
+        </div>
+        <div class="text-muted small py-3 text-center">
+          <i class="bi bi-hourglass-split fs-4 d-block mb-2 opacity-50" aria-hidden="true"></i>
+          Leads will appear here once the feature is live.
         </div>
       </div>
-
-      <!-- Recent Leads -->
-      <div class="col-12 col-lg-4">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body p-4">
-            <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
-              <div class="fw-semibold">Recent Leads</div>
-              <a class="btn btn-sm btn-outline-dark" href="/subscriber/leads/">
-                <i class="bi bi-person-lines-fill me-1" aria-hidden="true"></i>View all
-              </a>
-            </div>
-            <div class="text-muted small py-3 text-center">
-              <i class="bi bi-hourglass-split fs-4 d-block mb-2 opacity-50" aria-hidden="true"></i>
-              Leads will appear here once the feature is live.
-            </div>
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
 </div>

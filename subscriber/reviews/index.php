@@ -5,17 +5,21 @@ $subActive = 'reviews';
 $hideCta = true;
 $appArea = 'subscriber';
 
+require_once __DIR__ . '/../../includes/mci_session.php';
+require_once __DIR__ . '/../../api/v1/lib/db.php';
+
 $csrfAction = 'subscriber_reviews_reply';
 require_once __DIR__ . '/../../includes/mci_csrf.php';
 $csrfToken = mci_csrf_token($csrfAction);
-$csrfOk = false;
 
-$flash = '';
-$statusFilter = trim((string) ($_GET['status'] ?? 'all'));
+$userId = (string)($_SESSION['mci_user_id'] ?? '');
+
+$flash        = '';
+$statusFilter = trim((string) ($_GET['status']   ?? 'all'));
 $statusFilter = $statusFilter !== '' ? $statusFilter : 'all';
-$fromDate = trim((string) ($_GET['from_date'] ?? ''));
-$toDate = trim((string) ($_GET['to_date'] ?? ''));
-$replyFor = trim((string) ($_POST['comment_id'] ?? ''));
+$fromDate     = trim((string) ($_GET['from_date'] ?? ''));
+$toDate       = trim((string) ($_GET['to_date']   ?? ''));
+$replyFor     = trim((string) ($_POST['comment_id'] ?? ''));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $replyFor !== '') {
     $replyText = trim((string) ($_POST['reply_text'] ?? ''));
@@ -23,89 +27,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $replyFor !== '') {
         $csrfPost = trim((string) ($_POST['csrf_token'] ?? ''));
         if (!mci_csrf_verify($csrfAction, $csrfPost)) {
             $flash = 'Invalid request token. Please refresh and try again.';
-            $csrfOk = false;
         } else {
-            $flash = 'Reply sent for comment #' . htmlspecialchars($replyFor, ENT_QUOTES, 'UTF-8') . '.';
-            $csrfOk = true;
+            $flash = 'Reply recorded for comment #' . htmlspecialchars($replyFor, ENT_QUOTES, 'UTF-8') . '.';
         }
     }
 }
 
-$comments = [
-    [
-        'id' => '74d77c14-9956-4d2e-b4f1-bf96e34f0d5e',
-        'user' => 'Anonymous',
-        'stars' => 4,
-        'text' => 'Great service — punctual and professional. Would recommend to friends.',
-        'when' => 'Yesterday',
-        'date' => '2026-03-19',
-        'status' => 'New',
-    ],
-    [
-        'id' => '2f9a5134-1754-4d8d-93cf-d2747fa2a5ec',
-        'user' => 'Anonymous',
-        'stars' => 2,
-        'text' => 'Good result but communication was slow. Took longer than expected.',
-        'when' => '3 days ago',
-        'date' => '2026-03-17',
-        'status' => 'Waiting reply',
-    ],
-    [
-        'id' => 'b08b95bc-77af-4ce7-b082-e8d9eb0a62f8',
-        'user' => 'Anonymous',
-        'stars' => 5,
-        'text' => 'Excellent! Everything was handled smoothly and on time.',
-        'when' => '1 week ago',
-        'date' => '2026-03-13',
-        'status' => 'Replied',
-    ],
-];
+// Load real reviews from DB scoped to the subscriber's business groups
+$comments = [];
+try {
+    $pdo = api_db();
 
-// UI demo: update status after reply
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $replyFor !== '' && $flash !== '' && $csrfOk) {
-    foreach ($comments as &$c) {
-        if ((string) $c['id'] === (string) $replyFor) {
-            $c['status'] = 'Replied';
-            break;
+    // Get all business group IDs owned by this subscriber
+    $groupStmt = $pdo->prepare(
+        "SELECT id FROM mci_business_groups WHERE added_by_user_id = ? AND status != 'deleted'"
+    );
+    $groupStmt->execute([$userId]);
+    $groupIds = array_column($groupStmt->fetchAll(PDO::FETCH_ASSOC), 'id');
+
+    if (!empty($groupIds)) {
+        $placeholders = implode(',', array_fill(0, count($groupIds), '?'));
+        $binds = $groupIds;
+
+        $where = ["r.business_group_id IN ({$placeholders})"];
+
+        if ($fromDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fromDate)) {
+            $where[] = 'DATE(r.created_at) >= ?';
+            $binds[] = $fromDate;
+        }
+        if ($toDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $toDate)) {
+            $where[] = 'DATE(r.created_at) <= ?';
+            $binds[] = $toDate;
+        }
+
+        $whereSql = implode(' AND ', $where);
+
+        $stmt = $pdo->prepare(
+            "SELECT r.id, r.rating, r.review_text, r.created_at, g.name AS business_name
+             FROM mci_business_reviews r
+             INNER JOIN mci_business_groups g ON g.id = r.business_group_id
+             WHERE {$whereSql}
+             ORDER BY r.created_at DESC"
+        );
+        $stmt->execute($binds);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as $row) {
+            $ts   = strtotime((string)$row['created_at']);
+            $diff = $ts ? time() - $ts : 0;
+            if ($diff < 86400)       $when = 'Today';
+            elseif ($diff < 172800)  $when = 'Yesterday';
+            elseif ($diff < 604800)  $when = (int)($diff / 86400) . ' days ago';
+            else                     $when = date('M j, Y', $ts ?: 0);
+
+            $comments[] = [
+                'id'           => (string)$row['id'],
+                'user'         => 'Anonymous',
+                'stars'        => (int)$row['rating'],
+                'text'         => (string)$row['review_text'],
+                'when'         => $when,
+                'date'         => substr((string)$row['created_at'], 0, 10),
+                'business'     => (string)$row['business_name'],
+                'status'       => 'new',
+            ];
         }
     }
-    unset($c);
-}
+} catch (Throwable) {}
 
-// Filter by status (UI demo)
-$statusMap = [
-    'all' => 'all',
-    'new' => 'New',
-    'awaiting' => 'Waiting reply',
-    'waiting' => 'Waiting reply',
-    'waiting reply' => 'Waiting reply',
-    'replied' => 'Replied',
-];
-$key = strtolower(trim($statusFilter));
-$wanted = $statusMap[$key] ?? 'all';
-if ($wanted !== 'all') {
-    $comments = array_values(array_filter($comments, static function (array $c) use ($wanted): bool {
-        return isset($c['status']) && (string) $c['status'] === (string) $wanted;
-    }));
-}
-
-$fromDateObj = DateTime::createFromFormat('Y-m-d', $fromDate) ?: null;
-$toDateObj = DateTime::createFromFormat('Y-m-d', $toDate) ?: null;
-if ($fromDateObj || $toDateObj) {
-    $comments = array_values(array_filter($comments, static function (array $c) use ($fromDateObj, $toDateObj): bool {
-        $itemDate = DateTime::createFromFormat('Y-m-d', (string) ($c['date'] ?? '')) ?: null;
-        if ($itemDate === null) {
-            return false;
-        }
-        if ($fromDateObj && $itemDate < $fromDateObj) {
-            return false;
-        }
-        if ($toDateObj && $itemDate > $toDateObj) {
-            return false;
-        }
-        return true;
-    }));
-}
+// Status filter (visual only — reviews table has no reply status column yet)
+$statusMap = ['all' => 'all', 'new' => 'new', 'awaiting' => 'new', 'replied' => 'replied'];
+$wanted    = $statusMap[strtolower($statusFilter)] ?? 'all';
 
 function starsHtml(int $n): string
 {
@@ -139,10 +130,10 @@ ob_start();
             <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
               <label class="form-label small mb-0">Status</label>
               <select name="status" class="form-select form-select-sm" aria-label="Filter comments by status">
-                <option value="all" <?= $wanted === 'all' ? 'selected' : '' ?>>All</option>
-                <option value="new" <?= $wanted === 'New' ? 'selected' : '' ?>>New</option>
-                <option value="awaiting" <?= $wanted === 'Waiting reply' ? 'selected' : '' ?>>Awaiting response</option>
-                <option value="replied" <?= $wanted === 'Replied' ? 'selected' : '' ?>>Replied</option>
+                <option value="all" <?= $wanted === 'all'     ? 'selected' : '' ?>>All</option>
+                <option value="new" <?= $wanted === 'new'     ? 'selected' : '' ?>>New</option>
+                <option value="awaiting" <?= $wanted === 'new'  ? 'selected' : '' ?>>Awaiting response</option>
+                <option value="replied" <?= $wanted === 'replied' ? 'selected' : '' ?>>Replied</option>
               </select>
               <label class="form-label small mb-0">From</label>
               <input type="date" name="from_date" class="form-control form-control-sm" value="<?= htmlspecialchars($fromDate, ENT_QUOTES, 'UTF-8') ?>" aria-label="Filter comments from date" />
@@ -170,8 +161,11 @@ ob_start();
                 </div>
                 <div class="text-muted small"><?= htmlspecialchars($c['when']) ?></div>
               </div>
-              <div class="mb-2">
+              <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
                 <span class="badge text-bg-light border"><?= htmlspecialchars((string) ($c['status'] ?? '')) ?></span>
+                <?php if (!empty($c['business'])): ?>
+                  <span class="text-muted small">For <?= htmlspecialchars($c['business']) ?></span>
+                <?php endif; ?>
               </div>
 
               <div class="small mb-3" style="line-height:1.6;">

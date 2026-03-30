@@ -54,7 +54,7 @@ ob_start();
 <div class="mci-preview-banner" id="pvBanner" role="status">
   <div>
     <i class="bi bi-eye-fill me-2" aria-hidden="true"></i>
-    Preview mode — this is exactly how your listing will appear once published.
+    Preview mode - this is exactly how your listing will appear once published.
   </div>
   <div class="d-flex align-items-center gap-3 flex-shrink-0">
     <a href="/submit-business-listing/">← Back to edit</a>

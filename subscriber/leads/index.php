@@ -5,134 +5,63 @@ $subActive = 'leads';
 $hideCta = true;
 $appArea = 'subscriber';
 
+require_once __DIR__ . '/../../includes/mci_session.php';
+require_once __DIR__ . '/../../api/v1/lib/db.php';
+require_once __DIR__ . '/../../api/v1/lib/leads_service.php';
+
 $csrfAction = 'subscriber_leads_status';
 require_once __DIR__ . '/../../includes/mci_csrf.php';
 $csrfToken = mci_csrf_token($csrfAction);
 
-$statusFlash = '';
-$statusFilter = trim((string) ($_GET['status'] ?? 'all'));
-$statusFilter = $statusFilter !== '' ? $statusFilter : 'all';
-$searchBusiness = trim((string) ($_GET['business'] ?? ''));
-$fromDate = trim((string) ($_GET['from_date'] ?? ''));
-$toDate = trim((string) ($_GET['to_date'] ?? ''));
+$userId = (string)($_SESSION['mci_user_id'] ?? '');
 
-$updateId = trim((string) ($_POST['lead_id'] ?? ''));
+$statusFlash    = '';
+$statusFilter   = trim((string) ($_GET['status']   ?? 'all'));
+$statusFilter   = $statusFilter !== '' ? $statusFilter : 'all';
+$searchBusiness = trim((string) ($_GET['business'] ?? ''));
+$fromDate       = trim((string) ($_GET['from_date'] ?? ''));
+$toDate         = trim((string) ($_GET['to_date']   ?? ''));
+
+$updateId  = trim((string) ($_POST['lead_id']    ?? ''));
 $newStatus = trim((string) ($_POST['new_status'] ?? ''));
 
-// UI demo: hardcoded lead data
-$leads = [
-    [
-        'id'       => 'a1b2c3d4-0001-4000-8000-000000000001',
-        'listing'  => 'Property 852',
-        'name'     => 'James Harrington',
-        'phone'    => '+44 7700 900123',
-        'email'    => 'james.h@example.com',
-        'message'  => 'Hi, I am looking for a 3-bed flat near the city centre. Do you have anything available from next month?',
-        'date'     => '2026-03-20',
-        'when'     => '2 hours ago',
-        'status'   => 'New',
-    ],
-    [
-        'id'       => 'a1b2c3d4-0002-4000-8000-000000000002',
-        'listing'  => 'JXF Painting Service',
-        'name'     => 'Sara Mitchell',
-        'phone'    => '+44 7700 900456',
-        'email'    => 'sara.m@company.org',
-        'message'  => 'We need a quote for repainting a 2,000 sq ft office space. Can you visit this week?',
-        'date'     => '2026-03-19',
-        'when'     => 'Yesterday',
-        'status'   => 'Contacted',
-    ],
-    [
-        'id'       => 'a1b2c3d4-0003-4000-8000-000000000003',
-        'listing'  => 'Locker Shop UK Ltd',
-        'name'     => 'School Admin Team',
-        'phone'    => '+44 7700 900789',
-        'email'    => 'ops@school-demo.org',
-        'message'  => 'Need 120 student lockers with delivery by end of April. Can you provide a quote with options?',
-        'date'     => '2026-03-18',
-        'when'     => '2 days ago',
-        'status'   => 'Converted',
-    ],
-    [
-        'id'       => 'a1b2c3d4-0004-4000-8000-000000000004',
-        'listing'  => 'Property 852',
-        'name'     => 'Linda Farrow',
-        'phone'    => '+44 7700 900321',
-        'email'    => 'linda.f@example.net',
-        'message'  => 'Interested in viewing a 1-bed studio if available. Please call me back.',
-        'date'     => '2026-03-15',
-        'when'     => '5 days ago',
-        'status'   => 'Closed',
-    ],
-    [
-        'id'       => 'a1b2c3d4-0005-4000-8000-000000000005',
-        'listing'  => 'JXF Painting Service',
-        'name'     => 'Oliver Brooks',
-        'phone'    => '+44 7700 900654',
-        'email'    => '',
-        'message'  => 'Looking for someone to paint the exterior of my house. 3 bed semi-detached. How much roughly?',
-        'date'     => '2026-03-12',
-        'when'     => '8 days ago',
-        'status'   => 'New',
-    ],
-];
+$validStatuses = ['new', 'contacted', 'converted', 'closed'];
 
-$validStatuses = ['New', 'Contacted', 'Converted', 'Closed'];
-
-// UI demo: update status in-memory
+// Handle status update POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $updateId !== '' && in_array($newStatus, $validStatuses, true)) {
     $csrfPost = trim((string) ($_POST['csrf_token'] ?? ''));
     if (!mci_csrf_verify($csrfAction, $csrfPost)) {
         $statusFlash = 'error:Invalid request token. Please refresh and try again.';
     } else {
-        foreach ($leads as &$lead) {
-            if ((string) $lead['id'] === (string) $updateId) {
-                $lead['status'] = $newStatus;
-                $statusFlash = 'success:Lead status updated to "' . htmlspecialchars($newStatus, ENT_QUOTES, 'UTF-8') . '".';
-                break;
-            }
+        try {
+            $pdo = api_db();
+            $ok  = leads_update_status($pdo, $updateId, $newStatus, $userId);
+            $statusFlash = $ok
+                ? 'success:Lead status updated to "' . htmlspecialchars(ucfirst($newStatus), ENT_QUOTES, 'UTF-8') . '".'
+                : 'error:Lead not found or you do not have permission to update it.';
+        } catch (Throwable) {
+            $statusFlash = 'error:Could not update status. Please try again.';
         }
-        unset($lead);
     }
 }
 
-// Filter by status
-$statusMap = [
-    'all'       => 'all',
-    'new'       => 'New',
-    'contacted' => 'Contacted',
-    'converted' => 'Converted',
-    'closed'    => 'Closed',
-];
-$wantedStatus = $statusMap[strtolower($statusFilter)] ?? 'all';
-if ($wantedStatus !== 'all') {
-    $leads = array_values(array_filter($leads, static fn(array $l): bool => (string) $l['status'] === $wantedStatus));
-}
+// Load from DB
+$leads  = [];
+$totals = ['all' => 0, 'new' => 0, 'contacted' => 0, 'converted' => 0, 'closed' => 0, 'replied' => 0];
+try {
+    $pdo    = api_db();
+    $result = leads_list($pdo, $userId, 'lead', $statusFilter, $searchBusiness, $fromDate, $toDate);
+    $leads  = $result['items'];
+    $totals = $result['totals'];
+} catch (Throwable) {}
 
-// Filter by business name search
-if ($searchBusiness !== '') {
-    $needle = strtolower($searchBusiness);
-    $leads = array_values(array_filter($leads, static fn(array $l): bool => str_contains(strtolower((string) $l['listing']), $needle)));
-}
+$totalAll  = $totals['all'];
+$totalNew  = $totals['new'];
+$totalCont = $totals['contacted'];
+$totalConv = $totals['converted'];
 
-// Filter by date range
-$fromDateObj = DateTime::createFromFormat('Y-m-d', $fromDate) ?: null;
-$toDateObj   = DateTime::createFromFormat('Y-m-d', $toDate) ?: null;
-if ($fromDateObj || $toDateObj) {
-    $leads = array_values(array_filter($leads, static function (array $l) use ($fromDateObj, $toDateObj): bool {
-        $itemDate = DateTime::createFromFormat('Y-m-d', (string) ($l['date'] ?? '')) ?: null;
-        if ($itemDate === null) return false;
-        if ($fromDateObj && $itemDate < $fromDateObj) return false;
-        if ($toDateObj   && $itemDate > $toDateObj)   return false;
-        return true;
-    }));
-}
-
-$totalAll  = 5;
-$totalNew  = 2;
-$totalCont = 1;
-$totalConv = 1;
+// Map DB status values to display labels for the filter UI
+$wantedStatus = $statusFilter !== 'all' ? $statusFilter : 'all';
 
 // JSON-encode leads for JS split panel
 $leadsJson = json_encode(
@@ -214,10 +143,10 @@ ob_start();
                 <label class="form-label small mb-1">Status</label>
                 <select name="status" class="form-select form-select-sm" aria-label="Filter by lead status">
                   <option value="all"      <?= $wantedStatus === 'all'       ? 'selected' : '' ?>>All</option>
-                  <option value="new"      <?= $wantedStatus === 'New'       ? 'selected' : '' ?>>New</option>
-                  <option value="contacted"<?= $wantedStatus === 'Contacted' ? 'selected' : '' ?>>Contacted</option>
-                  <option value="converted"<?= $wantedStatus === 'Converted' ? 'selected' : '' ?>>Converted</option>
-                  <option value="closed"   <?= $wantedStatus === 'Closed'    ? 'selected' : '' ?>>Closed</option>
+                  <option value="new"      <?= $wantedStatus === 'new'       ? 'selected' : '' ?>>New</option>
+                  <option value="contacted"<?= $wantedStatus === 'contacted' ? 'selected' : '' ?>>Contacted</option>
+                  <option value="converted"<?= $wantedStatus === 'converted' ? 'selected' : '' ?>>Converted</option>
+                  <option value="closed"   <?= $wantedStatus === 'closed'    ? 'selected' : '' ?>>Closed</option>
                 </select>
               </div>
               <div class="col-6 col-lg-auto">
@@ -264,10 +193,10 @@ ob_start();
                 <tbody id="mciLeadsTableBody">
                   <?php foreach ($leads as $lead):
                     $badgeClass = match($lead['status']) {
-                        'New'       => 'text-bg-primary',
-                        'Contacted' => 'text-bg-warning',
-                        'Converted' => 'text-bg-success',
-                        'Closed'    => 'text-bg-secondary',
+                        'new'       => 'text-bg-primary',
+                        'contacted' => 'text-bg-warning',
+                        'converted' => 'text-bg-success',
+                        'closed'    => 'text-bg-secondary',
                         default     => 'text-bg-light border',
                     };
                   ?>
@@ -324,7 +253,7 @@ ob_start();
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>" />
             <select name="new_status" id="ldUpdateStatus" class="form-select form-select-sm" aria-label="Update status" style="flex:1;">
               <?php foreach ($validStatuses as $vs): ?>
-                <option value="<?= htmlspecialchars($vs) ?>"><?= htmlspecialchars($vs) ?></option>
+                <option value="<?= htmlspecialchars($vs) ?>"><?= htmlspecialchars(ucfirst($vs)) ?></option>
               <?php endforeach; ?>
             </select>
             <button type="submit" class="btn btn-sm btn-dark text-nowrap">Update</button>

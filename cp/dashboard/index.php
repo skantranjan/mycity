@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/mci_config.php';
 require_once __DIR__ . '/../../includes/mci_session.php';
 require_once __DIR__ . '/../../includes/mci_require_session.php';
 
@@ -47,7 +48,7 @@ try {
          FROM mci_business_groups g
          WHERE g.status = 'draft'
          ORDER BY g.created_at DESC
-         LIMIT 10"
+         LIMIT " . MCI_CP_DASHBOARD_PENDING_LIMIT . ""
     );
     $pendingListings = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
 

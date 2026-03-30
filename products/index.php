@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../includes/mci_config.php';
 require_once __DIR__ . '/../api/v1/lib/db.php';
 require_once __DIR__ . '/../api/v1/lib/item_search_service.php';
 require_once __DIR__ . '/../includes/mci_category_icons.php';
+require_once __DIR__ . '/../includes/mci_price_presets.php';
 
 $pageTitle       = 'Products - My City Info';
 $activePage      = 'products';
@@ -29,11 +31,7 @@ $sort     = trim((string)($_GET['sort']     ?? 'relevance'));
 $curPage  = max(1, (int)($_GET['page']      ?? 1));
 
 // Derive active price preset label for the chip
-$priceLabel = '';
-if ($priceMin === '' && $priceMax === '500')    { $priceLabel = 'Under ₹500'; }
-elseif ($priceMin === '500' && $priceMax === '2000')  { $priceLabel = '₹500 – ₹2,000'; }
-elseif ($priceMin === '2000' && $priceMax === '10000') { $priceLabel = '₹2,000 – ₹10,000'; }
-elseif ($priceMin === '10000' && $priceMax === '')   { $priceLabel = 'Above ₹10,000'; }
+$priceLabel = mci_price_preset_label($priceMin, $priceMax);
 
 // ── Load categories for the filter dropdown (products-only) ───────────────────
 $filterCategories = [];
@@ -63,7 +61,7 @@ try {
         'price_max' => $priceMax,
         'sort'      => $sort,
         'page'      => $curPage,
-        'per_page'  => 12,
+        'per_page'  => MCI_ITEMS_PER_PAGE,
     ]);
 } catch (Throwable $ignored) {}
 
@@ -121,6 +119,34 @@ ob_start();
   </div>
 </div>
 
+<!-- HOW IT WORKS -->
+<div class="mci-how-it-works">
+  <h2 class="mci-how-it-works__title">How it works</h2>
+  <div class="mci-how-it-works__steps">
+    <div class="mci-hiw-step">
+      <div class="mci-hiw-step__icon"><i class="bi bi-search" aria-hidden="true"></i></div>
+      <div class="mci-hiw-step__body">
+        <div class="mci-hiw-step__num">1. Browse</div>
+        <p class="mci-hiw-step__desc">Search listings by keyword, category, or location to find businesses that offer the products you need.</p>
+      </div>
+    </div>
+    <div class="mci-hiw-step">
+      <div class="mci-hiw-step__icon mci-hiw-step__icon--contact"><i class="bi bi-telephone-fill" aria-hidden="true"></i></div>
+      <div class="mci-hiw-step__body">
+        <div class="mci-hiw-step__num">2. Contact</div>
+        <p class="mci-hiw-step__desc">Send an enquiry directly through the listing page. The business owner will respond to your request.</p>
+      </div>
+    </div>
+    <div class="mci-hiw-step">
+      <div class="mci-hiw-step__icon mci-hiw-step__icon--connect"><i class="bi bi-patch-check-fill" aria-hidden="true"></i></div>
+      <div class="mci-hiw-step__body">
+        <div class="mci-hiw-step__num">3. Connect</div>
+        <p class="mci-hiw-step__desc">Get the product or service you need from a local business you can trust, backed by real reviews.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- FILTER BAR -->
 <div class="mci-items-filter-bar">
   <div class="container">
@@ -134,7 +160,7 @@ ob_start();
         <span class="badge text-bg-dark ms-1"><?= $activeFilterCount ?></span>
       <?php endif; ?>
     </button>
-    <div id="mciFiltersPanel">
+    <div id="mciFiltersPanel" class="mci-items-filter-left">
     <form method="get" action="/products/" id="mciItemsFilterForm" style="display:contents;">
 
       <!-- Category pill -->
@@ -148,19 +174,12 @@ ob_start();
       </select>
 
       <!-- Price pill -->
-      <?php
-      $priceValue = '';
-      if ($priceMin === '' && $priceMax === '500')          $priceValue = 'under500';
-      elseif ($priceMin === '500' && $priceMax === '2000')  $priceValue = '500-2000';
-      elseif ($priceMin === '2000' && $priceMax === '10000') $priceValue = '2000-10000';
-      elseif ($priceMin === '10000' && $priceMax === '')    $priceValue = 'above10000';
-      ?>
+      <?php $priceValue = mci_price_preset_value($priceMin, $priceMax); ?>
       <select name="_price_preset" class="mci-items-filter-pill <?= $priceValue !== '' ? 'active' : '' ?>" aria-label="Filter by price" id="mciPricePreset">
         <option value="">💰 Price</option>
-        <option value="under500"    <?= $priceValue === 'under500'    ? 'selected' : '' ?>>Under ₹500</option>
-        <option value="500-2000"    <?= $priceValue === '500-2000'    ? 'selected' : '' ?>>₹500 – ₹2,000</option>
-        <option value="2000-10000"  <?= $priceValue === '2000-10000'  ? 'selected' : '' ?>>₹2,000 – ₹10,000</option>
-        <option value="above10000"  <?= $priceValue === 'above10000'  ? 'selected' : '' ?>>Above ₹10,000</option>
+        <?php foreach (mci_price_presets() as $pp): ?>
+          <option value="<?= htmlspecialchars($pp['value']) ?>" <?= $priceValue === $pp['value'] ? 'selected' : '' ?>><?= htmlspecialchars($pp['label']) ?></option>
+        <?php endforeach; ?>
       </select>
       <!-- Hidden price_min / price_max resolved by JS -->
       <input type="hidden" name="price_min" id="mciPriceMin" value="<?= htmlspecialchars($priceMin) ?>" />
@@ -202,8 +221,8 @@ ob_start();
       </span>
     <?php endif; ?>
 
-    <span class="mci-items-result-count"><?= number_format($total) ?> result<?= $total !== 1 ? 's' : '' ?></span>
     </div><!-- /#mciFiltersPanel -->
+    <span class="mci-items-result-count"><?= number_format($total) ?> result<?= $total !== 1 ? 's' : '' ?></span>
   </div>
 </div>
 
@@ -225,7 +244,7 @@ ob_start();
       <div class="fw-semibold">
         Products
         <?php if ($q !== ''): ?>
-          <span class="fw-normal text-muted">— "<?= htmlspecialchars($q) ?>"</span>
+          <span class="fw-normal text-muted">- "<?= htmlspecialchars($q) ?>"</span>
         <?php endif; ?>
         <?php if ($city !== ''): ?>
           <span class="fw-normal text-muted"> in <?= htmlspecialchars($city) ?></span>
@@ -234,7 +253,7 @@ ob_start();
     </div>
 
     <!-- Card grid -->
-    <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mb-4">
+    <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3 mb-4" id="mciCardGrid">
       <?php foreach ($items as $item):
         $bizUrl     = '/business/' . htmlspecialchars(urlencode($item['business_slug'])) . '/';
         $priceStr   = '';
@@ -297,28 +316,22 @@ ob_start();
       <?php endforeach; ?>
     </div>
 
-    <!-- Pagination -->
-    <?php if ($totalPages > 1): ?>
-      <nav class="d-flex justify-content-center mt-2 mb-4" aria-label="Product pages">
-        <ul class="pagination pagination-sm mb-0">
-          <li class="page-item <?= $curPage <= 1 ? 'disabled' : '' ?>">
-            <a class="page-link" href="<?= htmlspecialchars(mci_products_page_url($curPage - 1, $q, $city, $category, $priceMin, $priceMax, $sort)) ?>">
-              <i class="bi bi-chevron-left" aria-hidden="true"></i>
-            </a>
-          </li>
-          <?php for ($p = max(1, $curPage - 2); $p <= min($totalPages, $curPage + 2); $p++): ?>
-            <li class="page-item <?= $p === $curPage ? 'active' : '' ?>">
-              <a class="page-link" href="<?= htmlspecialchars(mci_products_page_url($p, $q, $city, $category, $priceMin, $priceMax, $sort)) ?>"><?= $p ?></a>
-            </li>
-          <?php endfor; ?>
-          <li class="page-item <?= $curPage >= $totalPages ? 'disabled' : '' ?>">
-            <a class="page-link" href="<?= htmlspecialchars(mci_products_page_url($curPage + 1, $q, $city, $category, $priceMin, $priceMax, $sort)) ?>">
-              <i class="bi bi-chevron-right" aria-hidden="true"></i>
-            </a>
-          </li>
-        </ul>
-      </nav>
-    <?php endif; ?>
+    <!-- Infinite scroll sentinel -->
+    <div id="mciInfiniteEnd"
+      data-type="products"
+      data-page="<?= $curPage ?>"
+      data-pages="<?= $totalPages ?>"
+      data-q="<?= htmlspecialchars($q) ?>"
+      data-city="<?= htmlspecialchars($city) ?>"
+      data-category="<?= htmlspecialchars($category) ?>"
+      data-price-min="<?= htmlspecialchars($priceMin) ?>"
+      data-price-max="<?= htmlspecialchars($priceMax) ?>"
+      data-sort="<?= htmlspecialchars($sort) ?>"
+      style="height:1px;"></div>
+    <div id="mciInfiniteLoader" class="mci-infinite-loader" style="display:none;">
+      <span class="mci-infinite-spinner" aria-hidden="true"></span>
+      <span class="mci-infinite-loader__text">Loading more…</span>
+    </div>
 
   <?php endif; ?>
 </div>
@@ -363,13 +376,7 @@ ob_start();
   var pMin   = document.getElementById('mciPriceMin');
   var pMax   = document.getElementById('mciPriceMax');
   if (!preset) return;
-  var map = {
-    'under500':   ['', '500'],
-    '500-2000':   ['500', '2000'],
-    '2000-10000': ['2000', '10000'],
-    'above10000': ['10000', ''],
-    '':           ['', '']
-  };
+  var map = <?= mci_price_presets_js_map() ?>;
   preset.addEventListener('change', function () {
     var vals = map[preset.value] || ['', ''];
     pMin.value = vals[0];

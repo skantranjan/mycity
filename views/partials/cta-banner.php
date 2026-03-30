@@ -12,7 +12,7 @@
           Reach locals who are searching for what you offer.
         </p>
         <p class="text-white-50 mb-0 mci-cta-banner__body">
-          One short form—add details, photos, and hours. Create an account to manage your listing later.
+          One short form - add details, photos, and hours. Create an account to manage your listing later.
         </p>
       </div>
       <div class="col-12 col-lg-4">

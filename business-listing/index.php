@@ -4,6 +4,7 @@ declare(strict_types=1);
 $pageTitle = 'Listings - My City Info';
 $activePage = 'listings';
 
+require_once __DIR__ . '/../includes/mci_config.php';
 require_once __DIR__ . '/../includes/mci_category_icons.php';
 require_once __DIR__ . '/../api/v1/lib/db.php';
 require_once __DIR__ . '/../api/v1/lib/business_service.php';
@@ -150,7 +151,7 @@ if ($subcategory !== '' && !in_array($subcategory, array_column($dbSubcategories
 }
 
 // ── Load listings from DB with server-side filter ─────────────────────────────
-$filters = ['page' => $curPage, 'per_page' => 12];
+$filters = ['page' => $curPage, 'per_page' => MCI_LISTING_PER_PAGE];
 if ($what !== '')        { $filters['q']                = $what; }
 if ($where !== '')       { $filters['city']             = $where; }
 if ($category !== '')    { $filters['category_slug']    = $category; }
@@ -198,7 +199,7 @@ ob_start();
         <nav class="mci-breadcrumb mb-2" aria-label="Breadcrumb">
           <a href="/">Home</a>
           <span class="mci-breadcrumb__sep" aria-hidden="true">›</span>
-          <span class="mci-breadcrumb__current">Listings<?php if ($category !== ''): ?> — <?= htmlspecialchars(ucfirst(str_replace('-', ' ', $category))) ?><?php endif; ?></span>
+          <span class="mci-breadcrumb__current">Listings<?php if ($category !== ''): ?> - <?= htmlspecialchars(ucfirst(str_replace('-', ' ', $category))) ?><?php endif; ?></span>
         </nav>
         <h1 class="h4 fw-bold mb-1">Listings</h1>
         <div class="text-muted small">

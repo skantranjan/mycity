@@ -56,8 +56,8 @@
 
     <div class="d-flex flex-column flex-sm-row align-items-start align-items-sm-center justify-content-between gap-3 mt-5 pt-4 border-top mci-footer__bottom">
       <div class="text-muted small">
-        <?php $mciStartYear = 2020; $mciCurrentYear = (int) date('Y'); ?>
-        Copyright &copy; <?= $mciStartYear ?><?= $mciCurrentYear > $mciStartYear ? ' - ' . $mciCurrentYear : '' ?> MyCityInfo.
+        <?php $mciCurrentYear = (int) date('Y'); ?>
+        Copyright &copy; <?= MCI_FOUNDING_YEAR ?><?= $mciCurrentYear > MCI_FOUNDING_YEAR ? ' - ' . $mciCurrentYear : '' ?> MyCityInfo.
       </div>
       <div class="text-muted small d-flex align-items-center gap-3">
         <span class="d-inline-flex align-items-center gap-2">

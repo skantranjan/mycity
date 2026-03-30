@@ -10,6 +10,7 @@ $mciErrorHandlerIncluded = false;
 require_once __DIR__ . '/../includes/mci_error_handler.php';
 $mciErrorHandlerIncluded = true;
 require_once __DIR__ . '/../includes/mci_paths.php';
+require_once __DIR__ . '/../includes/mci_config.php';
 $appArea = isset($appArea) && in_array($appArea, ['subscriber', 'cp'], true) ? $appArea : '';
 $__mciBodyClass = 'mci-body';
 if ($appArea !== '') {

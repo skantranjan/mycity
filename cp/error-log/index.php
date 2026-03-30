@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/mci_config.php';
 require_once __DIR__ . '/../../includes/mci_session.php';
 require_once __DIR__ . '/../../includes/mci_require_session.php';
 
@@ -23,7 +24,7 @@ if (!in_array($levelFilter, $validLevels, true)) {
 }
 
 $page    = max(1, (int) ($_GET['page'] ?? 1));
-$perPage = 50;
+$perPage = MCI_CP_ERRORLOG_PER_PAGE;
 $offset  = ($page - 1) * $perPage;
 
 // ── Query ─────────────────────────────────────────────────

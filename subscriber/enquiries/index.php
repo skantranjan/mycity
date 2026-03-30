@@ -5,109 +5,71 @@ $subActive = 'enquiries';
 $hideCta = true;
 $appArea = 'subscriber';
 
+require_once __DIR__ . '/../../includes/mci_session.php';
+require_once __DIR__ . '/../../api/v1/lib/db.php';
+require_once __DIR__ . '/../../api/v1/lib/leads_service.php';
+
 $csrfAction = 'subscriber_enquiries_reply';
 require_once __DIR__ . '/../../includes/mci_csrf.php';
 $csrfToken = mci_csrf_token($csrfAction);
-$csrfOk = false;
 
-$replyFlash = '';
-$statusFilter = trim((string) ($_GET['status'] ?? 'all'));
+$userId = (string)($_SESSION['mci_user_id'] ?? '');
+
+$replyFlash   = '';
+$statusFilter = trim((string) ($_GET['status']   ?? 'all'));
 $statusFilter = $statusFilter !== '' ? $statusFilter : 'all';
-$fromDate = trim((string) ($_GET['from_date'] ?? ''));
-$toDate = trim((string) ($_GET['to_date'] ?? ''));
-$replyFor = trim((string) ($_POST['enquiry_id'] ?? ''));
+$fromDate     = trim((string) ($_GET['from_date'] ?? ''));
+$toDate       = trim((string) ($_GET['to_date']   ?? ''));
+$replyFor     = trim((string) ($_POST['enquiry_id'] ?? ''));
+
+// Handle reply POST — marks enquiry as 'replied'
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $replyFor !== '') {
     $replyText = trim((string) ($_POST['reply_text'] ?? ''));
     if ($replyText !== '') {
         $csrfPost = trim((string) ($_POST['csrf_token'] ?? ''));
         if (!mci_csrf_verify($csrfAction, $csrfPost)) {
             $replyFlash = 'Invalid request token. Please refresh and try again.';
-            $csrfOk = false;
         } else {
-            $replyFlash = 'Reply sent for enquiry #' . htmlspecialchars($replyFor, ENT_QUOTES, 'UTF-8') . '.';
-            $csrfOk = true;
+            try {
+                $pdo = api_db();
+                leads_update_status($pdo, $replyFor, 'replied', $userId);
+                $replyFlash = 'Reply recorded.';
+            } catch (Throwable) {
+                $replyFlash = 'Could not save reply. Please try again.';
+            }
         }
     }
 }
 
-$enquiries = [
-    [
-        'id' => '4f2286e9-d99f-4337-97e6-2ee38f8b14d5',
-        'listing' => 'JXF Painting Service',
-        'from' => 'Ava Thompson',
-        'email' => 'ava.t@example.com',
-        'message' => 'Do you handle exterior repainting for small retail shops? Looking for work in next 2 weeks.',
-        'when' => '2 hours ago',
-        'date' => '2026-03-20',
-        'status' => 'New',
-    ],
-    [
-        'id' => '7f6a4ff8-08d0-47a8-8928-a89ffeb15b88',
-        'listing' => 'Locker Shop UK Ltd',
-        'from' => 'School Admin Team',
-        'email' => 'ops@school-demo.org',
-        'message' => 'Need quote for 120 student lockers with delivery timeline. Can you share options?',
-        'when' => 'Yesterday',
-        'date' => '2026-03-19',
-        'status' => 'Waiting reply',
-    ],
-    [
-        'id' => 'f0d42f4e-92fe-425d-9fd9-15c58c181e2a',
-        'listing' => 'Property 852',
-        'from' => 'Noah Lee',
-        'email' => 'noahl@example.net',
-        'message' => 'Please share if 800-1000 sq ft office spaces are available this month.',
-        'when' => '2 days ago',
-        'date' => '2026-03-18',
-        'status' => 'Replied',
-    ],
-];
-
-// UI demo: update status after reply
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $replyFor !== '' && $replyFlash !== '' && $csrfOk) {
-    foreach ($enquiries as &$q) {
-        if ((string) $q['id'] === (string) $replyFor) {
-            $q['status'] = 'Replied';
-            break;
-        }
-    }
-    unset($q);
-}
-
-// Filter by status (UI demo)
+// Map UI filter value to DB status
 $statusMap = [
-    'all' => 'all',
-    'new' => 'New',
-    'awaiting' => 'Waiting reply',
-    'waiting' => 'Waiting reply',
-    'waiting reply' => 'Waiting reply',
-    'replied' => 'Replied',
+    'all'      => 'all',
+    'new'      => 'new',
+    'awaiting' => 'new',
+    'replied'  => 'replied',
 ];
-$key = strtolower(trim($statusFilter));
-$wanted = $statusMap[$key] ?? 'all';
-if ($wanted !== 'all') {
-    $enquiries = array_values(array_filter($enquiries, static function (array $q) use ($wanted): bool {
-        return isset($q['status']) && (string) $q['status'] === (string) $wanted;
-    }));
-}
+$wanted = $statusMap[strtolower($statusFilter)] ?? 'all';
 
-$fromDateObj = DateTime::createFromFormat('Y-m-d', $fromDate) ?: null;
-$toDateObj = DateTime::createFromFormat('Y-m-d', $toDate) ?: null;
-if ($fromDateObj || $toDateObj) {
-    $enquiries = array_values(array_filter($enquiries, static function (array $q) use ($fromDateObj, $toDateObj): bool {
-        $itemDate = DateTime::createFromFormat('Y-m-d', (string) ($q['date'] ?? '')) ?: null;
-        if ($itemDate === null) {
-            return false;
-        }
-        if ($fromDateObj && $itemDate < $fromDateObj) {
-            return false;
-        }
-        if ($toDateObj && $itemDate > $toDateObj) {
-            return false;
-        }
-        return true;
-    }));
-}
+// Load from DB
+$enquiries = [];
+try {
+    $pdo       = api_db();
+    $result    = leads_list($pdo, $userId, 'enquiry', $wanted, '', $fromDate, $toDate);
+    $rawItems  = $result['items'];
+    // Map DB fields to the template's expected keys
+    $enquiries = array_map(static function (array $item): array {
+        return [
+            'id'      => $item['id'],
+            'listing' => $item['listing'],
+            'from'    => $item['name'],
+            'email'   => $item['email'],
+            'message' => $item['message'],
+            'when'    => $item['when'],
+            'date'    => $item['date'],
+            'status'  => $item['status'],
+        ];
+    }, $rawItems);
+} catch (Throwable) {}
 
 ob_start();
 ?>
@@ -128,10 +90,10 @@ ob_start();
             <form method="get" class="d-flex align-items-center gap-2 flex-wrap">
               <label class="form-label small mb-0">Status</label>
               <select name="status" class="form-select form-select-sm" aria-label="Filter enquiries by status">
-                <option value="all" <?= $wanted === 'all' ? 'selected' : '' ?>>All</option>
-                <option value="new" <?= $wanted === 'New' ? 'selected' : '' ?>>New</option>
-                <option value="awaiting" <?= $wanted === 'Waiting reply' ? 'selected' : '' ?>>Awaiting response</option>
-                <option value="replied" <?= $wanted === 'Replied' ? 'selected' : '' ?>>Replied</option>
+                <option value="all" <?= $wanted === 'all'     ? 'selected' : '' ?>>All</option>
+                <option value="new" <?= $wanted === 'new'     ? 'selected' : '' ?>>New</option>
+                <option value="awaiting" <?= $wanted === 'new'  ? 'selected' : '' ?>>Awaiting response</option>
+                <option value="replied" <?= $wanted === 'replied' ? 'selected' : '' ?>>Replied</option>
               </select>
               <label class="form-label small mb-0">From</label>
               <input type="date" name="from_date" class="form-control form-control-sm" value="<?= htmlspecialchars($fromDate, ENT_QUOTES, 'UTF-8') ?>" aria-label="Filter enquiries from date" />
@@ -158,14 +120,13 @@ ob_start();
                 <div class="d-flex align-items-center gap-2">
                   <?php
                   $enqBadgeClass = match($q['status']) {
-                      'New'          => 'text-bg-primary',
-                      'Waiting reply'=> 'text-bg-warning',
-                      'Replied'      => 'text-bg-success',
-                      default        => 'text-bg-light border',
+                      'new'     => 'text-bg-primary',
+                      'replied' => 'text-bg-success',
+                      default   => 'text-bg-light border',
                   };
                   ?>
                   <span class="badge <?= $enqBadgeClass ?>"><?= htmlspecialchars($q['status']) ?></span>
-                  <?php if ($q['status'] === 'New'): ?>
+                  <?php if ($q['status'] === 'new'): ?>
                     <form method="post" action="" class="d-inline">
                       <input type="hidden" name="enquiry_id" value="<?= htmlspecialchars($q['id']) ?>" />
                       <input type="hidden" name="reply_text" value="(marked as read)" />
