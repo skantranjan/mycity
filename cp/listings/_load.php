@@ -13,6 +13,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../../includes/mci_config.php';
 require_once __DIR__ . '/../../includes/mci_session.php';
 require_once __DIR__ . '/../../includes/mci_require_session.php';
 require_once __DIR__ . '/../../includes/mci_csrf.php';
@@ -27,7 +28,7 @@ $curPage = max(1, (int)($_GET['page'] ?? 1));
 
 $dbFilters = [
     'page'     => $curPage,
-    'per_page' => 25,
+    'per_page' => MCI_CP_LISTING_PER_PAGE,
 ];
 if (!empty($statusFilter)) {
     $dbFilters['status'] = $statusFilter;

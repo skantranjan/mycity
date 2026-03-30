@@ -1112,6 +1112,75 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '
 }
 
 // =============================================================================
+// Public — items name suggestions (typeahead) — no auth
+// GET /api/v1/public/items/suggest?type=products&q=foo
+// =============================================================================
+if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'items' && ($segments[2] ?? '') === 'suggest') {
+    $type = trim((string)($_GET['type'] ?? ''));
+    if (!in_array($type, ['products', 'services'], true)) {
+        api_error('invalid_type', 400);
+    }
+    $q = substr(strip_tags(trim((string)($_GET['q'] ?? ''))), 0, 120);
+    if (strlen($q) < 3) {
+        api_json(['ok' => true, 'suggestions' => []]);
+    }
+    $table = $type === 'products' ? 'mci_business_products' : 'mci_business_services';
+    $pdo   = api_db();
+    $stmt  = $pdo->prepare("
+        SELECT DISTINCT p.name
+        FROM {$table} p
+        INNER JOIN mci_business_groups g ON g.id = p.business_group_id AND g.status = 'live'
+        WHERE p.is_active = 1 AND p.name LIKE ?
+        ORDER BY p.name
+        LIMIT 8
+    ");
+    $stmt->execute(['%' . $q . '%']);
+    $names = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'name');
+    api_json(['ok' => true, 'suggestions' => $names]);
+}
+
+// =============================================================================
+// Public — submit a lead or enquiry for a business listing — no auth
+// POST /api/v1/public/leads
+// Body (JSON or form): business_group_id, type ('lead'|'enquiry'),
+//   sender_name, sender_phone, sender_email, message
+// =============================================================================
+if ($method === 'POST' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'leads' && !isset($segments[2])) {
+    require_once __DIR__ . '/lib/leads_service.php';
+
+    $data = api_request_data();
+
+    $bgId    = substr(trim((string)($data['business_group_id'] ?? '')), 0, 36);
+    $type    = trim((string)($data['type'] ?? 'lead'));
+    $name    = substr(trim((string)($data['sender_name']  ?? '')), 0, 160);
+    $phone   = substr(trim((string)($data['sender_phone'] ?? '')), 0, 40);
+    $email   = substr(trim((string)($data['sender_email'] ?? '')), 0, 254);
+    $message = trim((string)($data['message'] ?? ''));
+
+    if ($bgId === '' || $message === '') {
+        api_error('missing_fields', 400);
+    }
+    if (!in_array($type, ['lead', 'enquiry'], true)) {
+        $type = 'lead';
+    }
+
+    // Verify the business group exists and is live
+    $pdo    = api_db();
+    $bgStmt = $pdo->prepare("SELECT id FROM mci_business_groups WHERE id = ? AND status = 'live' LIMIT 1");
+    $bgStmt->execute([$bgId]);
+    if (!$bgStmt->fetch()) {
+        api_error('business_not_found', 404);
+    }
+
+    $newId = leads_create($pdo, $bgId, $type, $name, $phone, $email, $message);
+    if ($newId === '') {
+        api_error('create_failed', 500);
+    }
+
+    api_json(['ok' => true, 'id' => $newId], 201);
+}
+
+// =============================================================================
 // Business registration
 // POST /api/v1/businesses
 // =============================================================================

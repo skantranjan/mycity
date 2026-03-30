@@ -253,7 +253,7 @@ ob_start();
       <div class="flex-grow-1 min-w-0">
         <div class="home-section-accent mb-2"></div>
         <h2 class="home-section-title h3 mb-1">Recent listings</h2>
-        <p class="text-muted small mb-0">Newly added businesses—name, category, and full address at a glance</p>
+        <p class="text-muted small mb-0">Newly added businesses - name, category, and full address at a glance</p>
       </div>
       <a class="btn btn-home-primary btn-sm text-center mci-touch-target mci-touch-target--sm" href="/submit-business-listing/">+ List your business</a>
     </div>
@@ -274,7 +274,7 @@ ob_start();
           Popular in
           <span id="homePopularCity" class="home-popular-city-name"><?= $activeCity !== '' ? htmlspecialchars($activeCity) : 'your city' ?></span>
         </h2>
-        <p class="text-muted small mb-0">Highly viewed listings near you—updated when we detect your area</p>
+        <p class="text-muted small mb-0">Highly viewed listings near you - updated when we detect your area</p>
       </div>
       <a href="/business-listing/" class="btn btn-home-outline btn-sm align-self-stretch align-self-sm-auto text-center mci-touch-target mci-touch-target--sm">See all in directory →</a>
     </div>

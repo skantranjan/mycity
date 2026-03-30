@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../includes/mci_config.php';
 require_once __DIR__ . '/../includes/mci_category_icons.php';
 require_once __DIR__ . '/../api/v1/lib/db.php';
 require_once __DIR__ . '/../api/v1/lib/business_service.php';
@@ -123,7 +124,7 @@ if ($categoryRow) {
     try {
         $filters = [
             'category_slug' => $categorySlug,
-            'per_page'      => 12,
+            'per_page'      => MCI_LISTING_PER_PAGE,
             'page'          => $curPage,
             'sort'          => $sort,
         ];
@@ -369,10 +370,10 @@ ob_start();
                 <label class="form-label">Price range</label>
                 <select class="form-select" name="price_range">
                   <option value="">Any</option>
-                  <option value="free"     <?= $priceRange === 'free'     ? 'selected' : '' ?>>₹ — Inexpensive</option>
-                  <option value="moderate" <?= $priceRange === 'moderate' ? 'selected' : '' ?>>₹₹ — Moderate</option>
-                  <option value="pricey"   <?= $priceRange === 'pricey'   ? 'selected' : '' ?>>₹₹₹ — Pricey</option>
-                  <option value="ultra"    <?= $priceRange === 'ultra'    ? 'selected' : '' ?>>₹₹₹₹ — Ultra High</option>
+                  <option value="free"     <?= $priceRange === 'free'     ? 'selected' : '' ?>>₹ - Inexpensive</option>
+                  <option value="moderate" <?= $priceRange === 'moderate' ? 'selected' : '' ?>>₹₹ - Moderate</option>
+                  <option value="pricey"   <?= $priceRange === 'pricey'   ? 'selected' : '' ?>>₹₹₹ - Pricey</option>
+                  <option value="ultra"    <?= $priceRange === 'ultra'    ? 'selected' : '' ?>>₹₹₹₹ - Ultra High</option>
                 </select>
               </div>
 

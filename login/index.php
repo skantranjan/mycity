@@ -72,7 +72,7 @@ ob_start();
   <div class="col-12 col-lg-6 order-2 order-lg-1">
     <div class="mci-auth-benefits h-100">
       <p class="mci-auth-benefits__kicker mb-0">My City Info</p>
-      <h1 class="mci-auth-benefits__title">Welcome back—sign in to pick up where you left off</h1>
+      <h1 class="mci-auth-benefits__title">Welcome back - sign in to pick up where you left off</h1>
       <p class="mci-auth-benefits__lead">
         Your account keeps your reviews, saved searches, and claimed listings in one place.
         Sign in to rate businesses, manage your profile, and discover what's new in your neighbourhood.
@@ -81,7 +81,7 @@ ob_start();
       <figure class="mci-auth-benefits__figure" aria-hidden="true">
         <img
           src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&amp;fit=crop&amp;w=800&amp;h=600&amp;q=80"
-          alt="People using laptop and mobile devices — easy access"
+          alt="People using laptop and mobile devices - easy access"
           width="800"
           height="600"
           loading="lazy"
@@ -107,14 +107,14 @@ ob_start();
           <span class="mci-auth-benefits__icon" aria-hidden="true"><i class="bi bi-building"></i></span>
           <div>
             <strong>Manage your listing</strong>
-            <p>If you've claimed a business, sign in to update details, reply to reviews, and upload fresh photos—all from your subscriber dashboard.</p>
+            <p>If you've claimed a business, sign in to update details, reply to reviews, and upload fresh photos - all from your subscriber dashboard.</p>
           </div>
         </li>
         <li class="mci-auth-benefits__item">
           <span class="mci-auth-benefits__icon" aria-hidden="true"><i class="bi bi-lightning"></i></span>
           <div>
             <strong>One login, all devices</strong>
-            <p>Use the same credentials on desktop, tablet, and mobile—your session stays secure and your data syncs across devices.</p>
+            <p>Use the same credentials on desktop, tablet, and mobile - your session stays secure and your data syncs across devices.</p>
           </div>
         </li>
       </ul>

@@ -86,7 +86,7 @@ ob_start();
   <div class="col-12 col-lg-6 order-2 order-lg-1">
     <div class="mci-auth-benefits h-100">
       <p class="mci-auth-benefits__kicker mb-0">My City Info</p>
-      <h1 class="mci-auth-benefits__title">A free account that works for you—not marketers</h1>
+      <h1 class="mci-auth-benefits__title">A free account that works for you - not marketers</h1>
       <p class="mci-auth-benefits__lead">
         Join locals who discover businesses, leave honest feedback, and optionally manage a listing.
         We built registration around respect for your inbox and your time.
@@ -95,7 +95,7 @@ ob_start();
       <figure class="mci-auth-benefits__figure" aria-hidden="true">
         <img
           src="https://images.unsplash.com/photo-1556761175-4b46a572b786?auto=format&amp;fit=crop&amp;w=800&amp;h=600&amp;q=80"
-          alt="People collaborating — local community and trust"
+          alt="People collaborating - local community and trust"
           width="800"
           height="600"
           loading="lazy"
@@ -107,7 +107,7 @@ ob_start();
           <span class="mci-auth-benefits__icon" aria-hidden="true"><i class="bi bi-envelope-check"></i></span>
           <div>
             <strong>No spam, no sell-offs</strong>
-            <p>We don’t blast promotions or share your email with random “partners.” Account mail is for security and things you asked for—like listing updates or password resets.</p>
+            <p>We don’t blast promotions or share your email with random “partners.” Account mail is for security and things you asked for - like listing updates or password resets.</p>
           </div>
         </li>
         <li class="mci-auth-benefits__item">
@@ -121,14 +121,14 @@ ob_start();
           <span class="mci-auth-benefits__icon" aria-hidden="true"><i class="bi bi-shield-lock"></i></span>
           <div>
             <strong>Your data, plainly explained</strong>
-            <p>We follow our <a href="/privacy-policy/">Privacy Policy</a>—what we collect, why we use it, and how you can ask questions.</p>
+            <p>We follow our <a href="/privacy-policy/">Privacy Policy</a> - what we collect, why we use it, and how you can ask questions.</p>
           </div>
         </li>
         <li class="mci-auth-benefits__item">
           <span class="mci-auth-benefits__icon" aria-hidden="true"><i class="bi bi-shop"></i></span>
           <div>
             <strong>List or claim when you’re ready</strong>
-            <p>One account can power reviews today and <a href="/submit-business-listing/">listing your business</a> or claiming a page when you choose—no pressure.</p>
+            <p>One account can power reviews today and <a href="/submit-business-listing/">listing your business</a> or claiming a page when you choose - no pressure.</p>
           </div>
         </li>
       </ul>

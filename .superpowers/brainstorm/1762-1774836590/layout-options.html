@@ -1,0 +1,146 @@
+<h2>Products Page — Layout Options</h2>
+<p class="subtitle">How should the search filters and results be arranged?</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px; background: #f8f9fa; font-size: 12px; font-family: monospace;">
+      <div style="background:#212529; color:#fff; padding:6px 10px; border-radius:4px; margin-bottom:8px; font-size:11px;">🔍 Search products...&nbsp;&nbsp;&nbsp;📍 City&nbsp;&nbsp;&nbsp;💰 Price&nbsp;&nbsp;&nbsp;[Filter]</div>
+      <div style="display:grid; grid-template-columns:180px 1fr; gap:8px;">
+        <div style="background:#e9ecef; border-radius:4px; padding:8px; font-size:10px;">
+          <div style="font-weight:600; margin-bottom:4px;">Category</div>
+          <div>☐ Electronics</div><div>☐ Clothing</div><div>☐ Food</div>
+          <div style="font-weight:600; margin:6px 0 4px;">Price Range</div>
+          <div style="background:#dee2e6; height:4px; border-radius:2px;"></div>
+          <div style="font-weight:600; margin:6px 0 4px;">City</div>
+          <div style="background:#dee2e6; height:20px; border-radius:4px;"></div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+          <div style="background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:8px;">
+            <div style="background:#e9ecef; height:60px; border-radius:4px; margin-bottom:6px;"></div>
+            <div style="font-size:10px; font-weight:600;">Product Name</div>
+            <div style="font-size:9px; color:#6c757d;">Business Name · Mumbai</div>
+            <div style="font-size:10px; color:#198754; font-weight:600; margin-top:3px;">₹500–₹1,200</div>
+          </div>
+          <div style="background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:8px;">
+            <div style="background:#e9ecef; height:60px; border-radius:4px; margin-bottom:6px;"></div>
+            <div style="font-size:10px; font-weight:600;">Product Name</div>
+            <div style="font-size:9px; color:#6c757d;">Business Name · Delhi</div>
+            <div style="font-size:10px; color:#198754; font-weight:600; margin-top:3px;">₹200–₹800</div>
+          </div>
+          <div style="background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:8px;">
+            <div style="background:#e9ecef; height:60px; border-radius:4px; margin-bottom:6px;"></div>
+            <div style="font-size:10px; font-weight:600;">Product Name</div>
+            <div style="font-size:9px; color:#6c757d;">Business Name · Pune</div>
+            <div style="font-size:10px; color:#198754; font-weight:600; margin-top:3px;">₹1,000+</div>
+          </div>
+          <div style="background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:8px;">
+            <div style="background:#e9ecef; height:60px; border-radius:4px; margin-bottom:6px;"></div>
+            <div style="font-size:10px; font-weight:600;">Product Name</div>
+            <div style="font-size:9px; color:#6c757d;">Business Name · Bangalore</div>
+            <div style="font-size:10px; color:#198754; font-weight:600; margin-top:3px;">Free</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Sidebar Filters + Grid Results</h3>
+      <p>Persistent filter panel on the left, product cards in a 2–3 column grid. Familiar e-commerce pattern. Filters always visible on desktop.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px; background: #f8f9fa; font-size: 12px; font-family: monospace;">
+      <div style="background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:10px; margin-bottom:8px; display:flex; gap:6px; align-items:center;">
+        <div style="background:#e9ecef; border-radius:4px; padding:4px 10px; flex:1; font-size:10px;">🔍 Search for products, businesses...</div>
+        <div style="background:#e9ecef; border-radius:4px; padding:4px 8px; font-size:10px;">📍 City</div>
+        <div style="background:#212529; color:#fff; border-radius:4px; padding:4px 10px; font-size:10px;">Search</div>
+      </div>
+      <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
+        <span style="background:#e9ecef; border-radius:20px; padding:3px 10px; font-size:10px;">Category ▾</span>
+        <span style="background:#e9ecef; border-radius:20px; padding:3px 10px; font-size:10px;">Price ▾</span>
+        <span style="background:#e9ecef; border-radius:20px; padding:3px 10px; font-size:10px;">Sort: Relevance ▾</span>
+        <span style="background:#0d6efd; color:#fff; border-radius:20px; padding:3px 10px; font-size:10px;">✓ Mumbai</span>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+        <div style="background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:8px;">
+          <div style="background:#e9ecef; height:55px; border-radius:4px; margin-bottom:6px;"></div>
+          <div style="font-size:10px; font-weight:600;">Product Name</div>
+          <div style="font-size:9px; color:#6c757d;">Business Name</div>
+          <div style="font-size:9px; color:#6c757d;">📍 Mumbai</div>
+          <div style="font-size:10px; color:#198754; font-weight:600; margin-top:3px;">₹500–₹1,200</div>
+        </div>
+        <div style="background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:8px;">
+          <div style="background:#e9ecef; height:55px; border-radius:4px; margin-bottom:6px;"></div>
+          <div style="font-size:10px; font-weight:600;">Product Name</div>
+          <div style="font-size:9px; color:#6c757d;">Business Name</div>
+          <div style="font-size:9px; color:#6c757d;">📍 Delhi</div>
+          <div style="font-size:10px; color:#198754; font-weight:600; margin-top:3px;">₹200–₹800</div>
+        </div>
+        <div style="background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:8px;">
+          <div style="background:#e9ecef; height:55px; border-radius:4px; margin-bottom:6px;"></div>
+          <div style="font-size:10px; font-weight:600;">Product Name</div>
+          <div style="font-size:9px; color:#6c757d;">Business Name</div>
+          <div style="font-size:9px; color:#6c757d;">📍 Pune</div>
+          <div style="font-size:10px; color:#198754; font-weight:600; margin-top:3px;">₹1,000+</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Top Search Bar + Filter Pills + Grid</h3>
+      <p>Prominent search bar at top, inline filter pills (Category, Price, Sort) below it, active filters shown as dismissible chips. More space for results. Mobile-friendly.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px; background: #f8f9fa; font-size: 12px; font-family: monospace;">
+      <div style="background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:10px; margin-bottom:8px; display:flex; gap:6px; align-items:center;">
+        <div style="background:#e9ecef; border-radius:4px; padding:4px 10px; flex:1; font-size:10px;">🔍 Search products...</div>
+        <div style="background:#e9ecef; border-radius:4px; padding:4px 8px; font-size:10px;">📍 City</div>
+        <div style="background:#e9ecef; border-radius:4px; padding:4px 8px; font-size:10px;">⚙ Filters</div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:5px;">
+        <div style="background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:8px; display:grid; grid-template-columns:70px 1fr; gap:8px; align-items:center;">
+          <div style="background:#e9ecef; height:55px; border-radius:4px;"></div>
+          <div>
+            <div style="font-size:10px; font-weight:600;">Product Name</div>
+            <div style="font-size:9px; color:#6c757d; margin:2px 0;">Short description of the product goes here</div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-size:9px; color:#6c757d;">🏪 Business Name · 📍 Mumbai</div>
+              <div style="font-size:10px; color:#198754; font-weight:600;">₹500–₹1,200</div>
+            </div>
+          </div>
+        </div>
+        <div style="background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:8px; display:grid; grid-template-columns:70px 1fr; gap:8px; align-items:center;">
+          <div style="background:#e9ecef; height:55px; border-radius:4px;"></div>
+          <div>
+            <div style="font-size:10px; font-weight:600;">Product Name</div>
+            <div style="font-size:9px; color:#6c757d; margin:2px 0;">Short description of the product goes here</div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-size:9px; color:#6c757d;">🏪 Business Name · 📍 Delhi</div>
+              <div style="font-size:10px; color:#198754; font-weight:600;">₹200–₹800</div>
+            </div>
+          </div>
+        </div>
+        <div style="background:#fff; border:1px solid #dee2e6; border-radius:6px; padding:8px; display:grid; grid-template-columns:70px 1fr; gap:8px; align-items:center;">
+          <div style="background:#e9ecef; height:55px; border-radius:4px;"></div>
+          <div>
+            <div style="font-size:10px; font-weight:600;">Product Name</div>
+            <div style="font-size:9px; color:#6c757d; margin:2px 0;">Short description of the product goes here</div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="font-size:9px; color:#6c757d;">🏪 Business Name · 📍 Pune</div>
+              <div style="font-size:10px; color:#198754; font-weight:600;">₹1,000+</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Top Search Bar + List Results (with description)</h3>
+      <p>Search + city at top, filters in a collapsible panel. Results as a list with thumbnail, product name, description snippet, business name, city, and price. Shows more info per result.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Click your preferred layout — or tell me in the terminal if you want a mix of these.</p>
