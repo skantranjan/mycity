@@ -1087,6 +1087,31 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '
 }
 
 // =============================================================================
+// Public — items search (products or services) — no auth
+// GET /api/v1/public/items?type=products&q=...&city=...&category=...&page=1
+// =============================================================================
+if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'items') {
+    require_once __DIR__ . '/lib/item_search_service.php';
+    $params = [
+        'type'      => trim((string)($_GET['type']      ?? 'products')),
+        'q'         => trim((string)($_GET['q']         ?? '')),
+        'city'      => trim((string)($_GET['city']      ?? '')),
+        'category'  => trim((string)($_GET['category']  ?? '')),
+        'price_min' => trim((string)($_GET['price_min'] ?? '')),
+        'price_max' => trim((string)($_GET['price_max'] ?? '')),
+        'sort'      => trim((string)($_GET['sort']      ?? 'relevance')),
+        'page'      => max(1, (int)($_GET['page']     ?? 1)),
+        'per_page'  => min(48, max(1, (int)($_GET['per_page'] ?? 12))),
+    ];
+    $pdo = api_db();
+    $res = api_items_search($pdo, $params);
+    if (!$res['ok']) {
+        api_error($res['error'], $res['status'] ?? 500);
+    }
+    api_json($res);
+}
+
+// =============================================================================
 // Business registration
 // POST /api/v1/businesses
 // =============================================================================
