@@ -37,8 +37,8 @@ function api_items_search(PDO $pdo, array $params): array
     }
     $category = substr($category, 0, 80);
 
-    $priceMin = $params['price_min'] !== '' ? max(0.0, (float)($params['price_min'] ?? 0)) : null;
-    $priceMax = $params['price_max'] !== '' ? max(0.0, (float)($params['price_max'] ?? 0)) : null;
+    $priceMin = (isset($params['price_min']) && $params['price_min'] !== '') ? max(0.0, (float)$params['price_min']) : null;
+    $priceMax = (isset($params['price_max']) && $params['price_max'] !== '') ? max(0.0, (float)$params['price_max']) : null;
     if ($priceMin !== null && $priceMax !== null && $priceMin > $priceMax) {
         [$priceMin, $priceMax] = [$priceMax, $priceMin];
     }
