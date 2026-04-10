@@ -24,6 +24,9 @@ const MCI_DASHBOARD_RECENT_LIMIT = 5;
 // Branding
 const MCI_FOUNDING_YEAR = 2020;
 
+// Google AdSense (ca-pub-…). Empty string disables the sitewide loader in layout.
+const MCI_ADSENSE_CLIENT_ID = 'ca-pub-8738802980664354';
+
 // ---------------------------------------------------------------------------
 // Error logging
 // ---------------------------------------------------------------------------

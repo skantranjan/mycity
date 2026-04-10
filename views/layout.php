@@ -33,6 +33,15 @@ if (!$__needsAppCss) {
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9ZLMGV0Q96"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-9ZLMGV0Q96');
+    </script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="description" content="<?= htmlspecialchars($metaDescription ?? 'Explore local businesses, services and places in your city.', ENT_QUOTES, 'UTF-8') ?>" />
@@ -44,7 +53,7 @@ if (!$__needsAppCss) {
       $__ogImage   = htmlspecialchars($ogImage          ?? mci_site_base_url() . '/assets/images/og-default.png', ENT_QUOTES, 'UTF-8');
     ?>
     <link rel="canonical"       href="<?= $__canonical ?>" />
-    <link rel="sitemap"         type="application/xml" title="Sitemap" href="/sitemap.xml" />
+    <link rel="sitemap"         type="application/xml" title="Sitemap" href="<?= htmlspecialchars(mci_web_path('/sitemap.xml'), ENT_QUOTES, 'UTF-8') ?>" />
     <link rel="icon"            type="image/png" href="/assets/images/logo.png" />
     <link rel="apple-touch-icon" href="/assets/images/logo.png" />
     <meta property="og:type"        content="<?= $__ogType ?>" />
@@ -58,6 +67,13 @@ if (!$__needsAppCss) {
     <meta name="twitter:description" content="<?= $__ogDesc ?>" />
     <meta name="twitter:image"       content="<?= $__ogImage ?>" />
     <title><?= htmlspecialchars($pageTitle ?? 'My City Info') ?></title>
+    <?php if (defined('MCI_ADSENSE_CLIENT_ID') && MCI_ADSENSE_CLIENT_ID !== ''): ?>
+    <script
+      async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=<?= htmlspecialchars(MCI_ADSENSE_CLIENT_ID, ENT_QUOTES, 'UTF-8') ?>"
+      crossorigin="anonymous"
+    ></script>
+    <?php endif; ?>
     <script>
 (function () {
   var b = <?= json_encode(mci_api_v1_base(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
