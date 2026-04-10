@@ -12,6 +12,9 @@ function api_db(): PDO
 
     $cfg = api_db_config();
     $dsn = sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4', $cfg['host'], $cfg['name']);
+    if (!empty($cfg['port'])) {
+        $dsn .= ';port=' . (int)$cfg['port'];
+    }
 
     $options = [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -19,6 +22,9 @@ function api_db(): PDO
         PDO::ATTR_EMULATE_PREPARES => false,
         PDO::ATTR_TIMEOUT => 5,
     ];
+    if (!empty($cfg['persistent'])) {
+        $options[PDO::ATTR_PERSISTENT] = true;
+    }
 
     $lastError = null;
     for ($attempt = 1; $attempt <= 2; $attempt++) {

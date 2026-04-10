@@ -4,6 +4,10 @@
 # Runtime logs
 logs/*.log
 
+# App file cache (APCu is preferred in production; files are fallback)
+storage/cache/app/*.json
+storage/cache/app/public_directory_version.txt
+
 # OS / IDE
 Thumbs.db
 .DS_Store

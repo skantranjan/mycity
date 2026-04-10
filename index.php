@@ -2,6 +2,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/includes/mci_paths.php';
+require_once __DIR__ . '/includes/mci_config.php';
+require_once __DIR__ . '/includes/mci_cache.php';
 require_once __DIR__ . '/includes/mci_category_icons.php';
 require_once __DIR__ . '/api/v1/lib/db.php';
 require_once __DIR__ . '/api/v1/lib/business_service.php';
@@ -22,16 +24,24 @@ $slugify = static function (string $value): string {
 $categories = [];          // top-level only — for the grid
 $categoryTree = [];        // [ {parent, children:[]} ] — for the accordion
 $pdo = null;               // defined so later queries don't trigger "undefined variable"
+$ttlHome = mci_cache_ttl_default();
 
 try {
     $pdo = api_db();
 
-    $stmt = $pdo->query(
-        "SELECT id, parent_id, name, slug, icon, sort_order
-         FROM mci_categories
-         ORDER BY COALESCE(parent_id, 0), sort_order, name"
+    $allCats = mci_cache_remember(
+        mci_cache_public_key('home:categories:v1'),
+        $ttlHome,
+        static function () use ($pdo): array {
+            $stmt = $pdo->query(
+                "SELECT id, parent_id, name, slug, icon, sort_order
+                 FROM mci_categories
+                 ORDER BY COALESCE(parent_id, 0), sort_order, name"
+            );
+
+            return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        }
     );
-    $allCats = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
     // Index by id for quick lookup
     $byId = [];
@@ -61,8 +71,8 @@ try {
     }
     shuffle($categories);
     $categories = array_slice($categories, 0, 16);
-} catch (Throwable $ignored) {
-    // DB not ready — fall back to static list
+} catch (Throwable $e) {
+    mci_log_error('index categories', $e);
 }
 
 $extraHead = <<<'HTML'
@@ -107,15 +117,28 @@ try {
     $establishedRows = [];
 
     if ($pdo instanceof PDO) {
-        $recentRows  = api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'newest'])['businesses'] ?? [];
+        $cityKey = $activeCity !== '' ? hash('sha256', strtolower($activeCity)) : 'all';
+        $recentRows = mci_cache_remember(
+            mci_cache_public_key('home:list:newest:' . $cityKey . ':v1'),
+            $ttlHome,
+            static function () use ($pdo, $cityFilter): array {
+                return api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'newest'])['businesses'] ?? [];
+            }
+        );
         // Oldest-first adds variety vs “recent”; not a popularity metric — copy matches this.
-        $establishedRows = api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'oldest'])['businesses'] ?? [];
+        $establishedRows = mci_cache_remember(
+            mci_cache_public_key('home:list:oldest:' . $cityKey . ':v1'),
+            $ttlHome,
+            static function () use ($pdo, $cityFilter): array {
+                return api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'oldest'])['businesses'] ?? [];
+            }
+        );
     }
 
     foreach ($recentRows  as $row) { $recentListings[]  = mci_listing_row_to_card($row); }
     foreach ($establishedRows as $row) { $establishedListings[] = mci_listing_row_to_card($row); }
-} catch (Throwable $ignored) {
-    // Graceful degradation — sections will render empty
+} catch (Throwable $e) {
+    mci_log_error('index listings', $e);
 }
 
 
@@ -345,15 +368,23 @@ ob_start();
 $siteIndexLocations = [];
 try {
     if ($pdo instanceof PDO) {
-        $locRows = $pdo->query(
-            "SELECT country, state, city FROM mci_locations ORDER BY country, state, city"
-        )->fetchAll(PDO::FETCH_ASSOC);
+        $locRows = mci_cache_remember(
+            mci_cache_public_key('home:locations:v1'),
+            $ttlHome,
+            static function () use ($pdo): array {
+                $stmt = $pdo->query(
+                    "SELECT country, state, city FROM mci_locations ORDER BY country, state, city"
+                );
+
+                return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            }
+        );
         foreach ($locRows as $locRow) {
             $siteIndexLocations[$locRow['country']][$locRow['state']][] = $locRow['city'];
         }
     }
-} catch (Throwable $ignored) {
-    // Graceful degradation — accordion renders with no locations
+} catch (Throwable $e) {
+    mci_log_error('index locations index', $e);
 }
 ?>
 

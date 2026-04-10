@@ -394,6 +394,10 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
         ];
     }
 
+    if (($ctx['status'] ?? '') === 'live') {
+        api_business_invalidate_public_directory_cache();
+    }
+
     // Sync to mci_locations — outside transaction; failure must never block listing
     try {
         api_locations_upsert($pdo, $branchCountry, $branchState, $city);
@@ -820,6 +824,8 @@ function api_business_update(PDO $pdo, string $groupId, array $data, string $act
         ];
     }
 
+    api_business_invalidate_public_directory_cache_if_live($pdo, $groupId);
+
     return [
         'ok'          => true,
         'id'          => $groupId,
@@ -967,6 +973,10 @@ function api_business_update_status(
         $pdo->rollBack();
         error_log('api_business_update_status error: ' . $e->getMessage());
         return false;
+    }
+
+    if ($previousStatus !== $newStatus) {
+        api_business_invalidate_public_directory_cache();
     }
 
     return true;
@@ -1326,5 +1336,29 @@ function api_business_patch_images(PDO $pdo, string $groupId, array $images, str
         return ['ok' => false, 'error' => 'server_error', 'status' => 500];
     }
 
+    api_business_invalidate_public_directory_cache_if_live($pdo, $groupId);
+
     return ['ok' => true];
+}
+
+// ---------------------------------------------------------------------------
+// Invalidate cached public directory (listings home, listing page, public API)
+// ---------------------------------------------------------------------------
+
+function api_business_invalidate_public_directory_cache(): void
+{
+    if (!function_exists('mci_cache_invalidate_public')) {
+        require_once dirname(__DIR__, 3) . '/includes/mci_cache.php';
+    }
+    mci_cache_invalidate_public();
+}
+
+function api_business_invalidate_public_directory_cache_if_live(PDO $pdo, string $groupId): void
+{
+    $st = $pdo->prepare('SELECT status FROM mci_business_groups WHERE id = ? LIMIT 1');
+    $st->execute([$groupId]);
+    if ((string)($st->fetchColumn() ?: '') !== 'live') {
+        return;
+    }
+    api_business_invalidate_public_directory_cache();
 }

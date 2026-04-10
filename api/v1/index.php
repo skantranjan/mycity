@@ -36,6 +36,7 @@ $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 require_once __DIR__ . '/lib/response.php';
 require_once __DIR__ . '/lib/request.php';
 require_once __DIR__ . '/lib/db.php';
+require_once dirname(__DIR__, 2) . '/includes/mci_cache.php';
 require_once __DIR__ . '/lib/auth_middleware.php';
 require_once __DIR__ . '/lib/jwt.php';
 require_once __DIR__ . '/lib/auth_cookie.php';
@@ -1061,30 +1062,39 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'upload' && ($segments[1] ?? 
 // GET /api/v1/public/categories
 // =============================================================================
 if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'categories') {
-    header('Cache-Control: public, max-age=120');
+    $ttl = mci_cache_ttl_default();
+    header('Cache-Control: public, max-age=' . min(86400, max(0, $ttl)));
     $pdo = api_db();
-    $stmt = $pdo->query('SELECT id, name, slug, parent_id FROM mci_categories ORDER BY parent_id IS NOT NULL, name');
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    $roots = [];
-    $children = [];
-    foreach ($rows as $row) {
-        if ($row['parent_id'] === null) {
-            $row['children'] = [];
-            $roots[$row['id']] = $row;
-        } else {
-            $children[(int)$row['parent_id']][] = [
-                'id'   => (int)$row['id'],
-                'name' => $row['name'],
-                'slug' => $row['slug'],
-            ];
+    $result = mci_cache_remember(
+        mci_cache_public_key('api:pub:categories:v1'),
+        $ttl,
+        static function () use ($pdo): array {
+            $stmt = $pdo->query('SELECT id, name, slug, parent_id FROM mci_categories ORDER BY parent_id IS NOT NULL, name');
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $roots = [];
+            $children = [];
+            foreach ($rows as $row) {
+                if ($row['parent_id'] === null) {
+                    $row['children'] = [];
+                    $roots[$row['id']] = $row;
+                } else {
+                    $children[(int)$row['parent_id']][] = [
+                        'id'   => (int)$row['id'],
+                        'name' => $row['name'],
+                        'slug' => $row['slug'],
+                    ];
+                }
+            }
+            $result = [];
+            foreach ($roots as $root) {
+                $root['id']       = (int)$root['id'];
+                $root['children'] = $children[$root['id']] ?? [];
+                $result[]         = $root;
+            }
+
+            return $result;
         }
-    }
-    $result = [];
-    foreach ($roots as $root) {
-        $root['id']       = (int)$root['id'];
-        $root['children'] = $children[$root['id']] ?? [];
-        $result[]         = $root;
-    }
+    );
     api_json(['ok' => true, 'categories' => $result]);
 }
 
@@ -1093,14 +1103,23 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '
 // GET /api/v1/public/tags
 // =============================================================================
 if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'tags') {
-    header('Cache-Control: public, max-age=120');
-    $pdo  = api_db();
-    $stmt = $pdo->query('SELECT id, name, slug FROM mci_tags ORDER BY name');
-    $tags = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($tags as &$t) {
-        $t['id'] = (int)$t['id'];
-    }
-    unset($t);
+    $ttl = mci_cache_ttl_default();
+    header('Cache-Control: public, max-age=' . min(86400, max(0, $ttl)));
+    $pdo = api_db();
+    $tags = mci_cache_remember(
+        mci_cache_public_key('api:pub:tags:v1'),
+        $ttl,
+        static function () use ($pdo): array {
+            $stmt = $pdo->query('SELECT id, name, slug FROM mci_tags ORDER BY name');
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as &$t) {
+                $t['id'] = (int)$t['id'];
+            }
+            unset($t);
+
+            return $rows;
+        }
+    );
     api_json(['ok' => true, 'tags' => $tags]);
 }
 
@@ -1154,8 +1173,18 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '
     ];
     $filters = array_filter($filters, static fn($v): bool => $v !== '');
 
+    $ttl = mci_cache_ttl_default();
+    header('Cache-Control: public, max-age=' . min(86400, max(0, $ttl)));
+
     $pdo = api_db();
-    $res = api_business_list_public($pdo, $filters);
+    $cacheKey = mci_cache_key_public_filters('api:pub:businesses:', $filters);
+    $res      = mci_cache_remember(
+        $cacheKey,
+        $ttl,
+        static function () use ($pdo, $filters): array {
+            return api_business_list_public($pdo, $filters);
+        }
+    );
     api_json(['ok' => true] + $res);
 }
 
