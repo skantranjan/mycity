@@ -13,13 +13,23 @@ $extraHead = <<<'HTML'
 HTML;
 
 // ── Load data from DB ─────────────────────────────────────────────────────────
-$pdo           = api_db();
+$pdo           = null;
 $locations     = [];
 $categories    = [];
 $newlyAdded    = [];
 $established   = [];
+$dbUnavailable = false;
 
 try {
+    $pdo = api_db();
+} catch (Throwable $ignored) {
+    $dbUnavailable = true;
+}
+
+try {
+    if (!$pdo instanceof PDO) {
+        throw new RuntimeException('db_unavailable');
+    }
     // Distinct cities from live business branches
     $locStmt = $pdo->query("
         SELECT DISTINCT b.city
@@ -42,6 +52,9 @@ if ($selectedLocation !== '' && !in_array($selectedLocation, $locations, true)) 
 
 // ── Categories with business count (filtered by location if set) ───────────
 try {
+    if (!$pdo instanceof PDO) {
+        throw new RuntimeException('db_unavailable');
+    }
     $catSql = "
         SELECT c.name, c.slug, c.icon, COUNT(DISTINCT g.id) AS cnt
         FROM mci_categories c
@@ -71,6 +84,9 @@ try {
 
 // ── Recently added + established (8 each) ───────────────────────────────────
 try {
+    if (!$pdo instanceof PDO) {
+        throw new RuntimeException('db_unavailable');
+    }
     $listFilters = ['per_page' => 8];
     if ($selectedLocation !== '') {
         $listFilters['city'] = $selectedLocation;
@@ -162,6 +178,11 @@ ob_start();
 ?>
 
 <div class="py-4 py-lg-5">
+  <?php if ($dbUnavailable): ?>
+    <div class="alert alert-warning border-0 shadow-sm mb-4" role="alert">
+      Listings are temporarily unavailable due to a hevy load. Please try again shortly.
+    </div>
+  <?php endif; ?>
   <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-4">
     <div>
       <h1 class="h3 mb-1">All categories</h1>

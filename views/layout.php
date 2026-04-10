@@ -120,7 +120,7 @@ $__seoTitle = mci_seo_document_title(isset($pageTitle) ? (string)$pageTitle : nu
           <?= $content ?? '' ?>
         </div>
       <?php else: ?>
-        <div class="container px-3 px-sm-4">
+        <div class="container px-2 px-sm-3 px-lg-4">
           <?php echo $content ?? ''; ?>
         </div>
       <?php endif; ?>
