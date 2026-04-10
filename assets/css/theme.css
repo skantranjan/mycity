@@ -151,6 +151,12 @@ h1, h2, .mci-display {
 }
 
 /* ─── Container ─────────────────────────────────────── */
+@media (max-width: 991.98px) {
+  .mci-body .container {
+    max-width: 100%;
+  }
+}
+
 @media (min-width: 1200px) {
   .mci-body .container {
     max-width: max(

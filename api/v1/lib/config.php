@@ -50,7 +50,9 @@ function api_db_config(): array
         'user'       => api_env('MCI_DB_USER'),
         'pass'       => api_env('MCI_DB_PASS'),
         'port'       => $port,
-        'persistent' => api_env_flag('MCI_DB_PERSISTENT'),
+        // Default to persistent connections to avoid shared-host max_connections_per_hour exhaustion.
+        // Set MCI_DB_PERSISTENT=0 to explicitly disable.
+        'persistent' => api_env_flag_default('MCI_DB_PERSISTENT', true),
     ];
 }
 
@@ -72,5 +74,27 @@ function api_env_flag(string $key): bool
     $v = strtolower(trim($v));
 
     return $v === '1' || $v === 'true' || $v === 'yes';
+}
+
+/** True/false env flag with explicit default when unset. */
+function api_env_flag_default(string $key, bool $default): bool
+{
+    $v = getenv($key);
+    if (!is_string($v) || trim($v) === '') {
+        $v = $_ENV[$key] ?? $_SERVER[$key] ?? null;
+    }
+    if (!is_string($v) || trim($v) === '') {
+        return $default;
+    }
+    $v = strtolower(trim($v));
+
+    if ($v === '1' || $v === 'true' || $v === 'yes' || $v === 'on') {
+        return true;
+    }
+    if ($v === '0' || $v === 'false' || $v === 'no' || $v === 'off') {
+        return false;
+    }
+
+    return $default;
 }
 
