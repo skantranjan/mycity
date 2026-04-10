@@ -71,6 +71,9 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
     $tagline     = trim((string)($group['tagline'] ?? ''));
     $description = trim((string)($group['description'] ?? ''));
     $videoUrl    = trim((string)($group['video_url'] ?? ''));
+    $pageTitle   = trim((string)($group['page_title'] ?? ''));
+    $metaDesc    = trim((string)($group['meta_description'] ?? ''));
+    $metaKey     = trim((string)($group['meta_keywords'] ?? ''));
     $priceRange  = (string)($group['price_range'] ?? '');
     $categoryId  = (int)($group['category_id'] ?? 0);
     if ($categoryId <= 0) {
@@ -112,12 +115,14 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
             INSERT INTO mci_business_groups
               (id, name, slug, tagline, description, parent_category_id,
                price_range, video_url,
+               page_title, meta_description, meta_keywords,
                logo_path, profile_path, banner_path,
                status, added_by_role, added_by_user_id,
                created_by_user_id)
             VALUES
               (?, ?, ?, ?, ?, ?,
                ?, ?,
+               ?, ?, ?,
                ?, ?, ?,
                ?, ?, ?,
                ?)
@@ -130,6 +135,9 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
             $categoryId,
             in_array($priceRange, ['free', 'moderate', 'pricey', 'ultra'], true) ? $priceRange : null,
             $videoUrl !== '' ? $videoUrl : null,
+            $pageTitle !== '' ? $pageTitle : null,
+            $metaDesc !== '' ? $metaDesc : null,
+            $metaKey !== '' ? $metaKey : null,
             $logoPah !== '' ? $logoPah : null,
             $profilePah !== '' ? $profilePah : null,
             $bannerPah !== '' ? $bannerPah : null,
@@ -316,7 +324,7 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
                 $faqStmt->execute([
                     api_uuid_v4(), $groupId,
                     $q,
-                    trim((string)($f['answer'] ?? '')) ?: null,
+                    trim((string)($f['answer'] ?? '')),
                     $i,
                     $actorId,
                 ]);
@@ -373,8 +381,17 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
-        error_log('api_business_create error: ' . $e->getMessage());
-        return ['ok' => false, 'error' => 'server_error', 'status' => 500];
+        if (function_exists('mci_log_error')) {
+            mci_log_error('api_business_create', $e);
+        } else {
+            error_log('api_business_create: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+        }
+        return [
+            'ok'     => false,
+            'error'  => 'server_error',
+            'detail' => get_class($e) . ': ' . $e->getMessage() . ' in ' . basename($e->getFile()) . ':' . $e->getLine(),
+            'status' => 500,
+        ];
     }
 
     // Sync to mci_locations — outside transaction; failure must never block listing
@@ -457,6 +474,358 @@ function api_business_fetch(PDO $pdo, string $groupId): ?array
     $group['social_links'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     return $group;
+}
+
+// ---------------------------------------------------------------------------
+// Update (in-place)
+// ---------------------------------------------------------------------------
+
+/**
+ * Update an existing business group + primary branch inside a transaction.
+ *
+ * Slug, status, and added_by_* columns are never touched.
+ * All subcategories, tags, products, services, faqs, and social links are
+ * fully replaced (DELETE + re-INSERT) so the caller does not need to diff.
+ *
+ * Returns ['ok'=>true, 'id'=>$groupId, 'product_ids'=>[...], 'service_ids'=>[...]]
+ *      or ['ok'=>false, 'error'=>'server_error', 'detail'=>..., 'status'=>500]
+ */
+function api_business_update(PDO $pdo, string $groupId, array $data, string $actorId): array
+{
+    $productIds = [];
+    $serviceIds = [];
+
+    $group  = $data['group']  ?? [];
+    $branch = $data['branch'] ?? [];
+
+    $name        = trim((string)($group['name']        ?? ''));
+    $tagline     = trim((string)($group['tagline']     ?? ''));
+    $description = trim((string)($group['description'] ?? ''));
+    $videoUrl    = trim((string)($group['video_url']   ?? ''));
+    $pageTitle   = trim((string)($group['page_title'] ?? ''));
+    $metaDesc    = trim((string)($group['meta_description'] ?? ''));
+    $metaKey     = trim((string)($group['meta_keywords'] ?? ''));
+    $priceRange  = (string)($group['price_range'] ?? '');
+    $categoryId  = (int)($group['category_id'] ?? 0);
+    if ($categoryId <= 0) {
+        return ['ok' => false, 'error' => 'category_required', 'status' => 400];
+    }
+    $subcategoryIds = array_map('intval', (array)($group['subcategory_ids'] ?? []));
+    $tagIds         = array_map('intval', (array)($group['tag_ids']         ?? []));
+    $editSections   = array_map('strval', (array)($data['edit_sections'] ?? []));
+    if ($editSections === []) {
+        $editSections = ['core', 'products', 'services', 'seo', 'location', 'faqs', 'social'];
+    }
+
+    $logoPath   = trim((string)($group['logo_path']   ?? ''));
+    $bannerPath = trim((string)($group['banner_path'] ?? ''));
+
+    $pdo->beginTransaction();
+    try {
+        // --- mci_business_groups (update only safe fields) ---
+        if (in_array('core', $editSections, true) || in_array('seo', $editSections, true)) {
+            $pdo->prepare('
+                UPDATE mci_business_groups
+                SET name                = ?,
+                    tagline             = ?,
+                    description         = ?,
+                    parent_category_id  = ?,
+                    price_range         = ?,
+                    video_url           = ?,
+                    page_title          = ?,
+                    meta_description    = ?,
+                    meta_keywords       = ?,
+                    logo_path           = ?,
+                    banner_path         = ?
+                WHERE id = ?
+            ')->execute([
+                $name !== '' ? $name : null,
+                $tagline !== '' ? $tagline : null,
+                $description !== '' ? $description : null,
+                $categoryId,
+                in_array($priceRange, ['free', 'moderate', 'pricey', 'ultra'], true) ? $priceRange : null,
+                $videoUrl !== '' ? $videoUrl : null,
+                $pageTitle !== '' ? $pageTitle : null,
+                $metaDesc !== '' ? $metaDesc : null,
+                $metaKey !== '' ? $metaKey : null,
+                $logoPath !== '' ? $logoPath : null,
+                $bannerPath !== '' ? $bannerPath : null,
+                $groupId,
+            ]);
+        }
+
+        // --- mci_business_subcategories: full replace ---
+        if (in_array('core', $editSections, true)) {
+            $pdo->prepare('DELETE FROM mci_business_subcategories WHERE business_group_id = ?')->execute([$groupId]);
+        if ($subcategoryIds !== []) {
+            $subStmt = $pdo->prepare('
+                INSERT IGNORE INTO mci_business_subcategories
+                  (id, business_group_id, category_id, created_by_user_id)
+                VALUES (?, ?, ?, ?)
+            ');
+            foreach ($subcategoryIds as $scId) {
+                if ($scId > 0) {
+                    $subStmt->execute([api_uuid_v4(), $groupId, $scId, $actorId]);
+                }
+            }
+        }
+        }
+
+        // --- mci_business_tags: full replace ---
+        if (in_array('core', $editSections, true)) {
+            $pdo->prepare('DELETE FROM mci_business_tags WHERE business_group_id = ?')->execute([$groupId]);
+        if ($tagIds !== []) {
+            $tagStmt = $pdo->prepare('
+                INSERT IGNORE INTO mci_business_tags
+                  (id, business_group_id, tag_id, created_by_user_id)
+                VALUES (?, ?, ?, ?)
+            ');
+            foreach ($tagIds as $tId) {
+                if ($tId > 0) {
+                    $tagStmt->execute([api_uuid_v4(), $groupId, $tId, $actorId]);
+                }
+            }
+        }
+        }
+
+        // --- primary branch: UPDATE (pick is_primary DESC, then oldest) ---
+        $branchState   = mb_substr(trim((string)($branch['state']   ?? '')), 0, 100);
+        $branchCountry = mb_substr(trim((string)($branch['country'] ?? 'India')), 0, 100);
+        if ($branchCountry === '') { $branchCountry = 'India'; }
+        $city = trim((string)($branch['city'] ?? ''));
+
+        // Resolve the primary branch id so we can upsert hours against it
+        $branchRow = $pdo->prepare('
+            SELECT id FROM mci_business_branches
+            WHERE business_group_id = ?
+            ORDER BY is_primary DESC, created_at ASC
+            LIMIT 1
+        ');
+        $branchRow->execute([$groupId]);
+        $branchId = (string)($branchRow->fetchColumn() ?? '');
+
+        if (in_array('location', $editSections, true) || in_array('core', $editSections, true)) {
+            $pdo->prepare('
+            UPDATE mci_business_branches
+            SET address_line1   = ?,
+                address_line2   = ?,
+                city            = ?,
+                state           = ?,
+                country         = ?,
+                pincode         = ?,
+                latitude        = ?,
+                longitude       = ?,
+                phone_primary   = ?,
+                phone_secondary = ?,
+                whatsapp_number = ?,
+                website         = ?
+            WHERE business_group_id = ?
+            ORDER BY is_primary DESC, created_at ASC
+            LIMIT 1
+        ')->execute([
+            trim((string)($branch['full_address']    ?? '')) ?: '',
+            trim((string)($branch['address_line2']   ?? '')) ?: null,
+            $city !== '' ? $city : '',
+            $branchState  !== '' ? $branchState  : null,
+            $branchCountry,
+            trim((string)($branch['pincode']         ?? '')) ?: null,
+            trim((string)($branch['latitude']        ?? '')) ?: null,
+            trim((string)($branch['longitude']       ?? '')) ?: null,
+            trim((string)($branch['phone']           ?? '')) ?: null,
+            trim((string)($branch['phone_secondary'] ?? '')) ?: null,
+            trim((string)($branch['whatsapp']        ?? '')) ?: null,
+            trim((string)($branch['website']         ?? '')) ?: null,
+            $groupId,
+        ]);
+        }
+
+        // --- mci_business_branch_hours: upsert (same ON DUPLICATE KEY pattern as create) ---
+        if ($branchId !== '' && (in_array('location', $editSections, true) || in_array('core', $editSections, true))) {
+            $hours = $branch['hours'] ?? [];
+            if (is_array($hours) && $hours !== []) {
+                $hourStmt = $pdo->prepare('
+                    INSERT INTO mci_business_branch_hours
+                      (id, branch_id, day_of_week, opens_at, closes_at,
+                       opens_at_2, closes_at_2, is_closed, created_by_user_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                      opens_at=VALUES(opens_at), closes_at=VALUES(closes_at),
+                      opens_at_2=VALUES(opens_at_2), closes_at_2=VALUES(closes_at_2),
+                      is_closed=VALUES(is_closed)
+                ');
+                $validDays = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+                foreach ($validDays as $day) {
+                    if (!isset($hours[$day])) {
+                        continue;
+                    }
+                    $h = $hours[$day];
+                    $isOpen     = !empty($h['open']);
+                    $slot1Start = trim((string)($h['slot1_start'] ?? '')) ?: null;
+                    $slot1End   = trim((string)($h['slot1_end']   ?? '')) ?: null;
+                    $slot2Start = trim((string)($h['slot2_start'] ?? '')) ?: null;
+                    $slot2End   = trim((string)($h['slot2_end']   ?? '')) ?: null;
+                    $hourStmt->execute([
+                        api_uuid_v4(), $branchId, $day,
+                        $isOpen ? $slot1Start : null,
+                        $isOpen ? $slot1End   : null,
+                        $isOpen ? $slot2Start : null,
+                        $isOpen ? $slot2End   : null,
+                        $isOpen ? 0 : 1,
+                        $actorId,
+                    ]);
+                }
+            }
+        }
+
+        // --- mci_business_products: full replace ---
+        if (in_array('products', $editSections, true)) {
+        $pdo->prepare('DELETE FROM mci_business_products WHERE business_group_id = ?')->execute([$groupId]);
+        $products = $data['products'] ?? [];
+        if (is_array($products)) {
+            $prodStmt = $pdo->prepare('
+                INSERT INTO mci_business_products
+                  (id, business_group_id, name, description,
+                   price_min, price_max, price_unit, image_path,
+                   sort_order, created_by_user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ');
+            foreach ($products as $i => $p) {
+                $pName = trim((string)($p['name'] ?? ''));
+                if ($pName === '') {
+                    continue;
+                }
+                $pid = api_uuid_v4();
+                $productIds[] = $pid;
+                $prodStmt->execute([
+                    $pid, $groupId,
+                    $pName,
+                    trim((string)($p['description'] ?? '')) ?: null,
+                    is_numeric($p['price_min'] ?? '') ? (float)$p['price_min'] : null,
+                    is_numeric($p['price_max'] ?? '') ? (float)$p['price_max'] : null,
+                    trim((string)($p['price_unit'] ?? 'INR')) ?: 'INR',
+                    trim((string)($p['image_path'] ?? '')) ?: null,
+                    $i,
+                    $actorId,
+                ]);
+            }
+        }
+        }
+
+        // --- mci_business_services: full replace ---
+        if (in_array('services', $editSections, true)) {
+        $pdo->prepare('DELETE FROM mci_business_services WHERE business_group_id = ?')->execute([$groupId]);
+        $services = $data['services'] ?? [];
+        if (is_array($services)) {
+            $svcStmt = $pdo->prepare('
+                INSERT INTO mci_business_services
+                  (id, business_group_id, name, description,
+                   price_min, price_max, price_unit, image_path,
+                   sort_order, created_by_user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ');
+            foreach ($services as $i => $s) {
+                $sName = trim((string)($s['name'] ?? ''));
+                if ($sName === '') {
+                    continue;
+                }
+                $sid = api_uuid_v4();
+                $serviceIds[] = $sid;
+                $svcStmt->execute([
+                    $sid, $groupId,
+                    $sName,
+                    trim((string)($s['description'] ?? '')) ?: null,
+                    is_numeric($s['price_min'] ?? '') ? (float)$s['price_min'] : null,
+                    is_numeric($s['price_max'] ?? '') ? (float)$s['price_max'] : null,
+                    trim((string)($s['price_unit'] ?? 'INR')) ?: 'INR',
+                    trim((string)($s['image_path'] ?? '')) ?: null,
+                    $i,
+                    $actorId,
+                ]);
+            }
+        }
+        }
+
+        // --- mci_business_faqs: full replace ---
+        if (in_array('faqs', $editSections, true) || in_array('core', $editSections, true)) {
+        $pdo->prepare('DELETE FROM mci_business_faqs WHERE business_group_id = ?')->execute([$groupId]);
+        $faqs = $data['faqs'] ?? [];
+        if (is_array($faqs)) {
+            $faqStmt = $pdo->prepare('
+                INSERT INTO mci_business_faqs
+                  (id, business_group_id, question, answer, sort_order, created_by_user_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ');
+            foreach ($faqs as $i => $f) {
+                $q = trim((string)($f['question'] ?? ''));
+                if ($q === '') {
+                    continue;
+                }
+                $faqStmt->execute([
+                    api_uuid_v4(), $groupId,
+                    $q,
+                    trim((string)($f['answer'] ?? '')),
+                    $i,
+                    $actorId,
+                ]);
+            }
+        }
+        }
+
+        // --- mci_business_social_links: full replace ---
+        if (in_array('social', $editSections, true) || in_array('location', $editSections, true)) {
+        $pdo->prepare('DELETE FROM mci_business_social_links WHERE business_group_id = ?')->execute([$groupId]);
+        $socialLinks = $branch['social_links'] ?? [];
+        $platformMap = [
+            'facebook'         => 'facebook',
+            'instagram'        => 'instagram',
+            'x'                => 'twitter',
+            'youtube'          => 'youtube',
+            'linkedin'         => 'linkedin',
+            'tiktok'           => 'tiktok',
+            'pinterest'        => 'pinterest',
+            'telegram'         => 'telegram',
+            'threads'          => 'threads',
+            'snapchat'         => 'snapchat',
+            'whatsapp_channel' => 'whatsapp_channel',
+        ];
+        if (is_array($socialLinks)) {
+            $socStmt = $pdo->prepare('
+                INSERT INTO mci_business_social_links
+                  (id, business_group_id, platform, url, created_by_user_id)
+                VALUES (?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE url=VALUES(url)
+            ');
+            foreach ($platformMap as $inputKey => $dbPlatform) {
+                $url = trim((string)($socialLinks[$inputKey] ?? ''));
+                if ($url !== '') {
+                    $socStmt->execute([api_uuid_v4(), $groupId, $dbPlatform, $url, $actorId]);
+                }
+            }
+        }
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        if (function_exists('mci_log_error')) {
+            mci_log_error('api_business_update', $e);
+        } else {
+            error_log('api_business_update: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+        }
+        return [
+            'ok'     => false,
+            'error'  => 'server_error',
+            'detail' => get_class($e) . ': ' . $e->getMessage() . ' in ' . basename($e->getFile()) . ':' . $e->getLine(),
+            'status' => 500,
+        ];
+    }
+
+    return [
+        'ok'          => true,
+        'id'          => $groupId,
+        'product_ids' => $productIds,
+        'service_ids' => $serviceIds,
+    ];
 }
 
 // ---------------------------------------------------------------------------
@@ -584,13 +953,13 @@ function api_business_update_status(
         $pdo->prepare('
             INSERT INTO mci_business_approvals
               (id, business_group_id, action, previous_status, new_status,
-               notes, reviewed_by_user_id, reviewed_at, created_by_user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, NOW(6), ?)
+               notes, reviewed_by_user_id, reviewed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NOW(6))
         ')->execute([
             api_uuid_v4(), $groupId,
             $action, $previousStatus, $newStatus,
             $notes,
-            $actorId, $actorId,
+            $actorId,
         ]);
 
         $pdo->commit();
@@ -601,6 +970,111 @@ function api_business_update_status(
     }
 
     return true;
+}
+
+function api_business_flag_create(PDO $pdo, array $data, ?array $auth): array
+{
+    $businessGroupId = trim((string)($data['business_group_id'] ?? ''));
+    $reason = trim((string)($data['reason'] ?? ''));
+    $reporterName = trim((string)($data['reporter_name'] ?? ''));
+    $reporterEmail = trim((string)($data['reporter_email'] ?? ''));
+    $reporterType = trim((string)($data['reporter_type'] ?? 'anonymous'));
+
+    if ($businessGroupId === '' || $reason === '') {
+        return ['ok' => false, 'error' => 'missing_fields', 'status' => 400];
+    }
+    $allowedReporterTypes = ['logged_in', 'guest', 'anonymous'];
+    if (!in_array($reporterType, $allowedReporterTypes, true)) {
+        $reporterType = 'anonymous';
+    }
+    if ($auth !== null && !empty($auth['user_id'])) {
+        $reporterType = 'logged_in';
+    }
+    if ($reporterType === 'guest' && $reporterName === '' && $reporterEmail === '') {
+        $reporterType = 'anonymous';
+    }
+
+    $existsStmt = $pdo->prepare("SELECT id FROM mci_business_groups WHERE id = ? LIMIT 1");
+    $existsStmt->execute([$businessGroupId]);
+    if (!$existsStmt->fetchColumn()) {
+        return ['ok' => false, 'error' => 'business_not_found', 'status' => 404];
+    }
+
+    $id = api_uuid_v4();
+    $pdo->prepare("
+        INSERT INTO mci_business_flags
+          (id, business_group_id, reporter_user_id, reporter_type, reporter_name, reporter_email, reason, status, created_by_user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)
+    ")->execute([
+        $id,
+        $businessGroupId,
+        ($auth !== null && !empty($auth['user_id'])) ? (string)$auth['user_id'] : null,
+        $reporterType,
+        $reporterName !== '' ? $reporterName : null,
+        $reporterEmail !== '' ? $reporterEmail : null,
+        mb_substr($reason, 0, 4000),
+        ($auth !== null && !empty($auth['user_id'])) ? (string)$auth['user_id'] : null,
+    ]);
+
+    return ['ok' => true, 'id' => $id];
+}
+
+function api_business_flag_list_cp(PDO $pdo, int $page = 1, int $perPage = 25, string $status = 'open'): array
+{
+    $page = max(1, $page);
+    $perPage = max(1, min(100, $perPage));
+    $offset = ($page - 1) * $perPage;
+    $status = trim($status);
+
+    $params = [];
+    $where = '1=1';
+    if ($status !== '' && $status !== 'all') {
+        $where = 'f.status = ?';
+        $params[] = $status;
+    }
+
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM mci_business_flags f WHERE {$where}");
+    $countStmt->execute($params);
+    $total = (int)$countStmt->fetchColumn();
+
+    $stmt = $pdo->prepare("
+        SELECT
+          f.*,
+          g.name AS business_name,
+          g.slug AS business_slug,
+          owner.id AS owner_user_id,
+          COALESCE(NULLIF(TRIM(owner.display_name), ''), owner.email) AS owner_display_name
+        FROM mci_business_flags f
+        INNER JOIN mci_business_groups g ON g.id = f.business_group_id
+        LEFT JOIN mci_users owner ON owner.id = g.added_by_user_id
+        WHERE {$where}
+        ORDER BY f.created_at DESC
+        LIMIT {$perPage} OFFSET {$offset}
+    ");
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    return [
+        'flags' => $rows,
+        'total' => $total,
+        'page' => $page,
+        'per_page' => $perPage,
+        'pages' => $total > 0 ? (int)ceil($total / $perPage) : 1,
+    ];
+}
+
+function api_business_flag_resolve(PDO $pdo, string $flagId, string $status, string $actorId, ?string $adminNote = null): bool
+{
+    if (!in_array($status, ['resolved', 'dismissed'], true)) {
+        return false;
+    }
+    $stmt = $pdo->prepare("
+        UPDATE mci_business_flags
+        SET status = ?, admin_note = ?, resolved_by_user_id = ?, resolved_at = NOW(6), updated_by_user_id = ?
+        WHERE id = ? AND status = 'open'
+    ");
+    $stmt->execute([$status, $adminNote, $actorId, $actorId, $flagId]);
+    return $stmt->rowCount() > 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -770,12 +1244,19 @@ function api_business_patch_images(PDO $pdo, string $groupId, array $images, str
         return ['ok' => false, 'error' => 'business_not_found', 'status' => 404];
     }
 
-    // Path safety: all paths must start with /storage/uploads/
+    // Path safety: under /storage/uploads/, no traversal or encoded tricks
     $safePath = function (mixed $v): ?string {
-        $s = trim((string)$v);
+        $s = trim((string) $v);
         if ($s === '' || !str_starts_with($s, '/storage/uploads/')) {
             return null;
         }
+        if (str_contains($s, '..') || str_contains($s, "\0")) {
+            return null;
+        }
+        if (preg_match('#//#', $s) === 1) {
+            return null;
+        }
+
         return $s;
     };
 

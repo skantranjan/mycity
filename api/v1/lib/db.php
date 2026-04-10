@@ -13,11 +13,32 @@ function api_db(): PDO
     $cfg = api_db_config();
     $dsn = sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4', $cfg['host'], $cfg['name']);
 
-    $pdo = new PDO($dsn, $cfg['user'], $cfg['pass'], [
+    $options = [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
-    ]);
+        PDO::ATTR_TIMEOUT => 5,
+    ];
+
+    $lastError = null;
+    for ($attempt = 1; $attempt <= 2; $attempt++) {
+        try {
+            $pdo = new PDO($dsn, $cfg['user'], $cfg['pass'], $options);
+            break;
+        } catch (PDOException $e) {
+            $lastError = $e;
+            $isConnectionRefused = str_contains($e->getMessage(), '[2002]');
+            if (!$isConnectionRefused || $attempt === 2) {
+                throw $e;
+            }
+            // Brief retry for transient DNS/network hiccups.
+            usleep(200000);
+        }
+    }
+
+    if (!$pdo instanceof PDO && $lastError instanceof PDOException) {
+        throw $lastError;
+    }
 
     return $pdo;
 }

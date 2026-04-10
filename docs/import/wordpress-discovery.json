@@ -1,0 +1,694 @@
+{
+    "generated_at": "2026-04-09T09:42:38+00:00",
+    "wp_prefix": "wpimp_",
+    "tables": [
+        "wpimp_actionscheduler_actions",
+        "wpimp_actionscheduler_claims",
+        "wpimp_actionscheduler_groups",
+        "wpimp_actionscheduler_logs",
+        "wpimp_asenha_failed_logins",
+        "wpimp_cmplz_cookiebanners",
+        "wpimp_cmplz_cookies",
+        "wpimp_cmplz_dnsmpd",
+        "wpimp_cmplz_services",
+        "wpimp_commentmeta",
+        "wpimp_comments",
+        "wpimp_jetpack_sync_queue",
+        "wpimp_links",
+        "wpimp_listing_stats_leads",
+        "wpimp_listing_stats_reviews",
+        "wpimp_listing_stats_views",
+        "wpimp_litespeed_crawler",
+        "wpimp_litespeed_crawler_blacklist",
+        "wpimp_litespeed_url",
+        "wpimp_litespeed_url_file",
+        "wpimp_options",
+        "wpimp_postmeta",
+        "wpimp_posts",
+        "wpimp_rank_math_404_logs",
+        "wpimp_rank_math_internal_links",
+        "wpimp_rank_math_internal_meta",
+        "wpimp_rank_math_redirections",
+        "wpimp_rank_math_redirections_cache",
+        "wpimp_social_users",
+        "wpimp_termmeta",
+        "wpimp_terms",
+        "wpimp_term_relationships",
+        "wpimp_term_taxonomy",
+        "wpimp_tm_taskmeta",
+        "wpimp_tm_tasks",
+        "wpimp_usermeta",
+        "wpimp_users",
+        "wpimp_wfauditevents",
+        "wpimp_wfconfig",
+        "wpimp_wffilechanges",
+        "wpimp_wfhits",
+        "wpimp_wfhoover",
+        "wpimp_wfissues",
+        "wpimp_wfknownfilelist",
+        "wpimp_wflogins",
+        "wpimp_wfls_2fa_secrets",
+        "wpimp_wfls_role_counts",
+        "wpimp_wfls_settings",
+        "wpimp_wfnotifications",
+        "wpimp_wfpendingissues",
+        "wpimp_wfsecurityevents",
+        "wpimp_wfsnipcache",
+        "wpimp_wfstatus",
+        "wpimp_wfwaffailures",
+        "wpimp_wpo_404_detector",
+        "wpimp_yoast_indexable",
+        "wpimp_yoast_indexable_hierarchy",
+        "wpimp_yoast_migrations",
+        "wpimp_yoast_primary_term",
+        "wpimp_yoast_seo_links",
+        "wpimp_yoast_seo_meta"
+    ],
+    "post_types": [
+        {
+            "post_type": "listing",
+            "count": 256
+        },
+        {
+            "post_type": "attachment",
+            "count": 132
+        },
+        {
+            "post_type": "page",
+            "count": 20
+        },
+        {
+            "post_type": "form-fields",
+            "count": 12
+        },
+        {
+            "post_type": "nav_menu_item",
+            "count": 8
+        },
+        {
+            "post_type": "lp-claims",
+            "count": 3
+        },
+        {
+            "post_type": "jetpack_migration",
+            "count": 2
+        },
+        {
+            "post_type": "wpcode",
+            "count": 2
+        },
+        {
+            "post_type": "post",
+            "count": 2
+        },
+        {
+            "post_type": "price_plan",
+            "count": 2
+        },
+        {
+            "post_type": "jp_sitemap_master",
+            "count": 1
+        },
+        {
+            "post_type": "lp-reviews",
+            "count": 1
+        },
+        {
+            "post_type": "jp_img_sitemap",
+            "count": 1
+        },
+        {
+            "post_type": "forminator_forms",
+            "count": 1
+        },
+        {
+            "post_type": "jp_sitemap",
+            "count": 1
+        }
+    ],
+    "taxonomies": [
+        {
+            "taxonomy": "list-tags",
+            "count": 782
+        },
+        {
+            "taxonomy": "location",
+            "count": 165
+        },
+        {
+            "taxonomy": "listing-category",
+            "count": 81
+        },
+        {
+            "taxonomy": "features",
+            "count": 47
+        },
+        {
+            "taxonomy": "web_story_media_source",
+            "count": 8
+        },
+        {
+            "taxonomy": "post_tag",
+            "count": 7
+        },
+        {
+            "taxonomy": "category",
+            "count": 5
+        },
+        {
+            "taxonomy": "wpcode_tags",
+            "count": 4
+        },
+        {
+            "taxonomy": "nav_menu",
+            "count": 4
+        },
+        {
+            "taxonomy": "wpcode_location",
+            "count": 2
+        },
+        {
+            "taxonomy": "wpcode_type",
+            "count": 2
+        }
+    ],
+    "meta_keys": [
+        {
+            "meta_key": "rank_math_news_sitemap_robots",
+            "count": 1259
+        },
+        {
+            "meta_key": "rank_math_robots",
+            "count": 1259
+        },
+        {
+            "meta_key": "_wp_attached_file",
+            "count": 1028
+        },
+        {
+            "meta_key": "_wp_attachment_metadata",
+            "count": 1027
+        },
+        {
+            "meta_key": "smush-complete",
+            "count": 897
+        },
+        {
+            "meta_key": "smush-info",
+            "count": 897
+        },
+        {
+            "meta_key": "wp-smpro-smush-data",
+            "count": 882
+        },
+        {
+            "meta_key": "smush-stats",
+            "count": 882
+        },
+        {
+            "meta_key": "original-file",
+            "count": 797
+        },
+        {
+            "meta_key": "lp_listingpro_options",
+            "count": 286
+        },
+        {
+            "meta_key": "rank_math_internal_links_processed",
+            "count": 278
+        },
+        {
+            "meta_key": "listing_reviewed",
+            "count": 256
+        },
+        {
+            "meta_key": "post_views_count",
+            "count": 256
+        },
+        {
+            "meta_key": "claimed",
+            "count": 256
+        },
+        {
+            "meta_key": "listing_rate",
+            "count": 256
+        },
+        {
+            "meta_key": "_thumbnail_id",
+            "count": 209
+        },
+        {
+            "meta_key": "gallery_image_ids",
+            "count": 189
+        },
+        {
+            "meta_key": "lp_listingpro_options_fields",
+            "count": 168
+        },
+        {
+            "meta_key": "_edit_lock",
+            "count": 140
+        },
+        {
+            "meta_key": "_wp_attachment_wp_user_avatar",
+            "count": 132
+        },
+        {
+            "meta_key": "_edit_last",
+            "count": 131
+        },
+        {
+            "meta_key": "google_avatar",
+            "count": 129
+        },
+        {
+            "meta_key": "_yoast_wpseo_content_score",
+            "count": 101
+        },
+        {
+            "meta_key": "_yoast_wpseo_linkdex",
+            "count": 64
+        },
+        {
+            "meta_key": "rank_math_focus_keyword",
+            "count": 64
+        },
+        {
+            "meta_key": "_yoast_wpseo_focuskw",
+            "count": 64
+        },
+        {
+            "meta_key": "_cmplz_scanned_post",
+            "count": 53
+        },
+        {
+            "meta_key": "_wp_old_date",
+            "count": 40
+        },
+        {
+            "meta_key": "_yoast_wpseo_primary_features",
+            "count": 37
+        },
+        {
+            "meta_key": "_yoast_wpseo_primary_listing-category",
+            "count": 37
+        },
+        {
+            "meta_key": "_yoast_wpseo_primary_location",
+            "count": 37
+        },
+        {
+            "meta_key": "rank_math_primary_features",
+            "count": 37
+        },
+        {
+            "meta_key": "rank_math_primary_listing-category",
+            "count": 37
+        },
+        {
+            "meta_key": "rank_math_primary_location",
+            "count": 37
+        },
+        {
+            "meta_key": "_yoast_wpseo_metadesc",
+            "count": 31
+        },
+        {
+            "meta_key": "rank_math_description",
+            "count": 31
+        },
+        {
+            "meta_key": "rank_math_seo_score",
+            "count": 25
+        },
+        {
+            "meta_key": "_wp_page_template",
+            "count": 17
+        },
+        {
+            "meta_key": "_wpb_vc_js_status",
+            "count": 16
+        },
+        {
+            "meta_key": "_jetpack_related_posts_cache",
+            "count": 14
+        },
+        {
+            "meta_key": "plan_text",
+            "count": 12
+        },
+        {
+            "meta_key": "contact_show",
+            "count": 12
+        },
+        {
+            "meta_key": "plan_time",
+            "count": 12
+        },
+        {
+            "meta_key": "lp_field_filter_type",
+            "count": 12
+        },
+        {
+            "meta_key": "map_show",
+            "count": 12
+        },
+        {
+            "meta_key": "gallery_show",
+            "count": 12
+        },
+        {
+            "meta_key": "plan_hot",
+            "count": 12
+        },
+        {
+            "meta_key": "video_show",
+            "count": 12
+        },
+        {
+            "meta_key": "plan_package_type",
+            "count": 12
+        },
+        {
+            "meta_key": "plan_price",
+            "count": 12
+        },
+        {
+            "meta_key": "_menu_item_classes",
+            "count": 8
+        },
+        {
+            "meta_key": "_menu_item_menu_item_parent",
+            "count": 8
+        },
+        {
+            "meta_key": "_menu_item_object",
+            "count": 8
+        },
+        {
+            "meta_key": "_menu_item_object_id",
+            "count": 8
+        },
+        {
+            "meta_key": "_menu_item_target",
+            "count": 8
+        },
+        {
+            "meta_key": "_menu_item_type",
+            "count": 8
+        },
+        {
+            "meta_key": "_menu_item_url",
+            "count": 8
+        },
+        {
+            "meta_key": "_menu_item_xfn",
+            "count": 8
+        },
+        {
+            "meta_key": "_vc_post_settings",
+            "count": 7
+        },
+        {
+            "meta_key": "_wp_old_slug",
+            "count": 7
+        },
+        {
+            "meta_key": "_wp_attachment_image_alt",
+            "count": 5
+        },
+        {
+            "meta_key": "_wp_suggested_privacy_policy_content",
+            "count": 4
+        },
+        {
+            "meta_key": "rank_math_title",
+            "count": 3
+        },
+        {
+            "meta_key": "facebook_avatar",
+            "count": 3
+        },
+        {
+            "meta_key": "_yoast_wpseo_title",
+            "count": 3
+        },
+        {
+            "meta_key": "cmplz_hide_cookiebanner",
+            "count": 2
+        },
+        {
+            "meta_key": "_yoast_wpseo_primary_category",
+            "count": 2
+        },
+        {
+            "meta_key": "_last_editor_used_jetpack",
+            "count": 2
+        },
+        {
+            "meta_key": "_wpcode_auto_insert",
+            "count": 2
+        },
+        {
+            "meta_key": "_yoast_wpseo_wordproof_timestamp",
+            "count": 2
+        },
+        {
+            "meta_key": "rank_math_primary_category",
+            "count": 2
+        },
+        {
+            "meta_key": "plan_id",
+            "count": 2
+        },
+        {
+            "meta_key": "_yoast_wpseo_estimated-reading-time-minutes",
+            "count": 2
+        },
+        {
+            "meta_key": "claimers",
+            "count": 2
+        },
+        {
+            "meta_key": "website_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "lp_ads_wih_plan",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_bhours",
+            "count": 1
+        },
+        {
+            "meta_key": "lp_eventsplan",
+            "count": 1
+        },
+        {
+            "meta_key": "contact_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "rank_math_twitter_description",
+            "count": 1
+        },
+        {
+            "meta_key": "_dp_original",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_faq",
+            "count": 1
+        },
+        {
+            "meta_key": "lp_featured_imageplan",
+            "count": 1
+        },
+        {
+            "meta_key": "_yoast_wpseo_opengraph-description",
+            "count": 1
+        },
+        {
+            "meta_key": "plan_title_color",
+            "count": 1
+        },
+        {
+            "meta_key": "deals_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "rank_math_twitter_title",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_location",
+            "count": 1
+        },
+        {
+            "meta_key": "_yoast_wpseo_opengraph-title",
+            "count": 1
+        },
+        {
+            "meta_key": "events_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "rank_math_twitter_use_facebook",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_plan_announcment",
+            "count": 1
+        },
+        {
+            "meta_key": "price_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "f_plan_continue",
+            "count": 1
+        },
+        {
+            "meta_key": "rating",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_plan_campaigns",
+            "count": 1
+        },
+        {
+            "meta_key": "reserva_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_plan_deals",
+            "count": 1
+        },
+        {
+            "meta_key": "rank_math_facebook_description",
+            "count": 1
+        },
+        {
+            "meta_key": "faqs_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_plan_menu",
+            "count": 1
+        },
+        {
+            "meta_key": "map_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "rank_math_facebook_title",
+            "count": 1
+        },
+        {
+            "meta_key": "featimg_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_plan_reservera",
+            "count": 1
+        },
+        {
+            "meta_key": "menu_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "forminator_form_meta",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_plan_timekit",
+            "count": 1
+        },
+        {
+            "meta_key": "metacampaign_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "_yoast_wpseo_twitter-description",
+            "count": 1
+        },
+        {
+            "meta_key": "gall_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "social_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_price",
+            "count": 1
+        },
+        {
+            "meta_key": "_yoast_wpseo_twitter-title",
+            "count": 1
+        },
+        {
+            "meta_key": "tagline_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_social",
+            "count": 1
+        },
+        {
+            "meta_key": "_wpcode_auto_insert_number",
+            "count": 1
+        },
+        {
+            "meta_key": "plan_desc_content",
+            "count": 1
+        },
+        {
+            "meta_key": "tags_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_tag_key",
+            "count": 1
+        },
+        {
+            "meta_key": "_wpcode_library_id",
+            "count": 1
+        },
+        {
+            "meta_key": "announcment_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "timekit_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_tagline",
+            "count": 1
+        },
+        {
+            "meta_key": "bhours_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "listing_plan_data",
+            "count": 1
+        },
+        {
+            "meta_key": "listingproc_website",
+            "count": 1
+        },
+        {
+            "meta_key": "video_show_hide",
+            "count": 1
+        },
+        {
+            "meta_key": "location_show_hide",
+            "count": 1
+        }
+    ],
+    "users_total": 3699
+}

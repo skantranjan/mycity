@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/mci_config.php';
+require_once __DIR__ . '/../includes/mci_paths.php';
 require_once __DIR__ . '/../api/v1/lib/db.php';
 require_once __DIR__ . '/../api/v1/lib/item_search_service.php';
 require_once __DIR__ . '/../includes/mci_category_icons.php';
@@ -13,7 +14,6 @@ $activePage      = 'services';
 $metaDescription = 'Find local services on My City Info. Filter by city, category and price to connect with service providers near you.';
 
 $extraHead = <<<'HTML'
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 <link rel="stylesheet" href="/assets/css/item-search.css" />
 <script src="/assets/js/item-search.js" defer></script>
 HTML;
@@ -299,11 +299,7 @@ ob_start();
               <?php endif; ?>
               <div class="mci-item-card__biz-strip">
                 <div class="mci-item-card__biz-logo">
-                  <?php if ($item['business_logo'] !== ''): ?>
-                    <img src="<?= htmlspecialchars($item['business_logo']) ?>" alt="" loading="lazy" />
-                  <?php else: ?>
-                    <i class="bi bi-shop" aria-hidden="true"></i>
-                  <?php endif; ?>
+                  <img src="<?= htmlspecialchars($item['business_logo'] !== '' ? $item['business_logo'] : mci_business_logo_placeholder_url()) ?>" alt="" loading="lazy" />
                 </div>
                 <span class="mci-item-card__biz-name"><?= htmlspecialchars($item['business_name']) ?></span>
                 <?php if ($item['city'] !== ''): ?>

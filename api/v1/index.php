@@ -4,10 +4,9 @@ declare(strict_types=1);
 // Minimal v1 API router entrypoint.
 // This file is intentionally small; the full DB/JWT implementation is added in later steps.
 
+require_once __DIR__ . '/lib/http_security.php';
+api_v1_send_cors_and_security_headers();
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET,POST,PUT,PATCH,DELETE,OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -43,6 +42,7 @@ require_once __DIR__ . '/lib/auth_cookie.php';
 require_once __DIR__ . '/lib/auth_direct.php';
 require_once __DIR__ . '/lib/uuid.php';
 require_once __DIR__ . '/lib/ip.php';
+require_once __DIR__ . '/lib/rate_limit.php';
 require_once __DIR__ . '/lib/account_service.php';
 require_once __DIR__ . '/lib/cp_users_service.php';
 require_once __DIR__ . '/lib/slug.php';
@@ -62,6 +62,9 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'health') {
 // Also: POST /subscriber/login, POST /cp/login (same behaviour; kept for compatibility)
 // -----------------------------------------------------------------------------
 if ($method === 'POST' && ($segments[0] ?? '') === 'auth' && ($segments[1] ?? '') === 'login') {
+    if (!api_rate_limit_allow('auth_login:' . api_client_ip(), 40, 900)) {
+        api_error('too_many_requests', 429);
+    }
     $data = api_request_data();
     $email = mb_strtolower(trim(api_body_get_string($data, 'email')));
     $password = api_body_get_string($data, 'password');
@@ -77,7 +80,11 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'auth' && ($segments[1] ?? ''
         api_error('audience_required', 400, ['hint' => 'Use audience: "subscriber" or "cp" (control panel: super_admin / co_admin).']);
     }
 
-    $res = api_direct_auth_login($email, $password, $audience);
+    $rememberLong = false;
+    if ($audience === 'subscriber' || $audience === 'sub') {
+        $rememberLong = !empty($data['remember_me']) || !empty($data['remember']);
+    }
+    $res = api_direct_auth_login($email, $password, $audience, $rememberLong);
     if (!$res['ok']) {
         api_error($res['error'], $res['status'] ?? 400);
     }
@@ -132,6 +139,9 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'auth' && ($segments[1] ?? ''
 
 // Auth endpoints (v1)
 if ($method === 'POST' && ($segments[0] ?? '') === 'subscriber' && ($segments[1] ?? '') === 'register') {
+    if (!api_rate_limit_allow('sub_register:' . api_client_ip(), 20, 3600)) {
+        api_error('too_many_requests', 429);
+    }
     $data = api_request_data();
     $res = api_direct_subscriber_register($data);
     if (!$res['ok']) {
@@ -146,10 +156,14 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'subscriber' && ($segments[1]
 }
 
 if ($method === 'POST' && ($segments[0] ?? '') === 'subscriber' && ($segments[1] ?? '') === 'login') {
+    if (!api_rate_limit_allow('sub_login:' . api_client_ip(), 40, 900)) {
+        api_error('too_many_requests', 429);
+    }
     $data = api_request_data();
     $email = mb_strtolower(trim(api_body_get_string($data, 'email')));
     $password = api_body_get_string($data, 'password');
-    $res = api_direct_auth_login($email, $password, 'subscriber');
+    $rememberLong = !empty($data['remember_me']) || !empty($data['remember']);
+    $res = api_direct_auth_login($email, $password, 'subscriber', $rememberLong);
     if (!$res['ok']) {
         api_error($res['error'], $res['status'] ?? 400);
     }
@@ -168,6 +182,9 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'subscriber' && ($segments[1]
 }
 
 if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'login') {
+    if (!api_rate_limit_allow('cp_login:' . api_client_ip(), 40, 900)) {
+        api_error('too_many_requests', 429);
+    }
     $data = api_request_data();
     $email = mb_strtolower(trim(api_body_get_string($data, 'email')));
     $password = api_body_get_string($data, 'password');
@@ -193,6 +210,9 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') 
 // Account: forgot / reset password (public)
 // -----------------------------------------------------------------------------
 if ($method === 'POST' && ($segments[0] ?? '') === 'auth' && ($segments[1] ?? '') === 'forgot-password') {
+    if (!api_rate_limit_allow('forgot_pw:' . api_client_ip(), 15, 3600)) {
+        api_error('too_many_requests', 429);
+    }
     $data = api_request_data();
     $email = api_body_get_string($data, 'email');
     $res = mci_account_request_password_reset($email);
@@ -951,11 +971,23 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') 
 // POST /api/v1/upload/image
 // =============================================================================
 if ($method === 'POST' && ($segments[0] ?? '') === 'upload' && ($segments[1] ?? '') === 'image') {
+    if (!api_rate_limit_allow('upload_img:' . api_client_ip(), 120, 3600)) {
+        api_error('too_many_requests', 429);
+    }
     $allowedTypes = ['logo', 'profile', 'banner', 'gallery', 'item_image'];
     $type = trim((string)($_POST['type'] ?? ''));
     if (!in_array($type, $allowedTypes, true)) {
         api_error('invalid_type', 400, ['allowed' => $allowedTypes]);
     }
+    $businessIdEarly = trim((string)($_POST['business_id'] ?? ''));
+    $uploadTokPost    = trim((string)($_POST['image_upload_token'] ?? ''));
+    $uploadTokHdr     = trim((string)($_SERVER['HTTP_X_MCI_IMAGE_UPLOAD_TOKEN'] ?? ''));
+    $uploadTok        = $uploadTokPost !== '' ? $uploadTokPost : $uploadTokHdr;
+    require_once __DIR__ . '/lib/business_helpers.php';
+    $pdoUp  = api_db();
+    $authUp = api_business_try_auth();
+    api_assert_can_upload_business_file($pdoUp, $businessIdEarly, $authUp, $uploadTok);
+
     if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
         $uploadErr = $_FILES['file']['error'] ?? -1;
         if ($uploadErr === UPLOAD_ERR_INI_SIZE || $uploadErr === UPLOAD_ERR_FORM_SIZE) {
@@ -978,7 +1010,7 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'upload' && ($segments[1] ?? 
     $extMap = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
     $ext    = $extMap[$mime] ?? 'jpg';
     // ── Per-business folder routing ──────────────────────────────────
-    $businessId = trim((string)($_POST['business_id'] ?? ''));
+    $businessId = $businessIdEarly;
     $subtype    = trim((string)($_POST['subtype']     ?? ''));
     $uuidV4Re   = '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i';
     $docRoot    = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
@@ -1016,6 +1048,7 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'upload' && ($segments[1] ?? 
 // GET /api/v1/public/categories
 // =============================================================================
 if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'categories') {
+    header('Cache-Control: public, max-age=120');
     $pdo = api_db();
     $stmt = $pdo->query('SELECT id, name, slug, parent_id FROM mci_categories ORDER BY parent_id IS NOT NULL, name');
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1047,6 +1080,7 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '
 // GET /api/v1/public/tags
 // =============================================================================
 if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'tags') {
+    header('Cache-Control: public, max-age=120');
     $pdo  = api_db();
     $stmt = $pdo->query('SELECT id, name, slug FROM mci_tags ORDER BY name');
     $tags = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1084,6 +1118,32 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '
     $stmt->execute();
     $cities = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'city');
     api_json(['ok' => true, 'cities' => $cities]);
+}
+
+// =============================================================================
+// Public — business listings search (no auth)
+// GET /api/v1/public/businesses?q=...&city=...&category_slug=...&subcategory_slug=...
+// =============================================================================
+if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'businesses') {
+    require_once __DIR__ . '/lib/business_service.php';
+    require_once dirname(__DIR__, 2) . '/includes/mci_config.php';
+
+    $filters = [
+        'q'                => trim((string)($_GET['q'] ?? '')),
+        'city'             => trim((string)($_GET['city'] ?? '')),
+        'category_slug'    => trim((string)($_GET['category_slug'] ?? '')),
+        'subcategory_slug' => trim((string)($_GET['subcategory_slug'] ?? '')),
+        'tag_slug'         => trim((string)($_GET['tag_slug'] ?? '')),
+        'price_range'      => trim((string)($_GET['price_range'] ?? '')),
+        'sort'             => trim((string)($_GET['sort'] ?? 'newest')),
+        'page'             => max(1, (int)($_GET['page'] ?? 1)),
+        'per_page'         => min(48, max(1, (int)($_GET['per_page'] ?? (defined('MCI_LISTING_PER_PAGE') ? MCI_LISTING_PER_PAGE : 12)))),
+    ];
+    $filters = array_filter($filters, static fn($v): bool => $v !== '');
+
+    $pdo = api_db();
+    $res = api_business_list_public($pdo, $filters);
+    api_json(['ok' => true] + $res);
 }
 
 // =============================================================================
@@ -1146,6 +1206,9 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '
 //   sender_name, sender_phone, sender_email, message
 // =============================================================================
 if ($method === 'POST' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'leads' && !isset($segments[2])) {
+    if (!api_rate_limit_allow('public_lead:' . api_client_ip(), 40, 3600)) {
+        api_error('too_many_requests', 429);
+    }
     require_once __DIR__ . '/lib/leads_service.php';
 
     $data = api_request_data();
@@ -1181,20 +1244,48 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? 
 }
 
 // =============================================================================
+// Public — flag a business listing as inappropriate (auth optional)
+// POST /api/v1/public/business-flags
+// =============================================================================
+if ($method === 'POST' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? '') === 'business-flags' && !isset($segments[2])) {
+    require_once __DIR__ . '/lib/business_helpers.php';
+    require_once __DIR__ . '/lib/business_service.php';
+    $auth = api_business_try_auth();
+    $data = api_request_data();
+    $res = api_business_flag_create(api_db(), $data, $auth);
+    if (!$res['ok']) {
+        api_error($res['error'], $res['status'] ?? 400);
+    }
+    api_json(['ok' => true, 'id' => $res['id']], 201);
+}
+
+// =============================================================================
 // Business registration
 // POST /api/v1/businesses
 // =============================================================================
 if ($method === 'POST' && ($segments[0] ?? '') === 'businesses' && !isset($segments[1])) {
     require_once __DIR__ . '/lib/business_helpers.php';
     require_once __DIR__ . '/lib/business_service.php';
+    require_once dirname(__DIR__, 2) . '/includes/mci_config.php';
 
     $auth = api_business_try_auth(); // optional — null for guests
     $data = api_request_data();
 
-    $pdo = api_db();
-    $res = api_business_create($pdo, $data, $auth);
+    try {
+        $pdo = api_db();
+        $res = api_business_create($pdo, $data, $auth);
+    } catch (Throwable $e) {
+        mci_log_error('POST /api/v1/businesses', $e);
+        $extra = [];
+        if (api_env_flag('MCI_DEBUG_API')) {
+            $extra['detail'] = get_class($e) . ': ' . $e->getMessage() . ' in ' . basename($e->getFile()) . ':' . $e->getLine();
+        }
+        api_error('server_error', 500, $extra);
+    }
+
     if (!$res['ok']) {
-        api_error($res['error'], $res['status'] ?? 400);
+        $extra = isset($res['detail']) ? ['detail' => $res['detail']] : [];
+        api_error($res['error'], $res['status'] ?? 400, $extra);
     }
 
     // Set data_source after create based on submission context
@@ -1224,6 +1315,10 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'businesses' && !isset($segme
         'product_ids' => $res['product_ids'] ?? [],
         'service_ids' => $res['service_ids'] ?? [],
     ];
+    if (!empty($res['id'])) {
+        require_once __DIR__ . '/lib/image_upload_token.php';
+        $out['image_upload_token'] = api_image_upload_token_issue((string) $res['id']);
+    }
     if (isset($res['token'])) {
         // Guest created an account at submit — return JWT so client can log in
         $out['token']     = $res['token'];
@@ -1238,6 +1333,9 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'businesses' && !isset($segme
 // PATCH /api/v1/businesses/{id}/images
 // =============================================================================
 if ($method === 'PATCH' && ($segments[0] ?? '') === 'businesses' && ($segments[2] ?? '') === 'images' && isset($segments[1])) {
+    if (!api_rate_limit_allow('patch_img:' . api_client_ip(), 200, 3600)) {
+        api_error('too_many_requests', 429);
+    }
     require_once __DIR__ . '/lib/business_helpers.php';
     require_once __DIR__ . '/lib/business_service.php';
 
@@ -1245,13 +1343,20 @@ if ($method === 'PATCH' && ($segments[0] ?? '') === 'businesses' && ($segments[2
     if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $groupId)) {
         api_error('not_found', 404);
     }
-    $data    = api_request_data();
+    $data = api_request_data();
 
-    // Optional auth — nil UUID for anonymous
-    $auth    = api_business_try_auth();
+    $uploadTok = trim((string)($data['image_upload_token'] ?? ''));
+    if ($uploadTok === '') {
+        $uploadTok = trim((string)($_SERVER['HTTP_X_MCI_IMAGE_UPLOAD_TOKEN'] ?? ''));
+    }
+    unset($data['image_upload_token']);
+
+    $auth = api_business_try_auth();
+    $pdo  = api_db();
+    api_assert_can_patch_business_images($pdo, $groupId, $auth, $uploadTok !== '' ? $uploadTok : null);
+
     $actorId = $auth['user_id'] ?? '00000000-0000-0000-0000-000000000000';
 
-    $pdo = api_db();
     $res = api_business_patch_images($pdo, $groupId, $data, $actorId);
     if (!$res['ok']) {
         api_error($res['error'], $res['status'] ?? 500);
@@ -1287,6 +1392,16 @@ if (($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'businesses') {
         api_json(api_business_list_cp($pdo, $filters));
     }
 
+    // GET /api/v1/cp/businesses/{id}
+    if ($method === 'GET' && isset($segments[2]) && !isset($segments[3])) {
+        $groupId = (string)$segments[2];
+        $data = api_business_fetch($pdo, $groupId);
+        if (!$data) {
+            api_error('business_not_found', 404);
+        }
+        api_json(['ok' => true, 'business' => $data]);
+    }
+
     // POST /api/v1/cp/businesses/{id}/approve|reject|suspend
     if ($method === 'POST' && isset($segments[2], $segments[3])) {
         $groupId = (string)$segments[2];
@@ -1308,6 +1423,48 @@ if (($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'businesses') {
 }
 
 // =============================================================================
+// CP — business flags moderation
+// GET  /api/v1/cp/business-flags
+// POST /api/v1/cp/business-flags/{id}/resolve
+// POST /api/v1/cp/business-flags/{id}/dismiss
+// =============================================================================
+if (($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'business-flags') {
+    require_once __DIR__ . '/lib/business_service.php';
+    $auth = api_require_auth(['super_admin', 'co_admin']);
+    $pdo = api_db();
+
+    if ($method === 'GET' && !isset($segments[2])) {
+        $status = trim((string)($_GET['status'] ?? 'open'));
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = min(100, max(1, (int)($_GET['per_page'] ?? 25)));
+        api_json(['ok' => true] + api_business_flag_list_cp($pdo, $page, $perPage, $status));
+    }
+
+    if ($method === 'POST' && isset($segments[2], $segments[3])) {
+        $flagId = (string)$segments[2];
+        $action = (string)$segments[3];
+        $data = api_request_data();
+        $status = $action === 'resolve' ? 'resolved' : ($action === 'dismiss' ? 'dismissed' : '');
+        if ($status === '') {
+            api_error('not_found', 404);
+        }
+        $ok = api_business_flag_resolve($pdo, $flagId, $status, (string)$auth['user_id'], trim((string)($data['admin_note'] ?? '')));
+        if (!$ok) {
+            api_error('flag_not_found_or_closed', 404);
+        }
+        if ($action === 'resolve' && !empty($data['suspend_listing'])) {
+            $flagStmt = $pdo->prepare('SELECT business_group_id FROM mci_business_flags WHERE id = ? LIMIT 1');
+            $flagStmt->execute([$flagId]);
+            $groupId = (string)($flagStmt->fetchColumn() ?: '');
+            if ($groupId !== '') {
+                api_business_update_status($pdo, $groupId, 'suspended', (string)$auth['user_id'], 'Suspended from inappropriate listing report');
+            }
+        }
+        api_json(['ok' => true]);
+    }
+}
+
+// =============================================================================
 // Subscriber — own business list
 // GET /api/v1/businesses?owner=me
 // =============================================================================
@@ -1318,6 +1475,66 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'businesses' && !isset($segmen
     $auth = api_require_auth(['subscriber', 'super_admin', 'co_admin']);
     $pdo  = api_db();
     api_json(api_business_list_owner($pdo, $auth['user_id']));
+}
+
+// =============================================================================
+// Subscriber — fetch single owned business (full details)
+// GET /api/v1/subscriber/businesses/{id}
+// =============================================================================
+if ($method === 'GET' && ($segments[0] ?? '') === 'subscriber' && ($segments[1] ?? '') === 'businesses' && isset($segments[2]) && !isset($segments[3])) {
+    require_once __DIR__ . '/lib/business_helpers.php';
+    require_once __DIR__ . '/lib/business_service.php';
+
+    $auth    = api_require_auth(['subscriber', 'super_admin', 'co_admin']);
+    $pdo     = api_db();
+    $groupId = (string)$segments[2];
+
+    $data = api_business_fetch($pdo, $groupId);
+    if (!$data) {
+        api_error('business_not_found', 404);
+    }
+    // Ownership check — subscribers may only view their own listings
+    if ($auth['role'] === 'subscriber' && (string)($data['added_by_user_id'] ?? '') !== $auth['user_id']) {
+        api_error('forbidden', 403);
+    }
+    api_json(['ok' => true, 'business' => $data]);
+}
+
+// =============================================================================
+// Subscriber — update own business (full replace of mutable fields)
+// PUT /api/v1/subscriber/businesses/{id}
+// =============================================================================
+if ($method === 'PUT' && ($segments[0] ?? '') === 'subscriber' && ($segments[1] ?? '') === 'businesses' && isset($segments[2]) && !isset($segments[3])) {
+    require_once __DIR__ . '/lib/business_helpers.php';
+    require_once __DIR__ . '/lib/business_service.php';
+
+    $auth    = api_require_auth(['subscriber', 'super_admin', 'co_admin']);
+    $pdo     = api_db();
+    $groupId = (string)$segments[2];
+
+    // Verify existence + ownership
+    $existing = api_business_fetch($pdo, $groupId);
+    if (!$existing) {
+        api_error('business_not_found', 404);
+    }
+    if ($auth['role'] === 'subscriber' && (string)($existing['added_by_user_id'] ?? '') !== $auth['user_id']) {
+        api_error('forbidden', 403);
+    }
+
+    $data = api_request_data();
+    $res  = api_business_update($pdo, $groupId, $data, $auth['user_id']);
+
+    if (!$res['ok']) {
+        $extra = isset($res['detail']) ? ['detail' => $res['detail']] : [];
+        api_error($res['error'], $res['status'] ?? 500, $extra);
+    }
+
+    api_json([
+        'ok'          => true,
+        'id'          => $res['id'],
+        'product_ids' => $res['product_ids'] ?? [],
+        'service_ids' => $res['service_ids'] ?? [],
+    ]);
 }
 
 // =============================================================================
@@ -1503,6 +1720,27 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'locations' && ($segments[1] ?
     $stmt->execute([$country]);
     $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
     api_json(['ok' => true, 'states' => array_values($rows)]);
+}
+
+if ($method === 'GET' && ($segments[0] ?? '') === 'locations' && ($segments[1] ?? '') === 'cities') {
+    require_once __DIR__ . '/lib/location_service.php';
+    $country = mb_substr(trim((string)($_GET['country'] ?? '')), 0, 100);
+    $state   = mb_substr(trim((string)($_GET['state']   ?? '')), 0, 100);
+    if ($country === '') {
+        api_json(['ok' => true, 'cities' => []]);
+    }
+    $pdo    = api_db();
+    $sql    = "SELECT DISTINCT city FROM mci_locations WHERE country = ?";
+    $params = [$country];
+    if ($state !== '') {
+        $sql .= " AND state = ?";
+        $params[] = $state;
+    }
+    $sql .= " ORDER BY city";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    api_json(['ok' => true, 'cities' => array_values($rows)]);
 }
 
 // =============================================================================

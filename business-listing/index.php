@@ -4,13 +4,13 @@ declare(strict_types=1);
 $pageTitle = 'Listings - My City Info';
 $activePage = 'listings';
 
+require_once __DIR__ . '/../includes/mci_paths.php';
 require_once __DIR__ . '/../includes/mci_config.php';
 require_once __DIR__ . '/../includes/mci_category_icons.php';
 require_once __DIR__ . '/../api/v1/lib/db.php';
 require_once __DIR__ . '/../api/v1/lib/business_service.php';
 
 $extraHead = <<<'HTML'
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 <link rel="stylesheet" href="/assets/css/listings.css" />
 <script src="/assets/js/listings-view.js" defer></script>
 HTML;
@@ -97,17 +97,20 @@ $extraJS = <<<'HTML'
     btn.type = 'button';
     btn.className = 'btn btn-sm ' + (active ? 'btn-dark' : 'btn-outline-secondary');
     btn.textContent = label;
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     btn.addEventListener('click', function () {
       input.value = slug;
-      // Update active state
       pills.querySelectorAll('.btn').forEach(function (b) {
         b.className = 'btn btn-sm btn-outline-secondary';
+        b.setAttribute('aria-pressed', 'false');
       });
       btn.className = 'btn btn-sm btn-dark';
+      btn.setAttribute('aria-pressed', 'true');
     });
     return btn;
   }
 })();
+
 </script>
 HTML;
 
@@ -122,6 +125,21 @@ $subcategory = trim((string)($_GET['subcategory'] ?? ''));
 $tag         = trim((string)($_GET['tag']         ?? ''));
 $priceRange  = trim((string)($_GET['price_range'] ?? ''));
 $curPage     = max(1, (int)($_GET['page']         ?? 1));
+
+// ── SEO meta for filter combinations ─────────────────────────────────────────
+$canonicalUrl = mci_site_base_url() . '/business-listing/';
+if ($what !== '' || $where !== '' || $category !== '') {
+    $_ogTitleParts = ['Listings'];
+    if ($what !== '')     $_ogTitleParts[] = $what;
+    if ($category !== '') $_ogTitleParts[] = ucwords(str_replace('-', ' ', $category));
+    if ($where !== '')    $_ogTitleParts[] = 'in ' . $where;
+    $ogTitle         = implode(' — ', $_ogTitleParts) . ' - My City Info';
+    $metaDescription = 'Browse local businesses'
+        . ($what !== ''     ? ' for ' . $what : '')
+        . ($category !== '' ? ' in ' . ucwords(str_replace('-', ' ', $category)) : '')
+        . ($where !== ''    ? ' in ' . $where : '')
+        . ' on My City Info.';
+}
 
 // ── Load categories from DB for the filter dropdown ──────────────────────────
 $dbCategories = [];
@@ -175,7 +193,7 @@ try {
                                ? $row['logo_path']
                                : (!empty($row['banner_path'])
                                    ? $row['banner_path']
-                                   : 'https://picsum.photos/seed/mci-' . ($row['slug'] ?? 'biz') . '/480/320'),
+                                   : mci_listing_placeholder_url()),
             'price_range' => $row['price_range'] ?? null,
             'tags'        => [],
         ];
@@ -184,6 +202,21 @@ try {
 
 $total = (int)($result['total'] ?? 0);
 $pages = (int)($result['pages'] ?? 1);
+
+$extraJS .= '<script>window.MCI_LISTING_CONFIG=' . json_encode([
+    'endpoint' => '/api/v1/public/businesses',
+    'filters' => [
+        'q' => $what,
+        'city' => $where,
+        'category_slug' => $category,
+        'subcategory_slug' => $subcategory,
+        'tag_slug' => $tag,
+        'price_range' => $priceRange,
+    ],
+    'page' => $curPage,
+    'pages' => $pages,
+    'perPage' => MCI_LISTING_PER_PAGE,
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';</script>';
 
 $activeFilterCount = ($what !== '' ? 1 : 0) + ($where !== '' ? 1 : 0) + ($category !== '' ? 1 : 0)
                    + ($subcategory !== '' ? 1 : 0) + ($tag !== '' ? 1 : 0) + ($priceRange !== '' ? 1 : 0);
@@ -222,6 +255,14 @@ ob_start();
             Browse businesses by category, city, or tag.
           <?php endif; ?>
         </div>
+        <?php if ($category === '' && $where === '' && $what === '' && $tag === '' && $curPage === 1): ?>
+        <p class="text-muted small mt-2 mb-0">
+          My City Info is India's free local business directory — covering restaurants, services,
+          shops, and more across cities nationwide. Use the filters to narrow down by category,
+          location, or price range, and discover trusted businesses with verified reviews and
+          up-to-date contact details.
+        </p>
+        <?php endif; ?>
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <button class="btn btn-sm btn-outline-dark d-lg-none" type="button" id="mciFilterToggle" aria-expanded="false" aria-controls="mciFiltersPanel">
@@ -277,7 +318,7 @@ ob_start();
             data-preload="<?= $preloadSubs ?>"
             style="<?= empty($dbSubcategories) ? 'display:none;' : '' ?>">
             <label class="form-label">Subcategory</label>
-            <div class="d-flex flex-wrap gap-2" id="mciSubcategoryPills"></div>
+            <div class="d-flex flex-wrap gap-2" id="mciSubcategoryPills" role="group" aria-label="Subcategory"></div>
             <input type="hidden" name="subcategory" id="mciSubcategoryInput" value="<?= htmlspecialchars($subcategory) ?>" />
           </div>
 
@@ -316,7 +357,7 @@ ob_start();
               <i class="bi bi-list-ul" aria-hidden="true"></i>
             </button>
           </div>
-          <div class="text-muted small">Showing <?= count($filteredListings) ?> of <?= number_format($total) ?> listings</div>
+          <div class="text-muted small">Showing <span id="mciShownCount"><?= count($filteredListings) ?></span> of <span id="mciTotalCount"><?= number_format($total) ?></span> listings</div>
         </div>
       </div>
 
@@ -328,34 +369,53 @@ ob_start();
           <a href="/business-listing/" class="btn btn-sm btn-dark">Clear all filters</a>
         </div>
       <?php else: ?>
-        <div id="listingsGridView" class="row g-3">
+        <div id="listingsGridView" class="row g-3" data-infinite-scroll="1">
           <?php foreach ($filteredListings as $listing): ?>
             <?php $size = 'md'; include __DIR__ . '/../views/components/listing-card.php'; ?>
           <?php endforeach; ?>
         </div>
 
-        <div id="listingsListView" class="row g-3 d-none">
+        <div id="listingsListView" class="row g-3 d-none" data-infinite-scroll="1">
           <?php foreach ($filteredListings as $listing): ?>
             <?php include __DIR__ . '/../views/components/listing-row.php'; ?>
           <?php endforeach; ?>
         </div>
 
-        <!-- Pagination -->
+        <?php
+        // Pagination: only for users without JS (infinite scroll handles paging in-browser).
+        $baseParams = [];
+        if ($what !== '') {
+            $baseParams['what'] = $what;
+        }
+        if ($where !== '') {
+            $baseParams['where'] = $where;
+        }
+        if ($category !== '') {
+            $baseParams['category'] = $category;
+        }
+        if ($subcategory !== '') {
+            $baseParams['subcategory'] = $subcategory;
+        }
+        if ($tag !== '') {
+            $baseParams['tag'] = $tag;
+        }
+        if ($priceRange !== '') {
+            $baseParams['price_range'] = $priceRange;
+        }
+        if (!function_exists('mci_listing_page_url')) {
+            function mci_listing_page_url(array $base, int $page): string
+            {
+                $p = $base;
+                if ($page > 1) {
+                    $p['page'] = $page;
+                }
+
+                return '/business-listing/?' . http_build_query($p);
+            }
+        }
+        ?>
         <?php if ($pages > 1): ?>
-          <?php
-          $baseParams = [];
-          if ($what !== '')        $baseParams['what']        = $what;
-          if ($where !== '')       $baseParams['where']       = $where;
-          if ($category !== '')    $baseParams['category']    = $category;
-          if ($subcategory !== '') $baseParams['subcategory'] = $subcategory;
-          if ($tag !== '')         $baseParams['tag']         = $tag;
-          if ($priceRange !== '')  $baseParams['price_range'] = $priceRange;
-          function mci_listing_page_url(array $base, int $page): string {
-              $p = $base;
-              if ($page > 1) $p['page'] = $page;
-              return '/business-listing/?' . http_build_query($p);
-          }
-          ?>
+        <noscript>
           <nav class="mt-4 d-flex justify-content-center" aria-label="Listings pages">
             <ul class="pagination pagination-sm mb-0">
               <li class="page-item <?= $curPage <= 1 ? 'disabled' : '' ?>">
@@ -375,7 +435,10 @@ ob_start();
               </li>
             </ul>
           </nav>
+        </noscript>
         <?php endif; ?>
+        <div id="mciInfiniteSentinel" class="mci-infinite-sentinel" aria-hidden="true"></div>
+        <div id="mciInfiniteStatus" class="text-center small text-muted mt-3" style="display:none;"></div>
       <?php endif; ?>
     </div>
   </div>

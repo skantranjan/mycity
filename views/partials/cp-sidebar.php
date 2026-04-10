@@ -116,7 +116,7 @@ $isSuperAdmin = ($cpRole === 'super_admin');
 
     <!-- ── Users ────────────────────────────── -->
     <div class="mci-sidebar-group-label mt-2">Users</div>
-    <?php cpNavLink('subscribers', '/cp/users/', 'bi-people-fill', 'Subscribers', $cpActive); ?>
+    <?php cpNavLink('subscribers', '/cp/subscribers/', 'bi-people-fill', 'Subscribers', $cpActive); ?>
     <?php if ($isSuperAdmin): ?>
       <?php cpNavLink('coadmins', '/cp/coadmins/', 'bi-shield-lock', 'Co-admins', $cpActive); ?>
     <?php endif; ?>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/uuid.php';
 require_once __DIR__ . '/ip.php';
+require_once __DIR__ . '/business_service.php';
 
 /**
  * @return array{ok:true, count:int}|array{ok:false, error:string, status:int}
@@ -344,13 +345,28 @@ function mci_cp_users_soft_delete(PDO $pdo, string $actorUserId, string $targetI
     }
 
     try {
+        $pdo->beginTransaction();
         $upd = $pdo->prepare('
             UPDATE mci_users
             SET deleted_at = NOW(6), status = "deleted", last_update_ip = ?
             WHERE id = ?
         ');
         $upd->execute([api_client_ip(), $targetId]);
+
+        $bizStmt = $pdo->prepare("
+            SELECT id FROM mci_business_groups
+            WHERE added_by_user_id = ? AND status != 'deleted'
+        ");
+        $bizStmt->execute([$targetId]);
+        $businessIds = $bizStmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        foreach ($businessIds as $businessId) {
+            api_business_update_status($pdo, (string)$businessId, 'deleted', $actorUserId, 'Owner account soft-deleted');
+        }
+        $pdo->commit();
     } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         return ['ok' => false, 'error' => 'delete_failed', 'status' => 500];
     }
 

@@ -8,54 +8,47 @@ $subActive = 'listings';
 $hideCta = true;
 $appArea = 'subscriber';
 
+// Session + auth
+require_once __DIR__ . '/../../includes/mci_session.php';
+require_once __DIR__ . '/../../includes/mci_require_session.php';
+mci_require_subscriber_session();
+
+$sessionUserId = (string)($_SESSION['mci_user_id'] ?? '');
+
+// CSRF
 $csrfAction = 'subscriber_edit_listing';
 require_once __DIR__ . '/../../includes/mci_csrf.php';
 $mciSubmitCsrfToken = mci_csrf_token($csrfAction);
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $csrfPost = trim((string) ($_POST['csrf_token'] ?? ''));
-    if (!mci_csrf_verify($csrfAction, $csrfPost)) {
-        http_response_code(403);
-        throw new RuntimeException('Invalid CSRF token.');
+
+// Resolve listing id from query param
+$editId = trim((string)($_GET['id'] ?? ''));
+
+// Fetch real listing data
+$listing = null;
+if ($editId !== '') {
+    require_once __DIR__ . '/../../api/v1/lib/db.php';
+    require_once __DIR__ . '/../../api/v1/lib/business_service.php';
+    try {
+        $fetched = api_business_fetch(api_db(), $editId);
+        // Ownership check — only the owner (or admins via session) may edit
+        if ($fetched && (string)($fetched['added_by_user_id'] ?? '') === $sessionUserId) {
+            $listing = $fetched;
+        }
+    } catch (Throwable $e) {
+        $listing = null;
     }
 }
 
-// UI demo: resolve listing from slug/id query param
-$editSlug = trim((string) ($_GET['slug'] ?? ($_GET['id'] ?? '')));
-
-// UI demo: hardcoded listing data keyed by slug
-$demoListings = [
-    'property-852' => [
-        'slug'   => 'property-852',
-        'title'  => 'Property 852',
-        'status' => 'Live',
-    ],
-    'locker-shop-uk' => [
-        'slug'   => 'locker-shop-uk',
-        'title'  => 'Locker Shop UK Ltd',
-        'status' => 'Pending',
-    ],
-    'jxf-painting' => [
-        'slug'   => 'jxf-painting',
-        'title'  => 'JXF Painting Service',
-        'status' => 'Live',
-    ],
-    'hunter-hill-physio' => [
-        'slug'   => 'hunter-hill-physio',
-        'title'  => 'Hunter Hill Physiotherapy',
-        'status' => 'Rejected',
-    ],
-];
-
-$editListing = $demoListings[$editSlug] ?? null;
-$listingTitle  = $editListing['title']  ?? 'Unknown Listing';
-$listingStatus = $editListing['status'] ?? '';
+$listingTitle  = $listing ? (string)($listing['name']   ?? 'Unknown Listing') : 'Unknown Listing';
+$listingStatus = $listing ? (string)($listing['status'] ?? '')                 : '';
 
 $statusBadgeClass = match($listingStatus) {
-    'Live'     => 'text-bg-success',
-    'Pending'  => 'text-bg-warning',
-    'Rejected' => 'text-bg-danger',
-    'Draft'    => 'text-bg-secondary',
-    default    => 'text-bg-light border',
+    'live'      => 'text-bg-success',
+    'pending'   => 'text-bg-warning',
+    'rejected'  => 'text-bg-danger',
+    'draft'     => 'text-bg-secondary',
+    'suspended' => 'text-bg-danger',
+    default     => 'text-bg-light border',
 };
 
 $extraHead = <<<'HTML'
@@ -63,41 +56,34 @@ $extraHead = <<<'HTML'
 <link rel="stylesheet" href="/assets/css/submit-listing.css" />
 HTML;
 
-$extraJS = <<<'HTML'
+// Build the inline JS block that seeds the edit data
+$listingJson  = $listing ? json_encode($listing, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) : 'null';
+$editIdSafe   = htmlspecialchars($editId, ENT_QUOTES, 'UTF-8');
+
+$extraJS = <<<HTML
+<script>
+window._mciSubmitContext  = 'subscriber';
+window._mciSubmitRedirect = '/subscriber/listings/';
+window._mciSubmitBtnText  = 'Save changes';
+window._mciEditListing    = {$listingJson};
+window._mciEditListingId  = '{$editIdSafe}';
+</script>
 <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
 <script src="/assets/js/subscriber-list-business.js"></script>
+<script src="/assets/js/subscriber-listing-edit.js"></script>
 HTML;
 
-$categories = [
-    'Airport', 'Amusement Park', 'Aquarium', 'Art Gallery', 'ATM', 'Automotive',
-    'Bakery', 'Bank', 'Bar', 'Beauty Salon', 'Bicycle Store', 'Books & Stationary Store',
-    'Bus Stations', 'Cafe', 'Car Dealer', 'Car Rental', 'Car Repair', 'Car Wash',
-    'Cemetery', 'Church', 'City Attraction', 'Clothing Store', 'College',
-    'Convenience Store', 'Courier Services', 'Dentist', 'Departmental Store',
-    'Doctor', 'Electrician', 'Electronics Store', 'Fire Station', 'Florist',
-    'Funeral Home', 'Furniture Store', 'Gift Shop', 'Government Office', 'Gym',
-    'Hardware Store', 'Health', 'Hindu Temple', 'Home Appliances Products',
-    'Hospital', 'Hotels', 'Industrial and Manufacturing Supplies', 'Insurance Agency',
-    'Jewelry Store', 'Laundry', 'Lawyer', 'Library', 'Liquor Store', 'Locksmith',
-    'Medical Store', 'Monuments', 'Mosque', 'Movie Theater', 'Museum',
-    'NGO and Charitable Trusts', 'Night Club', 'Painter', 'Park', 'Pet Store',
-    'Petrol Pump', 'Physiotherapist', 'Plumber', 'Police Station', 'Post Office',
-    'Pre Schools and Day Care', 'Private Coaching Institutes', 'Real Estate',
-    'Resorts', 'Restaurant', 'School', 'Services', 'Shoe Store', 'Shopping', 'Spa',
-    'Stadium', 'Supermarket', 'Travel Agency', 'University', 'Veterinary Care',
-];
-
 // Override wizard labels for edit context
-$submitKicker   = 'Edit listing';
-$submitTitle    = 'Edit: ' . htmlspecialchars($listingTitle, ENT_QUOTES, 'UTF-8');
-$submitLead     = 'Update your listing details. All changes will be reviewed before going live.';
+$submitKicker    = 'Edit listing';
+$submitTitle     = 'Edit: ' . htmlspecialchars($listingTitle, ENT_QUOTES, 'UTF-8');
+$submitLead      = 'Update your listing details. All changes will be reviewed before going live.';
 $step7SubmitText = 'Save changes';
 $step7HeaderDesc = 'Review your changes below, then save when everything looks right.';
 $step7AlertTitle = 'Review &amp; save';
 $step7AlertBody  = 'Check all steps before saving. Changes to a live listing may require re-approval.';
-$formOrigin     = 'ui_subscriber_edit_listing';
-$postingType    = 'registered';
-$requesterLabel = 'Subscriber';
+$formOrigin      = 'ui_subscriber_edit_listing';
+$postingType     = 'registered';
+$requesterLabel  = 'Subscriber';
 
 ob_start();
 ?>
@@ -120,14 +106,15 @@ ob_start();
       </nav>
       <?php if ($listingStatus !== ''): ?>
         <span class="badge <?= $statusBadgeClass ?>">
-          <?= htmlspecialchars($listingStatus, ENT_QUOTES, 'UTF-8') ?>
+          <?= htmlspecialchars(ucfirst($listingStatus), ENT_QUOTES, 'UTF-8') ?>
         </span>
       <?php endif; ?>
     </div>
 
-    <?php if ($editListing === null && $editSlug !== ''): ?>
+    <?php if ($listing === null): ?>
       <div class="alert alert-warning">
-        Listing not found. <a href="/subscriber/listings/">Back to My Listings</a>.
+        Listing not found or you do not have permission to edit it.
+        <a href="/subscriber/listings/">Back to My Listings</a>.
       </div>
     <?php else: ?>
       <?php include __DIR__ . '/../../views/partials/subscriber-list-business-inner.php'; ?>

@@ -23,3 +23,32 @@ const MCI_DASHBOARD_RECENT_LIMIT = 5;
 
 // Branding
 const MCI_FOUNDING_YEAR = 2020;
+
+// ---------------------------------------------------------------------------
+// Error logging
+// ---------------------------------------------------------------------------
+
+/**
+ * Write a structured entry to logs/api-errors.log.
+ * Call this wherever you catch a Throwable you want to diagnose.
+ */
+function mci_log_error(string $context, Throwable $e): void
+{
+    $logFile = dirname(__DIR__) . '/logs/api-errors.log';
+    $line = implode(' | ', [
+        date('Y-m-d H:i:s'),
+        $context,
+        get_class($e) . ': ' . $e->getMessage(),
+        $e->getFile() . ':' . $e->getLine(),
+        // compact one-line trace (first 5 frames)
+        implode(' -> ', array_slice(
+            array_map(
+                static fn(array $f): string =>
+                    ($f['file'] ?? '?') . ':' . ($f['line'] ?? '?') . ' ' . ($f['function'] ?? ''),
+                $e->getTrace()
+            ),
+            0, 5
+        )),
+    ]);
+    error_log($line . PHP_EOL, 3, $logFile);
+}

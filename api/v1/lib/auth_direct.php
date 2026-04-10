@@ -21,11 +21,11 @@ require_once __DIR__ . '/ip.php';
  *
  * @return array{ok:true, user: array{id: string, email: string, role: string}, token: string, exp: int}|array{ok:false, error: string, status?: int}
  */
-function api_direct_auth_login(string $email, string $password, string $audience): array
+function api_direct_auth_login(string $email, string $password, string $audience, bool $rememberLongSession = false): array
 {
     $audience = mb_strtolower(trim($audience));
     if ($audience === 'subscriber' || $audience === 'sub') {
-        return api_direct_subscriber_login($email, $password);
+        return api_direct_subscriber_login($email, $password, $rememberLongSession);
     }
     if (
         $audience === 'cp'
@@ -43,7 +43,7 @@ function api_direct_auth_login(string $email, string $password, string $audience
 /**
  * @return array{ok:true, user: array{id: string, email: string, role: string}, token: string, exp: int}|array{ok:false, error: string, status?: int}
  */
-function api_direct_subscriber_login(string $email, string $password): array
+function api_direct_subscriber_login(string $email, string $password, bool $rememberLongSession = false): array
 {
     $email = mb_strtolower(trim($email));
     if ($email === '' || $password === '') {
@@ -81,7 +81,7 @@ function api_direct_subscriber_login(string $email, string $password): array
     $upd = $pdo->prepare('UPDATE mci_users SET last_login_at = NOW(6), is_logged_in = 1, last_update_ip = ? WHERE id = ?');
     $upd->execute([$ip, $userId]);
 
-    $exp = time() + 28800;
+    $exp = $rememberLongSession ? time() + (86400 * 30) : time() + 28800;
     $jwt = api_jwt_sign(['sub' => $userId, 'role' => $role, 'iat' => time(), 'exp' => $exp]);
 
     return [

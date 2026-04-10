@@ -11,13 +11,12 @@
 -- DO NOT run on production databases.
 --
 -- Dependencies (must be seeded first):
---   1. Master seed: 01_roles_and_system_user.sql
---   2. Master seed: database/seed_categories.sql
---   3. Master seed: database/seed_tags.sql
---   4. Test seed:   01_test_users.sql  (businesses are attributed to superadmin UUID)
+--   1. database/seed/master/01_roles_and_system_user.sql
+--   2. database/seed_categories.sql
+--   3. database/seed_tags.sql
+--   4. database/seed/test/01_test_users.sql  (businesses attributed to superadmin UUID)
 --
--- The canonical data file is: api/v1/migrations/011_seed_businesses.sql
--- Run that file directly — it is idempotent (INSERT IGNORE throughout).
+-- Canonical data file: api/v1/migrations/011_seed_businesses.sql
 --
 -- Command line:
 --   mysql -u <user> -p <database> < api/v1/migrations/011_seed_businesses.sql

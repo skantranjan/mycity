@@ -21,6 +21,7 @@ If something is missing, add a stub under `docs/` or update the canonical files 
 - Small, reviewable changes.
 - Keep auth/role logic consistent.
 - SQL must be valid MySQL (FK order, etc.).
+- If a feature is hidden/removed for launch, update `project_brain/LAUNCH_FREEZE_LOG.md` in the same change.
 
 ### Phase C: Validate
 

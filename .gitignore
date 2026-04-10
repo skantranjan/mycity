@@ -1,6 +1,9 @@
 # Local secrets — never commit
 .env
 
+# Runtime logs
+logs/*.log
+
 # OS / IDE
 Thumbs.db
 .DS_Store

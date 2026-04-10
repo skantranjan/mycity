@@ -67,3 +67,61 @@ function mci_api_v1_base(): string
 
     return ($base === '' ? '' : $base) . '/api/v1';
 }
+
+/** Full absolute URL of the current request, e.g. "https://www.mycityinfo.com/business/slug/". */
+function mci_current_url(): string
+{
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host   = $_SERVER['HTTP_HOST'] ?? 'www.mycityinfo.com';
+    $uri    = $_SERVER['REQUEST_URI'] ?? '/';
+    return $scheme . '://' . $host . $uri;
+}
+
+/** Scheme + host only, e.g. "https://www.mycityinfo.com". */
+function mci_site_base_url(): string
+{
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host   = $_SERVER['HTTP_HOST'] ?? 'www.mycityinfo.com';
+    return $scheme . '://' . $host;
+}
+
+/** Web path for a local listing/banner placeholder (no third-party image CDNs). */
+function mci_listing_placeholder_url(): string
+{
+    return '/assets/images/listing-placeholder.svg';
+}
+
+/** Wide hero/banner slot when a business has no banner image. */
+function mci_business_banner_placeholder_url(): string
+{
+    return '/assets/images/business-banner-placeholder.svg';
+}
+
+/** Square logo slot placeholder (cards, modals, admin previews). */
+function mci_business_logo_placeholder_url(): string
+{
+    return '/assets/images/business-logo-placeholder.svg';
+}
+
+/** Profile / storefront avatar circle when no profile (or logo fallback) image. */
+function mci_business_profile_placeholder_url(): string
+{
+    return '/assets/images/business-profile-placeholder.svg';
+}
+
+/**
+ * Build an absolute URL for Open Graph / JSON-LD when the value may be a site path (/...) or already absolute.
+ */
+function mci_absolute_url(string $url): string
+{
+    if ($url === '') {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $url) === 1) {
+        return $url;
+    }
+    $base = rtrim(mci_site_base_url(), '/');
+    $path = $url[0] === '/' ? $url : '/' . $url;
+
+    return $base . $path;
+}

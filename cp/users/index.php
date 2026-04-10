@@ -7,7 +7,7 @@ require_once __DIR__ . '/../../includes/mci_require_session.php';
 
 mci_require_super_admin_session();
 
-$pageTitle = 'Users - My City Info';
+$pageTitle = 'Subscribers - My City Info';
 $activePage = '';
 $cpActive = 'subscribers';
 $hideCta = true;
@@ -15,9 +15,7 @@ $appArea = 'cp';
 
 $currentUserId = (string) ($_SESSION['mci_cp_user_id'] ?? '');
 
-$extraHead = <<<'HTML'
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-HTML;
+$extraHead = '';
 
 $extraJS = <<<'HTML'
 <script>
@@ -25,7 +23,7 @@ $extraJS = <<<'HTML'
   var API = (typeof window.mciApiUrl === 'function' ? window.mciApiUrl : function (p) { return '/api/v1' + p; })('/cp/users');
   var currentUserId = document.getElementById('mciCpUsersCurrentId').textContent.trim();
 
-  var state = { page: 1, perPage: 15, q: '', role: '', includeDeleted: false, last: null };
+  var state = { page: 1, perPage: 15, q: '', includeDeleted: false, last: null };
 
   function el(id) { return document.getElementById(id); }
 
@@ -65,7 +63,7 @@ $extraJS = <<<'HTML'
     qs.set('page', String(state.page));
     qs.set('per_page', String(state.perPage));
     if (state.q) qs.set('q', state.q);
-    if (state.role) qs.set('role', state.role);
+    qs.set('role', 'subscriber');
     if (state.includeDeleted) qs.set('include_deleted', '1');
 
     return fetchJson(API + '?' + qs.toString(), { credentials: 'include' });
@@ -92,7 +90,7 @@ $extraJS = <<<'HTML'
 
     tbody.innerHTML = '';
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-muted small">No users found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="text-muted small">No subscribers found.</td></tr>';
       return;
     }
 
@@ -101,15 +99,15 @@ $extraJS = <<<'HTML'
       if (u.deleted_at) tr.classList.add('table-secondary');
 
       tr.innerHTML =
-        '<td class="small text-muted">' + escapeHtml(u.display_name || '—') + '</td>' +
+        '<td class="small text-muted"><button type="button" class="btn btn-link btn-sm p-0 text-start mci-user-detail-link">' + escapeHtml(u.display_name || '—') + '</button></td>' +
         '<td class="small text-muted">' + escapeHtml(u.email || '') + '</td>' +
-        '<td><span class="badge text-bg-light border">' + escapeHtml(u.role || '') + '</span></td>' +
         '<td><span class="badge text-bg-light border">' + escapeHtml(u.status || '') + '</span></td>' +
         '<td class="small text-muted">' + escapeHtml(u.phone || '—') + '</td>' +
         '<td class="small text-muted text-nowrap">' + fmtDate(u.created_at) + '</td>' +
         '<td class="text-end"></td>';
 
       var tdAct = tr.querySelector('td:last-child');
+      tr.querySelector('.mci-user-detail-link').addEventListener('click', function () { openDetailPanel(u); });
       var btnEdit = document.createElement('button');
       btnEdit.type = 'button';
       btnEdit.className = 'btn btn-sm btn-outline-secondary mci-icon-btn';
@@ -151,7 +149,7 @@ $extraJS = <<<'HTML'
 
   function openPanel(mode, u) {
     el('mciUserPanelMode').value = mode;
-    el('mciUserPanelTitle').textContent = mode === 'add' ? 'Add user' : 'Edit user';
+    el('mciUserPanelTitle').textContent = mode === 'add' ? 'Add subscriber' : 'Edit subscriber';
     el('mciUserId').value = mode === 'edit' && u ? u.id : '';
     el('mciUserEmail').value = u && u.email ? u.email : '';
     el('mciUserEmail').disabled = mode === 'edit';
@@ -160,7 +158,6 @@ $extraJS = <<<'HTML'
     el('mciUserPasswordHelp').textContent = mode === 'edit' ? 'Leave blank to keep current password.' : 'Minimum 8 characters.';
     el('mciUserDisplayName').value = u && u.display_name ? u.display_name : '';
     el('mciUserPhone').value = u && u.phone ? u.phone : '';
-    el('mciUserRole').value = u && u.role ? u.role : 'subscriber';
     el('mciUserStatus').value = u && u.status ? u.status : 'active';
 
     var panel = document.getElementById('mciUserOffcanvas');
@@ -169,9 +166,25 @@ $extraJS = <<<'HTML'
     bs.show();
   }
 
+  function openDetailPanel(u) {
+    if (!u) return;
+    el('mciUserDetailName').textContent = u.display_name || '—';
+    el('mciUserDetailEmail').textContent = u.email || '—';
+    el('mciUserDetailPhone').textContent = u.phone || '—';
+    el('mciUserDetailStatus').textContent = u.status || '—';
+    el('mciUserDetailCreated').textContent = fmtDate(u.created_at);
+    el('mciUserDetailLastLogin').textContent = fmtDate(u.last_login_at);
+    var panel = document.getElementById('mciUserDetailOffcanvas');
+    var bs = bootstrap.Offcanvas.getInstance(panel);
+    if (!bs) bs = new bootstrap.Offcanvas(panel);
+    bs.show();
+  }
+
   function confirmDelete(u) {
     if (!u || !u.id) return;
-    if (!window.confirm('Delete this user? They will be marked as deleted in the database and will no longer be able to sign in.')) return;
+    if (!window.confirm('Delete this subscriber and soft-delete all their associated listings?')) return;
+    var typed = window.prompt('Type DELETE to confirm');
+    if (typed !== 'DELETE') return;
 
     fetchJson(API, {
       method: 'POST',
@@ -193,7 +206,7 @@ $extraJS = <<<'HTML'
     var payload = {
       display_name: el('mciUserDisplayName').value.trim(),
       phone: el('mciUserPhone').value.trim(),
-      role: el('mciUserRole').value,
+      role: 'subscriber',
       status: el('mciUserStatus').value
     };
 
@@ -244,7 +257,6 @@ $extraJS = <<<'HTML'
 
   el('mciCpUsersSearchBtn').addEventListener('click', function () {
     state.q = el('mciCpUsersSearch').value.trim();
-    state.role = el('mciCpUsersRoleFilter').value;
     state.includeDeleted = el('mciCpUsersIncludeDeleted').checked;
     state.page = 1;
     loadUsers().then(renderTable).catch(function (e) { showToast(e.message || 'Failed', true); });
@@ -285,11 +297,11 @@ ob_start();
       <div class="card-body p-4">
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
           <div>
-            <div class="fw-semibold">Users</div>
-            <div class="text-muted small">Create, edit, or soft-delete accounts (matches <code>mci_users</code>: email, role, status, <code>deleted_at</code>).</div>
+            <div class="fw-semibold">Subscribers</div>
+            <div class="text-muted small">Create, edit, or soft-delete subscriber accounts only.</div>
           </div>
           <button type="button" class="btn btn-dark btn-sm" id="mciCpUsersAddBtn">
-            <i class="bi bi-person-plus me-1" aria-hidden="true"></i>Add user
+            <i class="bi bi-person-plus me-1" aria-hidden="true"></i>Add subscriber
           </button>
         </div>
 
@@ -297,15 +309,6 @@ ob_start();
           <div class="col-12 col-md-4">
             <label class="form-label small mb-0" for="mciCpUsersSearch">Search</label>
             <input type="search" class="form-control form-control-sm" id="mciCpUsersSearch" placeholder="Email, name, phone" autocomplete="off" />
-          </div>
-          <div class="col-12 col-md-3">
-            <label class="form-label small mb-0" for="mciCpUsersRoleFilter">Role</label>
-            <select class="form-select form-select-sm" id="mciCpUsersRoleFilter">
-              <option value="">All</option>
-              <option value="subscriber">subscriber</option>
-              <option value="co_admin">co_admin</option>
-              <option value="super_admin">super_admin</option>
-            </select>
           </div>
           <div class="col-12 col-md-3 form-check mt-3 mt-md-4">
             <input class="form-check-input" type="checkbox" id="mciCpUsersIncludeDeleted" />
@@ -324,7 +327,6 @@ ob_start();
               <tr>
                 <th style="min-width:140px;">Display name</th>
                 <th>Email</th>
-                <th style="width:110px;">Role</th>
                 <th style="width:80px;">Status</th>
                 <th style="width:120px;">Phone</th>
                 <th style="min-width:200px;">Created</th>
@@ -332,7 +334,7 @@ ob_start();
               </tr>
             </thead>
             <tbody id="mciCpUsersBody">
-              <tr><td colspan="7" class="text-muted small">Loading…</td></tr>
+              <tr><td colspan="6" class="text-muted small">Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -343,6 +345,27 @@ ob_start();
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="mciUserDetailOffcanvas" aria-labelledby="mciUserDetailTitle">
+  <div class="offcanvas-header border-bottom">
+    <h2 class="offcanvas-title h5 mb-0" id="mciUserDetailTitle">Subscriber details</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <div class="small text-muted mb-1">Display name</div>
+    <div class="fw-semibold mb-3" id="mciUserDetailName">—</div>
+    <div class="small text-muted mb-1">Email</div>
+    <div class="mb-3" id="mciUserDetailEmail">—</div>
+    <div class="small text-muted mb-1">Phone</div>
+    <div class="mb-3" id="mciUserDetailPhone">—</div>
+    <div class="small text-muted mb-1">Status</div>
+    <div class="mb-3" id="mciUserDetailStatus">—</div>
+    <div class="small text-muted mb-1">Created</div>
+    <div class="mb-3" id="mciUserDetailCreated">—</div>
+    <div class="small text-muted mb-1">Last login</div>
+    <div class="mb-3" id="mciUserDetailLastLogin">—</div>
   </div>
 </div>
 
@@ -373,14 +396,6 @@ ob_start();
       <div class="mb-3">
         <label class="form-label" for="mciUserPhone">Phone</label>
         <input type="text" class="form-control" id="mciUserPhone" maxlength="32" />
-      </div>
-      <div class="mb-3">
-        <label class="form-label" for="mciUserRole">Role</label>
-        <select class="form-select" id="mciUserRole" required>
-          <option value="subscriber">subscriber</option>
-          <option value="co_admin">co_admin</option>
-          <option value="super_admin">super_admin</option>
-        </select>
       </div>
       <div class="mb-3">
         <label class="form-label" for="mciUserStatus">Status</label>

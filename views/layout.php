@@ -35,7 +35,28 @@ if (!$__needsAppCss) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="description" content="<?= htmlspecialchars($metaDescription ?? 'Explore local business, services and places in your city.', ENT_QUOTES, 'UTF-8') ?>" />
+    <meta name="description" content="<?= htmlspecialchars($metaDescription ?? 'Explore local businesses, services and places in your city.', ENT_QUOTES, 'UTF-8') ?>" />
+    <?php
+      $__canonical = htmlspecialchars($canonicalUrl    ?? mci_current_url(),  ENT_QUOTES, 'UTF-8');
+      $__ogType    = htmlspecialchars($ogType           ?? 'website',          ENT_QUOTES, 'UTF-8');
+      $__ogTitle   = htmlspecialchars($ogTitle          ?? $pageTitle ?? 'My City Info', ENT_QUOTES, 'UTF-8');
+      $__ogDesc    = htmlspecialchars($ogDescription    ?? $metaDescription ?? 'Explore local businesses, services and places in your city.', ENT_QUOTES, 'UTF-8');
+      $__ogImage   = htmlspecialchars($ogImage          ?? mci_site_base_url() . '/assets/images/og-default.png', ENT_QUOTES, 'UTF-8');
+    ?>
+    <link rel="canonical"       href="<?= $__canonical ?>" />
+    <link rel="sitemap"         type="application/xml" title="Sitemap" href="/sitemap.xml" />
+    <link rel="icon"            type="image/png" href="/assets/images/logo.png" />
+    <link rel="apple-touch-icon" href="/assets/images/logo.png" />
+    <meta property="og:type"        content="<?= $__ogType ?>" />
+    <meta property="og:url"         content="<?= $__canonical ?>" />
+    <meta property="og:title"       content="<?= $__ogTitle ?>" />
+    <meta property="og:description" content="<?= $__ogDesc ?>" />
+    <meta property="og:image"       content="<?= $__ogImage ?>" />
+    <meta property="og:site_name"   content="My City Info" />
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="<?= $__ogTitle ?>" />
+    <meta name="twitter:description" content="<?= $__ogDesc ?>" />
+    <meta name="twitter:image"       content="<?= $__ogImage ?>" />
     <title><?= htmlspecialchars($pageTitle ?? 'My City Info') ?></title>
     <script>
 (function () {
@@ -62,7 +83,7 @@ if (!$__needsAppCss) {
     />
     <!-- Site tokens + base overrides (after Bootstrap) -->
     <link rel="stylesheet" href="/assets/css/theme.css" />
-    <!-- Icons (used by header controls like theme toggle) -->
+    <!-- Icons (nav, city picker, footer, forms) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <?php if ($__needsAppCss): ?>
       <link rel="stylesheet" href="/assets/css/app-areas.css" />
@@ -72,13 +93,15 @@ if (!$__needsAppCss) {
     <?php include __DIR__ . '/partials/header.php'; ?>
 
     <main class="mci-main" id="mci-main-content">
-      <div class="container px-3 px-sm-4">
-        <?php
-        // $content is expected to be a safe HTML string produced by templates.
-        // If later we wire backend, we can add escaping for untrusted fields.
-        echo $content ?? '';
-        ?>
-      </div>
+      <?php if ($appArea !== ''): ?>
+        <div class="mci-app-canvas px-3 px-sm-4">
+          <?= $content ?? '' ?>
+        </div>
+      <?php else: ?>
+        <div class="container px-3 px-sm-4">
+          <?php echo $content ?? ''; ?>
+        </div>
+      <?php endif; ?>
     </main>
 
     <?php if (empty($hideCta)) include __DIR__ . '/partials/cta-banner.php'; ?>

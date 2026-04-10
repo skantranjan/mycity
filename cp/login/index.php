@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Same backend as POST /api/v1/auth/login with audience=cp
     $result = api_direct_auth_login($em, $pw, 'cp');
     if (!empty($result['ok'])) {
+        session_regenerate_id(true);
         $user = $result['user'] ?? [];
         $userId = (string)($user['id'] ?? '');
         $role = (string)($user['role'] ?? '');
@@ -62,7 +63,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $hideCta = true;
 $extraHead = <<<'HTML'
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 <link rel="stylesheet" href="/assets/css/auth-pages.css" />
 HTML;
 
@@ -79,10 +79,10 @@ ob_start();
       </p>
       <figure class="mci-auth-benefits__figure" aria-hidden="true">
         <img
-          src="https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&amp;fit=crop&amp;w=800&amp;h=600&amp;q=80"
-          alt="Team reviewing dashboard on screen"
-          width="800"
-          height="600"
+          src="/assets/images/hero-illustration.svg"
+          alt=""
+          width="640"
+          height="420"
           loading="lazy"
         />
       </figure>
