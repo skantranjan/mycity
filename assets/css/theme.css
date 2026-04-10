@@ -706,10 +706,15 @@ iframe { max-width: 100%; }
     inset: 0;
     background: rgba(10,15,30,0.65);
     backdrop-filter: blur(4px);
-    z-index: 1040;
+    z-index: 0;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;
+  }
+  /* Keep drawer content above backdrop so links remain tappable */
+  .site-header .navbar-collapse > * {
+    position: relative;
+    z-index: 1;
   }
   .site-header .navbar-collapse.show::before,
   .site-header .navbar-collapse.collapsing::before {
@@ -729,7 +734,7 @@ iframe { max-width: 100%; }
     box-shadow: -8px 0 40px rgba(0,0,0,0.45);
     z-index: 1050;
     overflow-y: auto;
-    padding: 1.25rem 1.25rem 2rem;
+    padding: 3.5rem 1.25rem 2rem;
     /* Start off-screen to the right */
     transform: translateX(100%);
     /* Bootstrap sets height:0 during collapse — override */
@@ -788,18 +793,29 @@ iframe { max-width: 100%; }
     margin-top: 0.25rem;
   }
 
-  /* Close affordance — add an X at the top of the drawer */
-  .site-header .navbar-collapse::after {
-    content: "\00D7";           /* × */
+  .site-header .mci-mobile-nav-close {
     position: absolute;
-    top: 0.85rem;
-    right: 1rem;
-    font-size: 1.6rem;
+    top: 0.75rem;
+    right: 0.9rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 9999px;
+    color: rgba(255,255,255,0.88);
+    background: rgba(255,255,255,0.08);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
     line-height: 1;
-    color: rgba(255,255,255,0.55);
-    cursor: pointer;
-    z-index: 1;
-    pointer-events: none;       /* toggler button handles actual close */
+    z-index: 2;
+  }
+  .site-header .mci-mobile-nav-close:hover,
+  .site-header .mci-mobile-nav-close:focus-visible {
+    color: #fff;
+    background: rgba(255,255,255,0.18);
+    border-color: rgba(255,255,255,0.35);
   }
 }
 

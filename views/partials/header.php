@@ -57,6 +57,16 @@ if ($appArea === '') {
       </button>
 
       <div class="collapse navbar-collapse" id="mciMainNav">
+        <button
+          type="button"
+          class="btn mci-mobile-nav-close d-lg-none"
+          data-bs-toggle="collapse"
+          data-bs-target="#mciMainNav"
+          aria-controls="mciMainNav"
+          aria-label="Close navigation"
+        >
+          <span aria-hidden="true">&times;</span>
+        </button>
         <?php if ($appArea === ''): ?>
         <ul class="navbar-nav ms-lg-auto my-3 my-lg-0 gap-lg-1">
           <li class="nav-item">
