@@ -36,5 +36,9 @@ try {
     exit(0);
 } catch (Throwable $e) {
     fwrite(STDERR, 'FAIL: ' . $e->getMessage() . "\n");
+    if (str_contains($e->getMessage(), 'max_connections_per_hour')) {
+        fwrite(STDERR, "Hint: wait for the hourly window to reset, ask your host to raise the limit,\n");
+        fwrite(STDERR, "or set MCI_DB_PERSISTENT=1 in .env to reuse connections (see .env.example).\n");
+    }
     exit(1);
 }

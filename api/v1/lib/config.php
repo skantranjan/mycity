@@ -26,13 +26,31 @@ function api_env(string $key): string
     return (string)$v;
 }
 
+/** Non-empty trimmed value, or null if unset. */
+function api_env_optional(string $key): ?string
+{
+    $v = getenv($key);
+    if (!is_string($v) || trim($v) === '') {
+        $v = $_ENV[$key] ?? $_SERVER[$key] ?? null;
+    }
+    if (!is_string($v) || trim($v) === '') {
+        return null;
+    }
+    return trim($v);
+}
+
 function api_db_config(): array
 {
+    $portStr = api_env_optional('MCI_DB_PORT');
+    $port    = ($portStr !== null && $portStr !== '' && ctype_digit($portStr)) ? (int)$portStr : null;
+
     return [
-        'host' => api_env('MCI_DB_HOST'),
-        'name' => api_env('MCI_DB_NAME'),
-        'user' => api_env('MCI_DB_USER'),
-        'pass' => api_env('MCI_DB_PASS'),
+        'host'       => api_env('MCI_DB_HOST'),
+        'name'       => api_env('MCI_DB_NAME'),
+        'user'       => api_env('MCI_DB_USER'),
+        'pass'       => api_env('MCI_DB_PASS'),
+        'port'       => $port,
+        'persistent' => api_env_flag('MCI_DB_PERSISTENT'),
     ];
 }
 

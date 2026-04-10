@@ -7,6 +7,7 @@ $activePage = 'listings';
 require_once __DIR__ . '/../includes/mci_paths.php';
 require_once __DIR__ . '/../includes/mci_seo.php';
 require_once __DIR__ . '/../includes/mci_config.php';
+require_once __DIR__ . '/../includes/mci_cache.php';
 require_once __DIR__ . '/../includes/mci_category_icons.php';
 require_once __DIR__ . '/../api/v1/lib/db.php';
 require_once __DIR__ . '/../api/v1/lib/business_service.php';
@@ -145,10 +146,19 @@ if ($what !== '' || $where !== '' || $category !== '') {
 // ── Load categories from DB for the filter dropdown ──────────────────────────
 $dbCategories = [];
 $dbSubcategories = [];
+$pdo = null;
+$ttlList = mci_cache_ttl_default();
 try {
     $pdo = api_db();
-    $catStmt = $pdo->query("SELECT name, slug FROM mci_categories WHERE parent_id IS NULL ORDER BY sort_order, name");
-    $dbCategories = $catStmt ? $catStmt->fetchAll(PDO::FETCH_ASSOC) : [];
+    $dbCategories = mci_cache_remember(
+        mci_cache_public_key('page:listing:parentCats:v1'),
+        $ttlList,
+        static function () use ($pdo): array {
+            $catStmt = $pdo->query("SELECT name, slug FROM mci_categories WHERE parent_id IS NULL ORDER BY sort_order, name");
+
+            return $catStmt ? $catStmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        }
+    );
 
     // Load subcategories for the selected parent category
     if ($category !== '') {
@@ -162,7 +172,9 @@ try {
         $subStmt->execute([$category]);
         $dbSubcategories = $subStmt->fetchAll(PDO::FETCH_ASSOC);
     }
-} catch (Throwable $ignored) {}
+} catch (Throwable $e) {
+    mci_log_error('business-listing categories', $e);
+}
 
 // Reset subcategory if it doesn't belong to the selected category
 if ($subcategory !== '' && !in_array($subcategory, array_column($dbSubcategories, 'slug'), true)) {
@@ -182,24 +194,35 @@ $result          = ['businesses' => [], 'total' => 0, 'pages' => 1];
 $filteredListings = [];
 
 try {
-    $result = api_business_list_public(isset($pdo) ? $pdo : api_db(), $filters);
-    foreach ($result['businesses'] as $row) {
-        $filteredListings[] = [
-            'title'       => (string)($row['name']          ?? ''),
-            'category'    => (string)($row['category_name'] ?? ''),
-            'location'    => (string)($row['city']          ?? ''),
-            'address'     => (string)($row['city']          ?? ''),
-            'slug'        => (string)($row['slug']          ?? ''),
-            'image'       => !empty($row['logo_path'])
-                               ? $row['logo_path']
-                               : (!empty($row['banner_path'])
-                                   ? $row['banner_path']
-                                   : mci_listing_placeholder_url()),
-            'price_range' => $row['price_range'] ?? null,
-            'tags'        => [],
-        ];
+    if ($pdo instanceof PDO) {
+        $listKey = mci_cache_key_public_filters('page:listing:pub:', $filters);
+        $result  = mci_cache_remember(
+            $listKey,
+            $ttlList,
+            static function () use ($pdo, $filters): array {
+                return api_business_list_public($pdo, $filters);
+            }
+        );
+        foreach ($result['businesses'] as $row) {
+            $filteredListings[] = [
+                'title'       => (string)($row['name']          ?? ''),
+                'category'    => (string)($row['category_name'] ?? ''),
+                'location'    => (string)($row['city']          ?? ''),
+                'address'     => (string)($row['city']          ?? ''),
+                'slug'        => (string)($row['slug']          ?? ''),
+                'image'       => !empty($row['logo_path'])
+                                   ? $row['logo_path']
+                                   : (!empty($row['banner_path'])
+                                       ? $row['banner_path']
+                                       : mci_listing_placeholder_url()),
+                'price_range' => $row['price_range'] ?? null,
+                'tags'        => [],
+            ];
+        }
     }
-} catch (Throwable $ignored) {}
+} catch (Throwable $e) {
+    mci_log_error('business-listing listings', $e);
+}
 
 $total = (int)($result['total'] ?? 0);
 $pages = (int)($result['pages'] ?? 1);

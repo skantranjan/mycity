@@ -22,6 +22,32 @@ Keep that terminal open while you work. Stop the server with **Ctrl+C**.
 - If the app is in a **subfolder** (e.g. `http://localhost/mycity/`), set env **`MCI_BASE_PATH=/mycity`** (no trailing slash) so API URLs resolve correctly, or rely on auto-detection from `DOCUMENT_ROOT` vs project path.
 - For full pretty URLs + production, use Apache, nginx, or Laragon/XAMPP with the project `.htaccess`. Database/API setup: see `project_brain/SETUP_AND_DEPLOY.md`.
 
+## Storage image optimization (batch)
+
+Uploaded media lives under `storage/` (for example `storage/uploads/...`). To **shrink existing files in place** without renaming paths or extensions (URLs and DB paths stay valid), use the helper script:
+
+1. Install [Pillow](https://pypi.org/project/pillow/) (Python):
+
+   ```bash
+   pip install Pillow
+   ```
+
+2. From the **project root** (where `index.php` lives):
+
+   ```bash
+   python scripts/optimize_storage_images.py
+   ```
+
+**What it does**
+
+- Walks all raster images under `storage/` (`.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`).
+- Applies EXIF orientation, then **downscales** so the long edge is at most **1920px** (same cap as `mci_business_upload_optimize` in `api/v1/index.php`).
+- Re-encodes **JPEG** at quality **86**, progressive; **PNG** with max zlib compression (alpha preserved); **WebP** with sensible lossy/lossless choice.
+- Writes each file atomically to the **same path**; skips a file if the output would be larger and dimensions did not change.
+- **Animated GIFs** are skipped so animations are not broken (there are typically none in `storage/`).
+
+Re-run the script anytime after bulk imports or if legacy uploads are oversized. To push smaller files further (e.g. a lower max edge or JPEG quality), edit the constants at the top of `scripts/optimize_storage_images.py`.
+
 ## What’s implemented so far
 
 ### Public site basics
@@ -146,6 +172,7 @@ Keep that terminal open while you work. Stop the server with **Ctrl+C**.
 - `sitemap/index.php` — dynamic XML sitemap / sitemap index with optional chunk files.
 - `includes/mci_paths.php` — `mci_web_path()`, `mci_site_base_url()`, `mci_app_web_base_path()`, etc.
 - `includes/mci_app_profile.php` — session-backed profile avatar/name for header dropdown.
+- `scripts/optimize_storage_images.py` — batch recompress/resize images under `storage/` (see **Storage image optimization** above).
 
 ## Notes / assumptions
 - Several screens are currently “UI demo” only (backend moderation/review persistence isn’t fully wired yet).
