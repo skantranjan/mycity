@@ -348,7 +348,7 @@ ob_start();
   </div>
 </div>
 
-<div class="offcanvas offcanvas-end" tabindex="-1" id="mciUserDetailOffcanvas" aria-labelledby="mciUserDetailTitle">
+<div class="offcanvas offcanvas-end" tabindex="-1" id="mciUserDetailOffcanvas" aria-labelledby="mciUserDetailTitle" style="width:clamp(300px,92vw,480px)">
   <div class="offcanvas-header border-bottom">
     <h2 class="offcanvas-title h5 mb-0" id="mciUserDetailTitle">Subscriber details</h2>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -370,7 +370,7 @@ ob_start();
 </div>
 
 <!-- Offcanvas: add / edit user -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="mciUserOffcanvas" aria-labelledby="mciUserPanelTitle">
+<div class="offcanvas offcanvas-end" tabindex="-1" id="mciUserOffcanvas" aria-labelledby="mciUserPanelTitle" style="width:clamp(300px,92vw,480px)">
   <div class="offcanvas-header border-bottom">
     <h2 class="offcanvas-title h5 mb-0" id="mciUserPanelTitle">User</h2>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>

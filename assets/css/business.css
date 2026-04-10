@@ -710,6 +710,23 @@
   padding: 0.25rem 1.15rem 0.85rem;
 }
 
+@media (max-width: 767.98px) {
+  .mci-business-map-actions {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .mci-business-map-actions .btn {
+    min-height: 2.5rem;
+  }
+  .mci-biz-tabs {
+    top: calc(var(--mci-header-height, 60px) - 1px);
+    margin-bottom: 1rem;
+  }
+  .mci-business-side-actions .btn {
+    min-height: 2.75rem;
+  }
+}
+
 /* ——— Empty state message for sections with no data ——— */
 .mci-business-empty-state {
   color: var(--mci-muted, #64748b);

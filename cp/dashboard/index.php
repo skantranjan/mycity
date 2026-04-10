@@ -154,7 +154,7 @@ ob_start();
     </div>
 
     <!-- ── Quick actions strip ──────────────────────────── -->
-    <div class="d-flex flex-wrap gap-2 mb-4">
+    <div class="mci-responsive-actions mb-4">
       <a href="/cp/anonymous-business/" class="btn btn-sm btn-outline-primary">
         <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Add business
       </a>

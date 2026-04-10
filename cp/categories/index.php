@@ -723,7 +723,7 @@ ob_start();
 </div>
 
 <!-- ── Category offcanvas ──────────────────────────────────── -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="mciCatOffcanvas" aria-labelledby="mciCatPanelTitle" style="width:clamp(340px,32vw,560px)">
+<div class="offcanvas offcanvas-end" tabindex="-1" id="mciCatOffcanvas" aria-labelledby="mciCatPanelTitle" style="width:clamp(300px,92vw,560px)">
   <div class="offcanvas-header border-bottom">
     <h2 class="offcanvas-title h6 mb-0" id="mciCatPanelTitle">Category</h2>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -805,7 +805,7 @@ ob_start();
 </div>
 
 <!-- ── Tag offcanvas ───────────────────────────────────────── -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="mciTagOffcanvas" aria-labelledby="mciTagPanelTitle" style="width:clamp(340px,32vw,560px)">
+<div class="offcanvas offcanvas-end" tabindex="-1" id="mciTagOffcanvas" aria-labelledby="mciTagPanelTitle" style="width:clamp(300px,92vw,560px)">
   <div class="offcanvas-header border-bottom">
     <h2 class="offcanvas-title h6 mb-0" id="mciTagPanelTitle">Tag</h2>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>

@@ -93,6 +93,7 @@
   /* ── Layout ──────────────────────────────────── */
   --mci-container-min: 1200px;
   --mci-container-max: 1440px;
+  --mci-header-height: 64px;
 
   /* ── Header — deep slate-black ─────────────────── */
   --mci-header-bg:           #0a0f1e;
@@ -127,6 +128,7 @@ body.mci-body {
   -webkit-font-smoothing: antialiased;
   padding-left: env(safe-area-inset-left, 0);
   padding-right: env(safe-area-inset-right, 0);
+  overflow-x: clip;
 }
 
 /* Display headings use the more characterful face */
@@ -448,6 +450,7 @@ body.mci-body .btn-primary:not(:disabled):not(.disabled):focus-visible {
   padding-bottom: 2rem;
   padding-left: env(safe-area-inset-left, 0);
   padding-right: env(safe-area-inset-right, 0);
+  overflow-x: clip;
 }
 @media (min-width: 576px) {
   .mci-main { padding-top: 1.75rem; padding-bottom: 2.5rem; }
@@ -699,6 +702,11 @@ iframe { max-width: 100%; }
  * the visual presentation so it slides in instead of collapsing.
  */
 @media (max-width: 991.98px) {
+  :root { --mci-header-height: 60px; }
+  body.mci-body.mci-nav-open {
+    overflow: hidden;
+    touch-action: none;
+  }
   /* Backdrop — shown when drawer is open */
   .site-header .navbar-collapse::before {
     content: "";
@@ -728,7 +736,7 @@ iframe { max-width: 100%; }
     top: 0;
     right: 0;
     bottom: 0;
-    width: min(320px, 85vw);
+    width: min(340px, 92vw);
     background: #0d1225;
     border-left: 1px solid rgba(124,58,237,0.2);
     box-shadow: -8px 0 40px rgba(0,0,0,0.45);
@@ -816,6 +824,32 @@ iframe { max-width: 100%; }
     color: #fff;
     background: rgba(255,255,255,0.18);
     border-color: rgba(255,255,255,0.35);
+  }
+
+  .mci-header-user__menu {
+    min-width: min(22rem, calc(100vw - 1.25rem));
+    max-width: calc(100vw - 1.25rem);
+    margin-right: 0.25rem;
+  }
+}
+
+@media (min-width: 992px) {
+  :root { --mci-header-height: 68px; }
+}
+
+/* Shared mobile/tablet action wrapping for dense toolbars */
+.mci-responsive-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (max-width: 767.98px) {
+  .mci-responsive-actions > .btn,
+  .mci-responsive-actions > a.btn {
+    flex: 1 1 100%;
+    min-height: 2.75rem;
+    justify-content: center;
   }
 }
 

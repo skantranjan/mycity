@@ -428,7 +428,7 @@
 
 /* ─── Sidebar column narrower via CSS ────────────────── */
 /* Override Bootstrap col-lg-3 (25%) → 21%, give extra to col-lg-9 → 79% */
-@media (min-width: 992px) {
+@media (min-width: 1200px) {
   .mci-app-canvas .row.g-4 > .col-lg-3 {
     flex: 0 0 auto;
     width: 17%;
@@ -561,10 +561,11 @@
 
   /* When open, expand */
   .mci-app-sidebar.mci-sidebar-open .mci-app-sidebar__nav {
-    max-height: 600px;
+    max-height: 72dvh;
+    overflow-y: auto;
   }
   .mci-app-sidebar.mci-sidebar-open .mci-app-sidebar__foot {
-    max-height: 4rem;
+    max-height: 8rem;
   }
 
   /* Sidebar head becomes a tap-to-expand button */
@@ -579,7 +580,7 @@
     align-items: center;
     justify-content: center;
     margin-left: auto;
-    color: rgba(255,255,255,0.55);
+    color: #64748b;
     font-size: 0.85rem;
     transition: transform 0.3s ease;
     flex-shrink: 0;
@@ -587,6 +588,24 @@
 
   .mci-app-sidebar.mci-sidebar-open .mci-sidebar-toggle-icon {
     transform: rotate(180deg);
+  }
+
+  .mci-app-area .mci-main .row.g-4 > .col-lg-9 > .card .card-body {
+    padding: 1rem 0.95rem;
+  }
+}
+
+/* App tables get a predictable horizontal layout on small screens */
+.mci-app-area .table-responsive > .table {
+  min-width: 640px;
+}
+
+@media (max-width: 767.98px) {
+  .mci-app-area .table-responsive > .table {
+    min-width: 700px;
+  }
+  .mci-app-area .mci-cat-actions-cell {
+    white-space: nowrap;
   }
 }
 

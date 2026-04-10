@@ -159,6 +159,22 @@ $__seoTitle = mci_seo_document_title(isset($pageTitle) ? (string)$pageTitle : nu
   // Close Bootstrap navbar on outside click
   var nav = document.getElementById('mciMainNav');
   if (!nav) return;
+  function syncBodyScrollLock() {
+    if (window.matchMedia('(max-width: 991.98px)').matches && nav.classList.contains('show')) {
+      document.body.classList.add('mci-nav-open');
+    } else {
+      document.body.classList.remove('mci-nav-open');
+    }
+  }
+  nav.addEventListener('shown.bs.collapse', syncBodyScrollLock);
+  nav.addEventListener('hidden.bs.collapse', syncBodyScrollLock);
+  window.addEventListener('resize', function () {
+    if (window.matchMedia('(min-width: 992px)').matches) {
+      document.body.classList.remove('mci-nav-open');
+    } else {
+      syncBodyScrollLock();
+    }
+  });
   document.addEventListener('click', function (e) {
     if (!nav.classList.contains('show')) return;
     var toggler = document.querySelector('[data-bs-target="#mciMainNav"]');
@@ -173,6 +189,7 @@ $__seoTitle = mci_seo_document_title(isset($pageTitle) ? (string)$pageTitle : nu
       if (bsNav && nav.classList.contains('show')) bsNav.hide();
     });
   });
+  syncBodyScrollLock();
 }());
     </script>
     <script>
