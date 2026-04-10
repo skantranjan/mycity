@@ -764,7 +764,8 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
             </div>
           </div>
           <div class="mci-submit-label">Logo, profile &amp; banner</div>
-          <p class="text-muted small mb-3">Crop each image to fit. All optional.</p>
+          <p class="text-muted small mb-2">Crop each image to fit. All optional.</p>
+          <p class="text-muted small mb-3">Maximum <strong>2&nbsp;MB per image</strong> for your listing. Photos are resized and compressed automatically when you choose them. If a file is still too large, use a free in-browser tool such as <a href="https://oneyfy.com/tools/?category=image-tools" target="_blank" rel="noopener noreferrer">Oneyfy image tools</a> (opens in a new tab), then upload again.</p>
           <div class="mci-img-upload-grid">
             <div class="mci-img-upload-tile" data-type="logo" data-aspect="1">
               <div class="mci-img-upload-tile__preview">
@@ -806,7 +807,7 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
             <div class="mci-drop-zone__inner">
               <div class="mci-drop-zone__icon" aria-hidden="true"><i class="bi bi-cloud-arrow-up"></i></div>
               <div class="mci-drop-zone__title">Drop photos here</div>
-              <div class="mci-drop-zone__sub">or click to browse</div>
+              <div class="mci-drop-zone__sub">or click to browse (2&nbsp;MB max each; images are compressed automatically)</div>
               <button type="button" class="btn btn-sm btn-dark mt-2 mci-drop-zone__btn">Choose files</button>
               <input id="fileInputImages" class="d-none" type="file" name="images[]" accept="image/*" multiple />
             </div>

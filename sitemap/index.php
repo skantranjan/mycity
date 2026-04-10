@@ -29,7 +29,19 @@ function mci_sitemap_static_pages(): array
         ['/contact/', 'monthly', '0.5'],
         ['/privacy-policy/', 'yearly', '0.3'],
         ['/terms-of-use/', 'yearly', '0.3'],
+        ['/disclaimer/', 'yearly', '0.3'],
+        ['/cookies/', 'yearly', '0.3'],
     ];
+}
+
+/** City name → URL slug for /location/{slug}/ (matches location/index.php de-slugify). */
+function mci_sitemap_city_slug(string $city): string
+{
+    $city = strtolower(trim($city));
+    $city = preg_replace('/\s+/', '-', $city) ?? '';
+    $city = preg_replace('/[^a-z0-9\-]+/', '', $city) ?? '';
+
+    return trim($city, '-');
 }
 
 function mci_sitemap_location(string $path): string
@@ -71,7 +83,7 @@ function mci_sitemap_date(?string $datetime): ?string
 }
 
 /**
- * @return array{np: int, nb: int, cat: int, tag: int, prod: int, svc: int}
+ * @return array{np: int, nb: int, cat: int, tag: int, prod: int, svc: int, loc: int}
  */
 function mci_sitemap_counts(PDO $pdo): array
 {
@@ -113,9 +125,18 @@ function mci_sitemap_counts(PDO $pdo): array
         WHERE status = 'live' AND slug <> ''
     ")->fetchColumn();
 
-    $np = $staticN + $cat + $tag + $prod + $svc;
+    $loc = (int)$pdo->query("
+        SELECT COUNT(*) FROM (
+            SELECT DISTINCT TRIM(b.city) AS c
+            FROM mci_business_branches b
+            INNER JOIN mci_business_groups g ON g.id = b.business_group_id AND g.status = 'live'
+            WHERE b.status = 'active' AND TRIM(b.city) <> ''
+        ) t
+    ")->fetchColumn();
 
-    return ['np' => $np, 'nb' => $nb, 'cat' => $cat, 'tag' => $tag, 'prod' => $prod, 'svc' => $svc];
+    $np = $staticN + $cat + $tag + $prod + $svc + $loc;
+
+    return ['np' => $np, 'nb' => $nb, 'cat' => $cat, 'tag' => $tag, 'prod' => $prod, 'svc' => $svc, 'loc' => $loc];
 }
 
 function mci_sitemap_begin_urlset(): void
@@ -208,6 +229,26 @@ function mci_sitemap_emit_pages_slice(PDO $pdo, int $skip, int $limit): int
         ],
         [
             'sql' => "
+                SELECT TRIM(b.city) AS city_name,
+                       MAX(COALESCE(b.updated_at, b.created_at, g.updated_at, g.created_at)) AS ts
+                FROM mci_business_branches b
+                INNER JOIN mci_business_groups g ON g.id = b.business_group_id AND g.status = 'live'
+                WHERE b.status = 'active' AND TRIM(b.city) <> ''
+                GROUP BY TRIM(b.city)
+                ORDER BY TRIM(b.city)
+            ",
+            'path_from_row' => true,
+            'path' => static function (array $r): string {
+                $city = trim((string)($r['city_name'] ?? ''));
+                $slug = mci_sitemap_city_slug($city);
+
+                return $slug !== '' ? '/location/' . rawurlencode($slug) . '/' : '';
+            },
+            'freq' => 'weekly',
+            'pri'  => '0.72',
+        ],
+        [
+            'sql' => "
                 SELECT c.slug, MAX(c.created_at) AS ts
                 FROM mci_categories c
                 INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
@@ -247,7 +288,7 @@ function mci_sitemap_emit_pages_slice(PDO $pdo, int $skip, int $limit): int
                 break;
             }
             $slug = (string)($r['slug'] ?? '');
-            if ($slug === '') {
+            if ($slug === '' && empty($bucket['path_from_row'])) {
                 continue;
             }
             if ($skip > 0) {
@@ -255,8 +296,17 @@ function mci_sitemap_emit_pages_slice(PDO $pdo, int $skip, int $limit): int
                 continue;
             }
             $pathFn = $bucket['path'];
+            if (!empty($bucket['path_from_row'])) {
+                $relPath = $pathFn($r);
+                if ($relPath === '') {
+                    continue;
+                }
+                $absLoc = mci_sitemap_location($relPath);
+            } else {
+                $absLoc = mci_sitemap_location($pathFn($slug));
+            }
             mci_sitemap_emit_url(
-                mci_sitemap_location($pathFn($slug)),
+                $absLoc,
                 $bucket['freq'],
                 $bucket['pri'],
                 mci_sitemap_date((string)($r['ts'] ?? ''))
@@ -354,7 +404,7 @@ $kind = isset($_GET['kind']) ? (string)$_GET['kind'] : '';
 $part = isset($_GET['part']) ? (int)$_GET['part'] : 0;
 
 $staticOnlyNp = count(mci_sitemap_static_pages());
-$counts = ['np' => $staticOnlyNp, 'nb' => 0, 'cat' => 0, 'tag' => 0, 'prod' => 0, 'svc' => 0];
+$counts = ['np' => $staticOnlyNp, 'nb' => 0, 'cat' => 0, 'tag' => 0, 'prod' => 0, 'svc' => 0, 'loc' => 0];
 $pdo = null;
 try {
     $pdo = api_db();

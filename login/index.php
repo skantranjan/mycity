@@ -108,7 +108,7 @@ ob_start();
       <figure class="mci-auth-benefits__figure" aria-hidden="true">
         <img
           src="/assets/images/hero-illustration.svg"
-          alt=""
+          alt="Local discovery — stylised city map and buildings illustration for My City Info"
           width="640"
           height="420"
           loading="lazy"

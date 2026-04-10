@@ -10,6 +10,7 @@ $mciErrorHandlerIncluded = false;
 require_once __DIR__ . '/../includes/mci_error_handler.php';
 $mciErrorHandlerIncluded = true;
 require_once __DIR__ . '/../includes/mci_paths.php';
+require_once __DIR__ . '/../includes/mci_seo.php';
 require_once __DIR__ . '/../includes/mci_config.php';
 $appArea = isset($appArea) && in_array($appArea, ['subscriber', 'cp'], true) ? $appArea : '';
 $__mciBodyClass = 'mci-body';
@@ -29,33 +30,34 @@ if (!$__needsAppCss) {
     }
     $__needsAppCss = !empty($_SESSION['mci_logged_in']) || !empty($_SESSION['mci_cp_logged_in']);
 }
+
+$__seoTitle = mci_seo_document_title(isset($pageTitle) ? (string)$pageTitle : null);
 ?>
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9ZLMGV0Q96"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-9ZLMGV0Q96');
-    </script>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <?php if (defined('MCI_ADSENSE_CLIENT_ID') && MCI_ADSENSE_CLIENT_ID !== ''): ?>
+    <link rel="dns-prefetch" href="https://pagead2.googlesyndication.com" />
+    <link rel="preconnect" href="https://pagead2.googlesyndication.com" crossorigin />
+    <?php endif; ?>
     <meta name="description" content="<?= htmlspecialchars($metaDescription ?? 'Explore local businesses, services and places in your city.', ENT_QUOTES, 'UTF-8') ?>" />
     <?php
       $__canonical = htmlspecialchars($canonicalUrl    ?? mci_current_url(),  ENT_QUOTES, 'UTF-8');
       $__ogType    = htmlspecialchars($ogType           ?? 'website',          ENT_QUOTES, 'UTF-8');
-      $__ogTitle   = htmlspecialchars($ogTitle          ?? $pageTitle ?? 'My City Info', ENT_QUOTES, 'UTF-8');
+      $__ogTitle   = htmlspecialchars($ogTitle          ?? $__seoTitle, ENT_QUOTES, 'UTF-8');
       $__ogDesc    = htmlspecialchars($ogDescription    ?? $metaDescription ?? 'Explore local businesses, services and places in your city.', ENT_QUOTES, 'UTF-8');
       $__ogImage   = htmlspecialchars($ogImage          ?? mci_site_base_url() . '/assets/images/og-default.png', ENT_QUOTES, 'UTF-8');
     ?>
     <link rel="canonical"       href="<?= $__canonical ?>" />
     <link rel="sitemap"         type="application/xml" title="Sitemap" href="<?= htmlspecialchars(mci_web_path('/sitemap.xml'), ENT_QUOTES, 'UTF-8') ?>" />
-    <link rel="icon"            type="image/png" href="/assets/images/logo.png" />
-    <link rel="apple-touch-icon" href="/assets/images/logo.png" />
+    <link rel="icon"            type="image/png" href="<?= htmlspecialchars(mci_web_path('/assets/images/logo.png'), ENT_QUOTES, 'UTF-8') ?>" />
+    <link rel="apple-touch-icon" href="<?= htmlspecialchars(mci_web_path('/assets/images/logo.png'), ENT_QUOTES, 'UTF-8') ?>" />
     <meta property="og:type"        content="<?= $__ogType ?>" />
     <meta property="og:url"         content="<?= $__canonical ?>" />
     <meta property="og:title"       content="<?= $__ogTitle ?>" />
@@ -66,13 +68,9 @@ if (!$__needsAppCss) {
     <meta name="twitter:title"       content="<?= $__ogTitle ?>" />
     <meta name="twitter:description" content="<?= $__ogDesc ?>" />
     <meta name="twitter:image"       content="<?= $__ogImage ?>" />
-    <title><?= htmlspecialchars($pageTitle ?? 'My City Info') ?></title>
-    <?php if (defined('MCI_ADSENSE_CLIENT_ID') && MCI_ADSENSE_CLIENT_ID !== ''): ?>
-    <script
-      async
-      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=<?= htmlspecialchars(MCI_ADSENSE_CLIENT_ID, ENT_QUOTES, 'UTF-8') ?>"
-      crossorigin="anonymous"
-    ></script>
+    <title><?= htmlspecialchars($__seoTitle, ENT_QUOTES, 'UTF-8') ?></title>
+    <?php if (empty($mciSkipDefaultSchema)): ?>
+    <script type="application/ld+json"><?= mci_schema_json_ld_encode(mci_schema_default_site_graph()) ?></script>
     <?php endif; ?>
     <script>
 (function () {
@@ -99,8 +97,16 @@ if (!$__needsAppCss) {
     />
     <!-- Site tokens + base overrides (after Bootstrap) -->
     <link rel="stylesheet" href="/assets/css/theme.css" />
-    <!-- Icons (nav, city picker, footer, forms) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <!-- Icons: non-blocking load (brief period without icon font is acceptable) -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    </noscript>
     <?php if ($__needsAppCss): ?>
       <link rel="stylesheet" href="/assets/css/app-areas.css" />
     <?php endif; ?>
@@ -123,6 +129,22 @@ if (!$__needsAppCss) {
     <?php if (empty($hideCta)) include __DIR__ . '/partials/cta-banner.php'; ?>
 
     <?php include __DIR__ . '/partials/footer.php'; ?>
+
+    <!-- Analytics / ads after content paint (do not block LCP) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9ZLMGV0Q96"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-9ZLMGV0Q96');
+    </script>
+    <?php if (defined('MCI_ADSENSE_CLIENT_ID') && MCI_ADSENSE_CLIENT_ID !== ''): ?>
+    <script
+      async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=<?= htmlspecialchars(MCI_ADSENSE_CLIENT_ID, ENT_QUOTES, 'UTF-8') ?>"
+      crossorigin="anonymous"
+    ></script>
+    <?php endif; ?>
 
     <!-- JS (jQuery + Bootstrap bundle) -->
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>

@@ -136,17 +136,48 @@ function mci_osm_embed_url(float $lat, float $lon): string
 }
 
 // ── Fetch business from DB by slug ───────────────────────────────────────────
-$pdo     = api_db();
-$dbBiz   = null;
-if ($slug !== '') {
-    try {
-        $dbBiz = api_business_fetch_by_slug($pdo, $slug);
-    } catch (Throwable $ignored) {}
+if ($slug === '') {
+    header('Location: /business-listing/', true, 301);
+    exit;
+}
+
+$pdo   = api_db();
+$dbBiz = null;
+try {
+    $dbBiz = api_business_fetch_by_slug($pdo, $slug);
+} catch (Throwable $ignored) {
 }
 
 if ($dbBiz === null) {
     http_response_code(404);
-    $dbBiz = []; // prevent undefined variable errors in map block below
+    $pageTitle = 'Business not found - My City Info';
+    $activePage = 'listings';
+    $metaDescription = 'This business listing does not exist or may have been removed from My City Info.';
+    $canonicalUrl = mci_site_base_url() . '/business-listing/';
+    $ogTitle = 'Business not found — My City Info';
+    $ogDescription = $metaDescription;
+    $extraHead = '<meta name="robots" content="noindex, follow" />';
+    $extraJS = '';
+    ob_start();
+    ?>
+<div class="card border-0 shadow-sm bg-white my-4">
+  <div class="card-body p-4 p-md-5 text-center">
+    <h1 class="h4 fw-bold mb-3">Business not found</h1>
+    <p class="text-muted mx-auto mb-4" style="max-width:28rem;">
+      We could not find a live listing for <span class="text-dark fw-semibold"><?= htmlspecialchars($slug, ENT_QUOTES, 'UTF-8') ?></span>.
+      It may have been removed or the link might be incorrect.
+    </p>
+    <div class="d-flex flex-wrap gap-2 justify-content-center">
+      <a href="/business-listing/" class="btn btn-dark mci-touch-target">Browse listings</a>
+      <a href="/submit-business-listing/" class="btn btn-outline-primary mci-touch-target">Submit your business</a>
+      <a href="/" class="btn btn-outline-secondary mci-touch-target">Home</a>
+    </div>
+  </div>
+</div>
+    <?php
+    $content = ob_get_clean();
+    include __DIR__ . '/../views/layout.php';
+    exit;
 }
 
 // ── Map DB record to the $listing shape the view expects ─────────────────────

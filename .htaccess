@@ -1,5 +1,11 @@
 RewriteEngine On
 
+# robots.txt → dynamic Sitemap line for current host
+RewriteRule ^robots\.txt$ robots/index.php [L]
+
+# Branded 404 (internal subrequest). If the app lives in a subdirectory, set this to /your-base/404/ instead.
+ErrorDocument 404 /404/
+
 # ------------------------------------------------------------
 # OAuth social login callbacks
 # ------------------------------------------------------------
@@ -134,6 +140,8 @@ RewriteRule ^submit-listing/?$ /submit-business-listing/ [R=301,L,QSA]
 RewriteRule ^register/?$ register/index.php [L,QSA]
 RewriteRule ^login/?$ login/index.php [L,QSA]
 RewriteRule ^about/?$ about/index.php [L,QSA]
+RewriteRule ^robots/?$ robots/index.php [L,QSA]
+RewriteRule ^404/?$ 404/index.php [L,QSA]
 RewriteRule ^contact/?$ contact/index.php [L,QSA]
 RewriteRule ^privacy-policy/?$ privacy-policy/index.php [L,QSA]
 RewriteRule ^terms-of-use/?$ terms-of-use/index.php [L,QSA]

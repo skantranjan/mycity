@@ -25,6 +25,13 @@ if (is_file($localFile)) {
     return false; // let PHP built-in server serve it directly
 }
 
+// ── robots.txt (dynamic Sitemap URL) ─────────────────────────────────────────
+$uriNorm = rtrim($uri, '/') ?: '/';
+if ($uri === '/robots.txt' || $uriNorm === '/robots') {
+    require __DIR__ . '/robots/index.php';
+    return true;
+}
+
 // ── API ──────────────────────────────────────────────────────────────────────
 if (str_starts_with($uri, '/api/v1')) {
     require __DIR__ . '/api/v1/index.php';
@@ -109,6 +116,7 @@ $folderMap = [
     '/register'                  => '/register/index.php',
     '/login'                     => '/login/index.php',
     '/about'                     => '/about/index.php',
+    '/404'                       => '/404/index.php',
     '/contact'                   => '/contact/index.php',
     '/privacy-policy'            => '/privacy-policy/index.php',
     '/terms-of-use'              => '/terms-of-use/index.php',
@@ -163,5 +171,13 @@ if ($uri === '/' || $uri === '') {
     return true;
 }
 
-// ── Not found — let PHP built-in server handle (will show 404) ───────────────
-return false;
+// ── Unknown path → branded 404 (skip likely static-asset URLs) ───────────────
+$pathExt = strtolower(pathinfo($uri, PATHINFO_EXTENSION) ?: '');
+$staticExt = ['css', 'js', 'mjs', 'map', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'woff', 'woff2', 'ttf', 'eot', 'json', 'xml', 'txt', 'pdf', 'zip', 'webmanifest'];
+if ($pathExt !== '' && in_array($pathExt, $staticExt, true)) {
+    return false;
+}
+
+http_response_code(404);
+require __DIR__ . '/404/index.php';
+return true;
