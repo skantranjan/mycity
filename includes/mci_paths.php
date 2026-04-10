@@ -60,6 +60,21 @@ function mci_app_web_base_path(): string
     return $cached;
 }
 
+/**
+ * Web path from site root for HTML href/src, e.g. "/sitemap.xml" or "/mycity/sitemap.xml"
+ * when MCI_BASE_PATH is set.
+ */
+function mci_web_path(string $path): string
+{
+    $path = $path !== '' && $path[0] === '/' ? $path : '/' . $path;
+    $prefix = mci_app_web_base_path();
+    if ($prefix === '') {
+        return $path;
+    }
+
+    return '/' . trim($prefix, '/') . $path;
+}
+
 /** Base URL path for API v1, e.g. "/mycity/api/v1" or "/api/v1". */
 function mci_api_v1_base(): string
 {

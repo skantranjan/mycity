@@ -31,6 +31,23 @@ if (str_starts_with($uri, '/api/v1')) {
     return true;
 }
 
+if (preg_match('#^/sitemap-pages-([1-9][0-9]*)\.xml$#', $uri, $m)) {
+    $_GET['kind'] = 'pages';
+    $_GET['part'] = (int) $m[1];
+    require __DIR__ . '/sitemap/index.php';
+    return true;
+}
+if (preg_match('#^/sitemap-businesses-([1-9][0-9]*)\.xml$#', $uri, $m)) {
+    $_GET['kind'] = 'businesses';
+    $_GET['part'] = (int) $m[1];
+    require __DIR__ . '/sitemap/index.php';
+    return true;
+}
+if ($uri === '/sitemap.xml') {
+    require __DIR__ . '/sitemap/index.php';
+    return true;
+}
+
 // Browser auto-fetch fallback.
 if ($uri === '/favicon.ico') {
     $fallback = __DIR__ . '/assets/images/logo.png';
