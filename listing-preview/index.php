@@ -1,12 +1,13 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../includes/mci_paths.php';
+
 $pageTitle    = 'Listing Preview – My City Info';
 $activePage   = '';
 $hideCta      = true;
 
 $extraHead = <<<'HTML'
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 <link rel="stylesheet" href="/assets/css/business.css" />
 <style>
 /* ── Preview-mode banner ─────────────────────────────── */
@@ -189,6 +190,13 @@ ob_start();
 </div>
 
 <script>
+window.MCI_PREVIEW_PLACEHOLDERS = <?= json_encode([
+    'banner'  => mci_business_banner_placeholder_url(),
+    'profile' => mci_business_profile_placeholder_url(),
+    'logo'    => mci_business_logo_placeholder_url(),
+], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) ?>;
+</script>
+<script>
 (function () {
   var LS_KEY = 'mci_listing_preview';
 
@@ -223,23 +231,24 @@ ob_start();
   function setTxt(id, val) { var e = el(id); if (e) e.textContent = val || ''; }
   function setHTML(id, val) { var e = el(id); if (e) e.innerHTML = val || ''; }
 
-  // Hero image: prefer banner, fallback logo, fallback placeholder gradient
-  var heroSrc = d.img_banner || d.img_logo || '';
-  if (heroSrc) {
-    el('pvHeroImg').src = heroSrc;
-    el('pvHeroImg').style.objectFit = 'cover';
-  } else {
-    el('pvHeroImg').style.background = 'linear-gradient(135deg,#6366f1 0%,#818cf8 100%)';
-    el('pvHeroImg').style.minHeight = '220px';
-  }
+  var ph = window.MCI_PREVIEW_PLACEHOLDERS || {};
+  var heroPh = ph.banner || '/assets/images/business-banner-placeholder.svg';
+  var profilePh = ph.profile || '/assets/images/business-profile-placeholder.svg';
 
-  // Profile image: prefer profile, fallback logo
-  var profileSrc = d.img_profile || d.img_logo || '';
-  if (profileSrc) {
-    el('pvProfileImg').src = profileSrc;
-  } else {
-    el('pvProfileImg').style.display = 'none';
-  }
+  // Hero: banner only (matches live listing); placeholder if missing
+  var heroSrc = (d.img_banner || '').trim();
+  var heroImg = el('pvHeroImg');
+  heroImg.style.display = '';
+  heroImg.style.background = '';
+  heroImg.style.minHeight = '';
+  heroImg.src = heroSrc || heroPh;
+  heroImg.style.objectFit = 'cover';
+
+  // Profile: profile → logo → placeholder (matches live listing)
+  var profileSrc = (d.img_profile || d.img_logo || '').trim();
+  var profileImg = el('pvProfileImg');
+  profileImg.style.display = '';
+  profileImg.src = profileSrc || profilePh;
 
   // Title & category
   var title = d.listing_title || 'Unnamed business';

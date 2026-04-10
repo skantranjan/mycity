@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../includes/mci_paths.php';
+require_once __DIR__ . '/../includes/mci_text.php';
 require_once __DIR__ . '/../includes/mci_session.php';
 require_once __DIR__ . '/../includes/mci_reviews.php';
 require_once __DIR__ . '/../includes/mci_favourites.php';
@@ -70,9 +72,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mci_fav_toggle'])) {
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mci_flag_submit'])) {
+    $flagSlug = trim((string)($_POST['business_slug'] ?? $slug));
+    if ($flagSlug === '') {
+        header('Location: /business-listing/');
+        exit;
+    }
+    try {
+        $flagPdo = api_db();
+        $flagSt = $flagPdo->prepare("SELECT id FROM mci_business_groups WHERE slug = ? LIMIT 1");
+        $flagSt->execute([$flagSlug]);
+        $flagGroupId = (string)($flagSt->fetchColumn() ?: '');
+        if ($flagGroupId === '') {
+            header('Location: /business/' . rawurlencode($flagSlug) . '/?flag_err=business_not_found');
+            exit;
+        }
+        $flagAuth = $isLoggedIn ? ['user_id' => $userId, 'role' => (string)($_SESSION['mci_role'] ?? '')] : null;
+        $flagRes = api_business_flag_create($flagPdo, [
+            'business_group_id' => $flagGroupId,
+            'reason' => trim((string)($_POST['flag_reason'] ?? '')),
+            'reporter_name' => trim((string)($_POST['flag_name'] ?? '')),
+            'reporter_email' => trim((string)($_POST['flag_email'] ?? '')),
+            'reporter_type' => $isLoggedIn ? 'logged_in' : ((trim((string)($_POST['flag_name'] ?? '')) !== '' || trim((string)($_POST['flag_email'] ?? '')) !== '') ? 'guest' : 'anonymous'),
+        ], $flagAuth);
+        if (!($flagRes['ok'] ?? false)) {
+            header('Location: /business/' . rawurlencode($flagSlug) . '/?flag_err=' . rawurlencode((string)($flagRes['error'] ?? 'submit_failed')));
+            exit;
+        }
+        header('Location: /business/' . rawurlencode($flagSlug) . '/?flag_ok=1');
+        exit;
+    } catch (Throwable $ignored) {
+        header('Location: /business/' . rawurlencode($flagSlug) . '/?flag_err=server_error');
+        exit;
+    }
+}
+
 $reviewFlashOk      = isset($_GET['review_ok']);
 $reviewFlashUpdated = isset($_GET['review_updated']);
 $reviewFlashErr     = trim((string) ($_GET['review_err'] ?? ''));
+$flagFlashOk        = isset($_GET['flag_ok']);
+$flagFlashErr       = trim((string)($_GET['flag_err'] ?? ''));
 
 /**
  * OpenStreetMap embed (no API key). $lat, $lon in WGS84.
@@ -123,7 +162,15 @@ $productNames = array_map(
 );
 $faqsRaw = $dbBiz['faqs'] ?? [];
 $listingFaqs = array_map(
-    static fn(array $f): array => ['q' => (string)($f['question'] ?? ''), 'a' => (string)($f['answer'] ?? '')],
+    static function (array $f): array {
+        $qRaw = (string)($f['question'] ?? '');
+        $aRaw = (string)($f['answer'] ?? '');
+        $aParas = mci_plain_paragraphs_from_html($aRaw);
+        return [
+            'q' => mci_plain_text_one_line($qRaw),
+            'a' => $aParas === [] ? '' : implode("\n\n", $aParas),
+        ];
+    },
     $faqsRaw
 );
 
@@ -137,7 +184,7 @@ $galleryImages = $dbBiz['images'] ?? [];
 $listing = [
     'title'    => (string)($dbBiz['name']        ?? 'Business'),
     'category' => (string)($dbBiz['category_name'] ?? ''),
-    'tagline'  => (string)($dbBiz['tagline']     ?? ''),
+    'tagline'  => mci_plain_text_flat((string)($dbBiz['tagline'] ?? '')),
     'location' => (string)($branch['city']       ?? ''),
     'address'  => trim(implode(', ', array_filter([
                       (string)($branch['address_line1'] ?? ''),
@@ -154,12 +201,10 @@ $listing = [
                     ? $dbBiz['banner_path']
                     : (!empty($dbBiz['logo_path'])
                         ? $dbBiz['logo_path']
-                        : 'https://picsum.photos/seed/mci-' . $slug . '/800/520'),
+                        : mci_listing_placeholder_url()),
     'map_lat'  => (float)($branch['latitude']  ?? 0),
     'map_lon'  => (float)($branch['longitude'] ?? 0),
-    'about'    => array_filter([
-                      (string)($dbBiz['description'] ?? ''),
-                  ]),
+    'about'    => mci_plain_paragraphs_from_html((string)($dbBiz['description'] ?? '')),
     'services' => $serviceNames,
     'products' => $productNames,
     'tags'     => $tagNames,
@@ -168,6 +213,15 @@ $listing = [
     'price_range'  => $dbBiz['price_range'] ?? null,
     'video_url'    => $dbBiz['video_url']   ?? null,
 ];
+
+$heroBannerUrl = !empty($dbBiz['banner_path'])
+    ? (string) $dbBiz['banner_path']
+    : mci_business_banner_placeholder_url();
+$profilePhotoUrl = !empty($dbBiz['profile_path'])
+    ? (string) $dbBiz['profile_path']
+    : (!empty($dbBiz['logo_path'])
+        ? (string) $dbBiz['logo_path']
+        : mci_business_profile_placeholder_url());
 
 $bizGroupId          = (string)($dbBiz['id'] ?? '');
 $listingIsClaimed    = !empty($dbBiz['claimed_by_user_id']);
@@ -190,7 +244,18 @@ $favFlashRemoved = isset($_GET['fav_removed']);
 
 $faqAccordionId = 'mciBizFaq' . preg_replace('/[^a-zA-Z0-9]+/', '', $slug !== '' ? $slug : 'general');
 
-$pageTitle = $listing['title'] . ' - My City Info';
+$pageTitle     = $listing['title'] . ' - My City Info';
+$canonicalUrl  = mci_site_base_url() . '/business/' . rawurlencode($slug) . '/';
+$ogType        = 'business.business';
+$ogTitle       = $listing['title']
+    . ($listing['category'] !== '' ? ' — ' . $listing['category'] : '')
+    . ($listing['location'] !== '' ? ' in ' . $listing['location'] : '');
+$ogDescription = !empty($listing['about'])
+    ? mb_substr(implode(' ', (array) $listing['about']), 0, 155) . '…'
+    : 'Find details, contact info, and reviews for ' . $listing['title'] . ' on My City Info.';
+$ogImage       = !empty($listing['image'])
+    ? mci_absolute_url((string) $listing['image'])
+    : mci_site_base_url() . '/assets/images/og-default.png';
 
 $mapEmbedUrl    = mci_osm_embed_url((float)$listing['map_lat'], (float)$listing['map_lon']);
 $directionsUrl  = 'https://www.google.com/maps/dir/?api=1&destination=' . rawurlencode($listing['address']);
@@ -267,7 +332,9 @@ if ($hasOriginCoords) {
                     'slug'        => $otherSlug,
                     'image'       => !empty($row['logo_path'])
                                        ? $row['logo_path']
-                                       : 'https://picsum.photos/seed/mci-' . $otherSlug . '/480/320',
+                                       : (!empty($row['banner_path'])
+                                           ? $row['banner_path']
+                                           : mci_listing_placeholder_url()),
                     'map_lat'     => $olat,
                     'map_lon'     => $olon,
                     'distance_km' => $d,
@@ -295,7 +362,7 @@ $catalog = [
     'phone' => '+852 2123 4567',
     'whatsapp' => '+852 9123 4567',
     'website' => 'https://example.com/property852',
-    'image' => 'https://picsum.photos/seed/mci-dir-852/800/520',
+    'image' => mci_listing_placeholder_url(),
     'map_lat' => 22.2623,
     'map_lon' => 114.0126,
     'about' => [
@@ -320,7 +387,7 @@ $catalog = [
     'phone' => '+44 1244 000000',
     'whatsapp' => '+44 7700 900000',
     'website' => 'https://example.com/locker-shop',
-    'image' => 'https://picsum.photos/seed/mci-dir-locker/800/520',
+    'image' => mci_listing_placeholder_url(),
     'map_lat' => 53.1934,
     'map_lon' => -2.8931,
     'about' => [
@@ -345,7 +412,7 @@ $catalog = [
     'phone' => '+1 416-555-0142',
     'whatsapp' => '+1 647-555-0199',
     'website' => 'https://example.com/jxf-painting',
-    'image' => 'https://picsum.photos/seed/mci-dir-jxf/800/520',
+    'image' => mci_listing_placeholder_url(),
     'map_lat' => 43.6532,
     'map_lon' => -79.3832,
     'about' => [
@@ -370,7 +437,7 @@ $catalog = [
     'phone' => '+61 2 9817 0000',
     'whatsapp' => '+61 400 000 000',
     'website' => 'https://example.com/hunter-hill-physio',
-    'image' => 'https://picsum.photos/seed/mci-dir-hh/800/520',
+    'image' => mci_listing_placeholder_url(),
     'map_lat' => -33.8368,
     'map_lon' => 151.1473,
     'about' => [
@@ -395,7 +462,7 @@ $catalog = [
     'phone' => '+91 93530 49993',
     'whatsapp' => '+91 93530 49993',
     'website' => 'http://www.dti.rocks/',
-    'image' => 'https://picsum.photos/seed/mci-dir-bhopal/800/520',
+    'image' => mci_listing_placeholder_url(),
     'map_lat' => 12.9698,
     'map_lon' => 77.7499,
     'about' => [
@@ -423,7 +490,7 @@ $defaultListing = [
   'phone' => '+91 98765 43210',
   'whatsapp' => '+91 98765 43210',
   'website' => 'https://example.com',
-  'image' => 'https://picsum.photos/seed/mci-biz-default-' . rawurlencode($slug ?: 'x') . '/800/520',
+  'image' => mci_listing_placeholder_url(),
   'map_lat' => 12.9716,
   'map_lon' => 77.5946,
   'about' => [
@@ -463,10 +530,54 @@ if ($bizDow >= 1 && $bizDow <= 5) {
 $bizStatusLabel = $bizIsOpen ? 'Open now' : 'Closed';
 $bizStatusClass = $bizIsOpen ? 'mci-biz-hours__status--open' : 'mci-biz-hours__status--closed';
 
-$extraHead = <<<'HTML'
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+// ── JSON-LD: LocalBusiness ────────────────────────────────────────────────────
+$__schema = [
+    '@context' => 'https://schema.org',
+    '@type'    => 'LocalBusiness',
+    'name'     => $listing['title'],
+    'url'      => mci_site_base_url() . '/business/' . rawurlencode($slug) . '/',
+    'image'    => mci_absolute_url((string) $listing['image']),
+    'address'  => [
+        '@type'           => 'PostalAddress',
+        'streetAddress'   => $listing['address'],
+        'addressLocality' => $listing['location'],
+        'addressCountry'  => 'IN',
+    ],
+];
+if ($listing['phone'] !== '')   { $__schema['telephone'] = $listing['phone']; }
+if ($listing['email'] !== '')   { $__schema['email']     = $listing['email']; }
+if ($listing['website'] !== '') { $__schema['sameAs']    = [$listing['website']]; }
+if (!empty($reviewSummary['count']) && (int)$reviewSummary['count'] > 0) {
+    $__schema['aggregateRating'] = [
+        '@type'       => 'AggregateRating',
+        'ratingValue' => round((float)($reviewSummary['avg'] ?? 0), 1),
+        'reviewCount' => (int)$reviewSummary['count'],
+        'bestRating'  => 5,
+        'worstRating' => 1,
+    ];
+}
+$__jsonLdTag = '<script type="application/ld+json">'
+    . json_encode($__schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG)
+    . '</script>';
+if (!empty($listingFaqs)) {
+    $__faqSchema = [
+        '@context'   => 'https://schema.org',
+        '@type'      => 'FAQPage',
+        'mainEntity' => array_map(static fn(array $f): array => [
+            '@type'          => 'Question',
+            'name'           => $f['q'],
+            'acceptedAnswer' => ['@type' => 'Answer', 'text' => $f['a']],
+        ], $listingFaqs),
+    ];
+    $__jsonLdTag .= "\n<script type=\"application/ld+json\">"
+        . json_encode($__faqSchema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG)
+        . '</script>';
+}
+
+$extraHead = <<<HTML
 <link rel="stylesheet" href="/assets/css/business.css" />
 <script src="/assets/js/business-reviews.js" defer></script>
+{$__jsonLdTag}
 HTML;
 
 $extraJS = <<<'HTML'
@@ -573,7 +684,7 @@ ob_start();
   <div class="mci-business-hero mb-0">
     <img
       class="mci-business-hero__img"
-      src="<?= htmlspecialchars($listing['image']) ?>"
+      src="<?= htmlspecialchars($heroBannerUrl) ?>"
       alt=""
       loading="eager"
     />
@@ -590,7 +701,7 @@ ob_start();
   <div class="mci-business-profile-wrap">
     <img
       class="mci-business-profile"
-      src="<?= htmlspecialchars($listing['image']) ?>"
+      src="<?= htmlspecialchars($profilePhotoUrl) ?>"
       alt="<?= htmlspecialchars($listing['title']) ?>"
       width="132"
       height="132"
@@ -727,12 +838,16 @@ ob_start();
             </div>
             <div class="row g-3" id="mciGalleryGrid">
               <?php foreach ($galleryImages as $i => $img): ?>
+                <?php
+                // Schema + API use file_path; image_path was a mistaken key (empty src).
+                $galleryImgUrl = (string)($img['file_path'] ?? $img['image_path'] ?? '');
+                ?>
                 <div class="col-6 col-md-4">
                   <button type="button" class="btn p-0 border-0 w-100 mci-gallery-open" data-index="<?= $i ?>" aria-label="View photo <?= $i + 1 ?>">
                     <img
                       class="mci-business-gallery-img"
-                      src="<?= htmlspecialchars((string)($img['image_path'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
-                      data-full="<?= htmlspecialchars((string)($img['image_path'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"
+                      src="<?= htmlspecialchars($galleryImgUrl, ENT_QUOTES, 'UTF-8') ?>"
+                      data-full="<?= htmlspecialchars($galleryImgUrl, ENT_QUOTES, 'UTF-8') ?>"
                       alt="<?= htmlspecialchars((string)($img['caption'] ?? ('Gallery photo ' . ($i + 1))), ENT_QUOTES, 'UTF-8') ?>"
                       loading="lazy"
                     />
@@ -1108,6 +1223,25 @@ ob_start();
               </div>
             <?php endif; ?>
 
+            <?php if ($flagFlashOk): ?>
+              <div class="alert alert-success py-2 small mb-3" role="status">
+                Thanks. This listing has been flagged for admin and owner review.
+              </div>
+            <?php elseif ($flagFlashErr !== ''): ?>
+              <div class="alert alert-danger py-2 small mb-3" role="alert">
+                Unable to submit flag: <?= htmlspecialchars($flagFlashErr) ?>
+              </div>
+            <?php endif; ?>
+
+            <div class="mb-3 p-3 border rounded-3 bg-light">
+              <div class="fw-semibold small mb-2">
+                <i class="bi bi-flag-fill text-danger me-1" aria-hidden="true"></i>Flag as inappropriate
+              </div>
+              <button type="button" class="btn btn-outline-danger btn-sm w-100" data-bs-toggle="modal" data-bs-target="#mciFlagBusinessModal">
+                <i class="bi bi-flag me-1" aria-hidden="true"></i>Report this business
+              </button>
+            </div>
+
             <!-- Claim / dispute -->
             <div class="d-flex flex-column gap-2">
               <?php if ($listingClaimPending): ?>
@@ -1198,6 +1332,40 @@ ob_start();
           </div>
         </div>
         <?php endif; ?>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="mciFlagBusinessModal" tabindex="-1" aria-labelledby="mciFlagBusinessModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5 mb-0" id="mciFlagBusinessModalLabel">
+          <i class="bi bi-flag-fill text-danger me-1" aria-hidden="true"></i>Report this business
+        </h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" action="">
+          <input type="hidden" name="mci_flag_submit" value="1" />
+          <input type="hidden" name="business_slug" value="<?= htmlspecialchars($slug, ENT_QUOTES, 'UTF-8') ?>" />
+          <?php if (!$isLoggedIn): ?>
+            <div class="mb-2">
+              <input type="text" class="form-control form-control-sm" name="flag_name" placeholder="Your name *" required />
+            </div>
+            <div class="mb-2">
+              <input type="email" class="form-control form-control-sm" name="flag_email" placeholder="Email *" required />
+            </div>
+            <div class="form-text mb-2">Name and email are required to submit a report.</div>
+          <?php endif; ?>
+          <div class="mb-2">
+            <textarea class="form-control form-control-sm" name="flag_reason" rows="4" required minlength="10" maxlength="4000" placeholder="Why is this listing inappropriate or incorrect?"></textarea>
+          </div>
+          <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+            <i class="bi bi-flag me-1" aria-hidden="true"></i>Submit report
+          </button>
+        </form>
       </div>
     </div>
   </div>

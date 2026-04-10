@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" role="img" aria-labelledby="mciProfilePhTitle">
+  <title id="mciProfilePhTitle">No profile photo</title>
+  <defs>
+    <linearGradient id="mciProfilePhBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e5e7eb"/>
+      <stop offset="100%" stop-color="#d1d5db"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="320" fill="url(#mciProfilePhBg)"/>
+  <g fill="none" stroke="#9ca3af" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="160" cy="118" r="44"/>
+    <path d="M88 262 C88 214 118 186 160 186 C202 186 232 214 232 262"/>
+  </g>
+</svg>

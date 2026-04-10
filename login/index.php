@@ -12,15 +12,31 @@ $returnUrl = mci_safe_return_url();
 
 $authError = null;
 
+// OAuth error passed back via redirect
+if (!empty($_GET['oauth_error'])) {
+    $oauthErrCode = (string)$_GET['oauth_error'];
+    $authError = match ($oauthErrCode) {
+        'provider_not_configured' => 'Social login is not yet enabled on this server.',
+        'invalid_state'           => 'Security check failed. Please try again.',
+        'token_exchange_failed'   => 'Could not complete sign-in with the provider. Please try again.',
+        'profile_fetch_failed'    => 'Could not retrieve your profile from the provider. Please try again.',
+        'email_not_provided'      => 'Your social account did not share an email address. Please register with email instead.',
+        'oauth_missing_email'     => 'No email address was returned by the provider. Please register with email.',
+        default                   => 'Social login failed. Please try again or use email.',
+    };
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $em = trim((string) ($_POST['email'] ?? ''));
     $pw = (string)($_POST['password'] ?? '');
+    $rememberMe = !empty($_POST['remember_me']);
 
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 
     // Same backend as POST /api/v1/auth/login with audience=subscriber
-    $result = api_direct_auth_login($em, $pw, 'subscriber');
+    $result = api_direct_auth_login($em, $pw, 'subscriber', $rememberMe);
     if (!empty($result['ok'])) {
+        session_regenerate_id(true);
         $user = $result['user'] ?? [];
         $userId = (string)($user['id'] ?? '');
         $role = (string)($user['role'] ?? '');
@@ -46,6 +62,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'samesite' => 'Lax',
         ]);
 
+        if ($rememberMe) {
+            $sessParams = session_get_cookie_params();
+            setcookie(session_name(), session_id(), [
+                'expires' => time() + (86400 * 30),
+                'path' => $sessParams['path'] !== '' ? $sessParams['path'] : '/',
+                'domain' => $sessParams['domain'] !== '' ? $sessParams['domain'] : '',
+                'secure' => $scheme === 'https',
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+        }
+
         $postedReturn = mci_safe_return_url(trim((string) ($_POST['return'] ?? '')));
         if ($postedReturn === '/index.php') {
             $postedReturn = '/subscriber/dashboard/';
@@ -60,7 +88,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $hideCta = true;
 $extraHead = <<<'HTML'
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 <link rel="stylesheet" href="/assets/css/auth-pages.css" />
 HTML;
 
@@ -80,10 +107,10 @@ ob_start();
 
       <figure class="mci-auth-benefits__figure" aria-hidden="true">
         <img
-          src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&amp;fit=crop&amp;w=800&amp;h=600&amp;q=80"
-          alt="People using laptop and mobile devices - easy access"
-          width="800"
-          height="600"
+          src="/assets/images/hero-illustration.svg"
+          alt=""
+          width="640"
+          height="420"
           loading="lazy"
         />
       </figure>
@@ -99,8 +126,8 @@ ob_start();
         <li class="mci-auth-benefits__item">
           <span class="mci-auth-benefits__icon" aria-hidden="true"><i class="bi bi-bookmark-star"></i></span>
           <div>
-            <strong>Favourites & saved searches</strong>
-            <p>Bookmark places you love or might try later. When we add watchlists, you'll get alerts when saved businesses update their hours or add photos.</p>
+            <strong>Favourites</strong>
+            <p>Bookmark places you love or might try later from any business page while you are signed in.</p>
           </div>
         </li>
         <li class="mci-auth-benefits__item">
@@ -125,14 +152,15 @@ ob_start();
   <div class="col-12 col-lg-6 order-1 order-lg-2">
     <div class="card border-0 shadow-sm bg-white mci-auth-form-card h-100">
       <div class="card-body d-flex flex-column">
-            <?php if ($authError): ?>
-              <div class="alert alert-danger small mb-3" role="alert">
-                <?= htmlspecialchars($authError) ?>
-              </div>
-            <?php endif; ?>
-        <div class="mb-4">
-          <div class="fw-bold fs-4">Sign in</div>
-        </div>
+
+        <div class="fw-bold fs-4 mb-1">Sign in</div>
+        <p class="text-muted small mb-3">Sign in with your email and password.</p>
+
+        <?php if ($authError): ?>
+          <div class="alert alert-danger small mb-3" role="alert">
+            <?= htmlspecialchars($authError) ?>
+          </div>
+        <?php endif; ?>
 
         <form action="/login/" method="post" class="flex-grow-1 d-flex flex-column">
           <input type="hidden" name="return" value="<?= htmlspecialchars($returnUrl) ?>" />
@@ -147,32 +175,18 @@ ob_start();
 
           <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="1" id="rememberMe" name="remember_me" />
+              <input class="form-check-input" type="checkbox" value="1" id="rememberMe" name="remember_me" aria-describedby="rememberMeHint" />
               <label class="form-check-label" for="rememberMe">Remember me</label>
             </div>
             <a class="text-decoration-none small" href="/forgot-password/">Forgot password?</a>
           </div>
+          <p class="text-muted small mb-3" id="rememberMeHint">When checked, stays signed in for up to 30 days on this device.</p>
 
           <button class="btn btn-dark w-100" type="submit">Login</button>
 
-          <div class="my-3 text-center text-muted small">or</div>
-
-          <div class="d-grid gap-2">
-            <button type="button" class="btn btn-outline-dark" aria-label="Login with Google">
-              Continue with Google
-            </button>
-            <button type="button" class="btn btn-outline-dark" aria-label="Login with Facebook">
-              Continue with Facebook
-            </button>
-          </div>
-
-          <div class="text-center mt-3 mb-1">
-            <span class="badge rounded-pill px-3 py-2" style="background:var(--mci-color-primary-soft);color:var(--mci-color-primary-deep);font-size:var(--mci-text-xs);font-weight:700;border:1px solid rgba(124,58,237,0.2);">
-              <i class="bi bi-shield-check me-1" aria-hidden="true"></i>Trusted by thousands of local businesses
-            </span>
-          </div>
-          <div class="text-muted small text-center mt-auto pt-3">
-            Don't have an account? <a href="/register/?return=<?= rawurlencode($returnUrl) ?>" class="text-decoration-none fw-semibold">Register</a>
+          <div class="text-center mt-3 pt-2 border-top">
+            <span class="text-muted small">Don't have an account?</span>
+            <a href="/register/?return=<?= rawurlencode($returnUrl) ?>" class="text-decoration-none fw-semibold small ms-1">Register</a>
           </div>
         </form>
       </div>

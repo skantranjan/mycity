@@ -5,6 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/slug.php';
 require_once __DIR__ . '/auth_cookie.php';
 require_once __DIR__ . '/jwt.php';
+require_once __DIR__ . '/response.php';
+require_once __DIR__ . '/image_upload_token.php';
 
 // ---------------------------------------------------------------------------
 // Slug helpers
@@ -170,4 +172,69 @@ function api_business_try_auth(): ?array
         return null;
     }
     return ['user_id' => $userId, 'role' => $role];
+}
+
+/**
+ * Authorize POST /upload/image: per-business folder needs upload JWT, admin, or owner; flat path needs authenticated portal user.
+ *
+ * @param string $businessIdPost Raw POST business_id (may be empty)
+ */
+function api_assert_can_upload_business_file(PDO $pdo, string $businessIdPost, ?array $auth, ?string $uploadToken): void
+{
+    $uuidV4Re = '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i';
+    $bid      = trim($businessIdPost);
+    $tok      = $uploadToken !== null ? trim($uploadToken) : '';
+
+    if ($bid !== '' && preg_match($uuidV4Re, $bid) === 1) {
+        if ($tok !== '' && api_image_upload_token_verify($tok, $bid)) {
+            return;
+        }
+        if ($auth === null) {
+            api_error('unauthorized', 401);
+        }
+        $role = (string) ($auth['role'] ?? '');
+        if (in_array($role, ['super_admin', 'co_admin'], true)) {
+            return;
+        }
+        if ($role === 'subscriber') {
+            $st = $pdo->prepare('SELECT added_by_user_id FROM mci_business_groups WHERE id = ? LIMIT 1');
+            $st->execute([$bid]);
+            $row = $st->fetch(PDO::FETCH_ASSOC);
+            if ($row && (string) ($row['added_by_user_id'] ?? '') === $auth['user_id']) {
+                return;
+            }
+        }
+        api_error('forbidden', 403);
+    }
+
+    if ($auth === null || !in_array($auth['role'], ['subscriber', 'super_admin', 'co_admin'], true)) {
+        api_error('unauthorized', 401);
+    }
+}
+
+/**
+ * Authorize PATCH /businesses/{id}/images (same rules as upload).
+ */
+function api_assert_can_patch_business_images(PDO $pdo, string $groupId, ?array $auth, ?string $uploadToken): void
+{
+    $tok = $uploadToken !== null ? trim($uploadToken) : '';
+    if ($tok !== '' && api_image_upload_token_verify($tok, $groupId)) {
+        return;
+    }
+    if ($auth === null) {
+        api_error('unauthorized', 401);
+    }
+    $role = (string) ($auth['role'] ?? '');
+    if (in_array($role, ['super_admin', 'co_admin'], true)) {
+        return;
+    }
+    if ($role === 'subscriber') {
+        $st = $pdo->prepare('SELECT added_by_user_id FROM mci_business_groups WHERE id = ? LIMIT 1');
+        $st->execute([$groupId]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if ($row && (string) ($row['added_by_user_id'] ?? '') === $auth['user_id']) {
+            return;
+        }
+    }
+    api_error('forbidden', 403);
 }

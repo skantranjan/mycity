@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS `mci_business_groups` (
   `parent_category_id`  int unsigned      NOT NULL                             COMMENT 'FK → mci_categories.id (top-level category only)',
   `price_range`         enum('free','moderate','pricey','ultra')
                                           DEFAULT NULL,
-  `status`              enum('live','draft','suspended','deleted')
+  `video_url`           varchar(512)      DEFAULT NULL                         COMMENT 'Optional YouTube or video embed URL',
+  `status`              enum('live','draft','suspended','deleted','rejected')
                                           NOT NULL DEFAULT 'live',
   `added_by_role`       enum('cp_admin','subscriber','anonymous')
                                           NOT NULL,
@@ -110,6 +111,7 @@ CREATE TABLE IF NOT EXISTS `mci_business_branches` (
   `phone_primary`       varchar(30)       DEFAULT NULL,
   `phone_secondary`     varchar(30)       DEFAULT NULL,
   `whatsapp_number`     varchar(30)       DEFAULT NULL,
+  `website`             varchar(512)      DEFAULT NULL                         COMMENT 'Branch-specific website URL',
   `is_primary`          tinyint(1)        NOT NULL DEFAULT 0                   COMMENT 'Soft display hint; not uniquely constrained',
   `status`              enum('active','inactive','deleted')
                                           NOT NULL DEFAULT 'active',
@@ -153,6 +155,8 @@ CREATE TABLE IF NOT EXISTS `mci_business_branch_hours` (
                                       NOT NULL,
   `opens_at`            time          DEFAULT NULL                             COMMENT 'NULL when is_closed = 1',
   `closes_at`           time          DEFAULT NULL                             COMMENT 'NULL when is_closed = 1',
+  `opens_at_2`          time          DEFAULT NULL                             COMMENT 'Second slot open time (split shift)',
+  `closes_at_2`         time          DEFAULT NULL                             COMMENT 'Second slot close time (split shift)',
   `is_closed`           tinyint(1)    NOT NULL DEFAULT 0,
   -- Audit
   `created_at`          datetime(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -345,7 +349,7 @@ CREATE TABLE IF NOT EXISTS `mci_business_faqs` (
   `id`                  char(36)      NOT NULL                                 COMMENT 'UUID v4',
   `business_group_id`   char(36)      NOT NULL,
   `question`            varchar(512)  NOT NULL,
-  `answer`              text          NOT NULL,
+  `answer`              text          NOT NULL DEFAULT '',
   `sort_order`          int           NOT NULL DEFAULT 0,
   -- Audit
   `created_at`          datetime(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -470,9 +474,9 @@ CREATE TABLE IF NOT EXISTS `mci_business_approvals` (
   `reviewed_by_user_id` char(36)        NOT NULL                               COMMENT 'FK → mci_users.id; CP admin who performed this action',
   `action`              enum('approved','rejected','suspended','reinstated','draft')
                                         NOT NULL,
-  `previous_status`     enum('live','draft','suspended','deleted')
+  `previous_status`     enum('live','draft','suspended','deleted','rejected')
                                         DEFAULT NULL,
-  `new_status`          enum('live','draft','suspended','deleted')
+  `new_status`          enum('live','draft','suspended','deleted','rejected')
                                         NOT NULL,
   `notes`               text            DEFAULT NULL,
   `reviewed_at`         datetime(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -545,7 +549,57 @@ CREATE TABLE IF NOT EXISTS `mci_business_claims` (
 
 
 -- =============================================================================
--- 13. mci_business_reviews  (branch-level — from migration 008)
+-- 13. mci_business_flags
+--     Public reporting workflow for inappropriate/incorrect business listings.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS `mci_business_flags` (
+  `id`                  char(36)        NOT NULL                               COMMENT 'UUID v4',
+  `business_group_id`   char(36)        NOT NULL,
+  `reporter_user_id`    char(36)        DEFAULT NULL                           COMMENT 'Set when logged-in reporter submits',
+  `reporter_type`       enum('logged_in','guest','anonymous') NOT NULL DEFAULT 'anonymous',
+  `reporter_name`       varchar(160)    DEFAULT NULL,
+  `reporter_email`      varchar(254)    DEFAULT NULL,
+  `reason`              text            NOT NULL,
+  `status`              enum('open','resolved','dismissed') NOT NULL DEFAULT 'open',
+  `admin_note`          text            DEFAULT NULL,
+  `resolved_by_user_id` char(36)        DEFAULT NULL,
+  `resolved_at`         datetime(6)     DEFAULT NULL,
+  -- Audit
+  `created_at`          datetime(6)     NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `created_by_user_id`  char(36)        DEFAULT NULL,
+  `updated_at`          datetime(6)     DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP(6),
+  `updated_by_user_id`  char(36)        DEFAULT NULL,
+
+  PRIMARY KEY (`id`),
+  KEY `idx_mci_bflag_group`        (`business_group_id`),
+  KEY `idx_mci_bflag_reporter`     (`reporter_user_id`),
+  KEY `idx_mci_bflag_status`       (`status`),
+  KEY `idx_mci_bflag_resolved_by`  (`resolved_by_user_id`),
+  KEY `idx_mci_bflag_created_by`   (`created_by_user_id`),
+  KEY `idx_mci_bflag_updated_by`   (`updated_by_user_id`),
+
+  CONSTRAINT `fk_mci_bflag_group`
+    FOREIGN KEY (`business_group_id`) REFERENCES `mci_business_groups` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_mci_bflag_reporter`
+    FOREIGN KEY (`reporter_user_id`) REFERENCES `mci_users` (`id`)
+    ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_mci_bflag_resolved_by`
+    FOREIGN KEY (`resolved_by_user_id`) REFERENCES `mci_users` (`id`)
+    ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_mci_bflag_created_by`
+    FOREIGN KEY (`created_by_user_id`) REFERENCES `mci_users` (`id`)
+    ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_mci_bflag_updated_by`
+    FOREIGN KEY (`updated_by_user_id`) REFERENCES `mci_users` (`id`)
+    ON DELETE SET NULL ON UPDATE CASCADE
+
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Public inappropriate listing reports with admin moderation status.';
+
+
+-- =============================================================================
+-- 14. mci_business_reviews  (branch-level — from migration 008)
 --     Ratings and reviews per branch. One review per subscriber per branch.
 --     NOTE: migration 013 adds a separate group-level review table of the same
 --     name; this is the original branch-level version with full moderation support.

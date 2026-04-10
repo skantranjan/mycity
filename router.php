@@ -31,6 +31,16 @@ if (str_starts_with($uri, '/api/v1')) {
     return true;
 }
 
+// Browser auto-fetch fallback.
+if ($uri === '/favicon.ico') {
+    $fallback = __DIR__ . '/assets/images/logo.png';
+    if (is_file($fallback)) {
+        header('Content-Type: image/png');
+        readfile($fallback);
+        return true;
+    }
+}
+
 // ── Pretty slug URL mappings (mirrors .htaccess RewriteRules) ────────────────
 
 // /business/{slug}/ → business/index.php?slug={slug}
@@ -108,6 +118,7 @@ $folderMap = [
     '/subscriber/logout'         => '/subscriber/logout/index.php',
     '/subscriber/listing-delete' => '/subscriber/listing-delete/index.php',
     '/cp/dashboard'              => '/cp/dashboard/index.php',
+    '/cp/subscribers'            => '/cp/users/index.php',
     '/cp/users'                  => '/cp/users/index.php',
     '/cp/listings'               => '/cp/listings/index.php',
     '/cp/anonymous-approvals'    => '/cp/anonymous-approvals/index.php',

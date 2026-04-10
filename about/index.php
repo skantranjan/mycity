@@ -69,9 +69,9 @@ ob_start();
     <div class="row g-3 mb-4">
       <div class="col-12">
         <div class="p-3 rounded-3 border" style="background:var(--mci-color-primary-soft);">
-          <div class="fw-semibold mb-2" style="color:var(--mci-color-primary-deep);">
+          <h2 class="fw-semibold mb-2 fs-6" style="color:var(--mci-color-primary-deep);">
             <i class="bi bi-heart me-2" aria-hidden="true"></i>What we believe
-          </div>
+          </h2>
           <div class="text-muted small" style="line-height:1.7;">
             Every city is full of remarkable local businesses - talented craftspeople, great restaurants, reliable service providers - that never get the visibility they deserve. We believe the internet should work for them, not against them. My City Info exists to level the playing field: a free, moderated, community-powered directory where quality and trust matter more than advertising budgets.
           </div>
@@ -83,7 +83,7 @@ ob_start();
     <div class="row g-3 mb-4">
       <div class="col-12 col-md-6">
         <div class="bg-light border rounded-3 p-3 h-100">
-          <div class="fw-semibold mb-2"><i class="bi bi-bullseye me-2 text-primary" aria-hidden="true"></i>Our mission</div>
+          <h2 class="fw-semibold mb-2 fs-6"><i class="bi bi-bullseye me-2 text-primary" aria-hidden="true"></i>Our mission</h2>
           <div class="text-muted small" style="line-height:1.7;">
             Make it effortless to discover, connect with, and support local businesses - whether you're looking for a dentist, a cosy cafe, or a reliable plumber. We put trust and community at the heart of every listing.
           </div>
@@ -91,7 +91,7 @@ ob_start();
       </div>
       <div class="col-12 col-md-6">
         <div class="bg-light border rounded-3 p-3 h-100">
-          <div class="fw-semibold mb-2"><i class="bi bi-journal-text me-2 text-primary" aria-hidden="true"></i>Our story</div>
+          <h2 class="fw-semibold mb-2 fs-6"><i class="bi bi-journal-text me-2 text-primary" aria-hidden="true"></i>Our story</h2>
           <div class="text-muted small" style="line-height:1.7;">
             Started in 2024 as a simple directory, My City Info grew as we saw how hard it was for local businesses to be found online. We built a platform that gives every neighbourhood business a fair shot - no paid rankings, no algorithms burying small operators.
           </div>
@@ -100,7 +100,7 @@ ob_start();
     </div>
 
     <!-- How it works -->
-    <div class="fw-semibold mb-3">How listings work</div>
+    <h2 class="fw-semibold mb-3 fs-6">How listings work</h2>
     <div class="row g-3 mb-4">
       <div class="col-12 col-md-4">
         <div class="d-flex align-items-start gap-3 p-3 bg-light rounded-3 h-100">

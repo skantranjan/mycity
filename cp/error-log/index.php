@@ -16,6 +16,26 @@ $appArea = 'cp';
 
 require_once __DIR__ . '/../../api/v1/lib/db.php';
 
+try {
+    $actionPdo = api_db();
+    if (isset($_GET['delete']) && trim((string)$_GET['delete']) !== '') {
+        $actionPdo->prepare('DELETE FROM mci_error_log WHERE id = ?')->execute([trim((string)$_GET['delete'])]);
+        header('Location: /cp/error-log/');
+        exit;
+    }
+    if (isset($_GET['prune_days'])) {
+        $days = max(1, (int)$_GET['prune_days']);
+        $actionPdo->prepare('DELETE FROM mci_error_log WHERE created_at < DATE_SUB(NOW(6), INTERVAL ? DAY)')->execute([$days]);
+        header('Location: /cp/error-log/');
+        exit;
+    }
+    if (isset($_GET['clear'])) {
+        $actionPdo->exec("TRUNCATE TABLE mci_error_log");
+        header('Location: /cp/error-log/');
+        exit;
+    }
+} catch (Throwable $ignored) {}
+
 // ── Filters ──────────────────────────────────────────────
 $levelFilter = trim((string) ($_GET['level'] ?? 'all'));
 $validLevels = ['all', 'exception', 'fatal', 'error', 'warning'];
@@ -96,23 +116,18 @@ ob_start();
         <div class="text-muted small">Application exceptions, fatal errors, and warnings captured by the system.</div>
       </div>
       <?php if ($total > 0): ?>
+        <div class="d-flex gap-2">
+        <a href="?prune_days=30" class="btn btn-sm btn-outline-secondary"
+           onclick="return confirm('Delete logs older than 30 days?')">
+          <i class="bi bi-funnel me-1" aria-hidden="true"></i>Prune 30d
+        </a>
         <a href="?clear=1" class="btn btn-sm btn-outline-danger"
            onclick="return confirm('Clear ALL error log entries? This cannot be undone.')">
           <i class="bi bi-trash me-1" aria-hidden="true"></i>Clear all
         </a>
+        </div>
       <?php endif; ?>
     </div>
-
-    <?php
-    // Handle clear action
-    if (isset($_GET['clear']) && $dbReady) {
-        try {
-            api_db()->exec("TRUNCATE TABLE mci_error_log");
-            header('Location: /cp/error-log/');
-            exit;
-        } catch (Throwable $ignored) {}
-    }
-    ?>
 
     <?php if (!$dbReady): ?>
       <div class="alert alert-warning">
@@ -161,7 +176,7 @@ ob_start();
                 <th>Message</th>
                 <th style="width:220px;">File : line</th>
                 <th style="width:160px;">When</th>
-                <th style="width:48px;"></th>
+                <th style="width:96px;"></th>
               </tr>
             </thead>
             <tbody>
@@ -201,6 +216,10 @@ ob_start();
                         <i class="bi bi-code-square" aria-hidden="true"></i>
                       </button>
                     <?php endif; ?>
+                    <a href="?delete=<?= urlencode((string)$row['id']) ?>" class="btn btn-sm btn-outline-danger py-0 px-1"
+                       onclick="return confirm('Delete this log entry?')">
+                      <i class="bi bi-trash" aria-hidden="true"></i>
+                    </a>
                   </td>
                 </tr>
               <?php endforeach; ?>

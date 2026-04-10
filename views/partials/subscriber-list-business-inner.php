@@ -139,8 +139,36 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
             </div>
             <div class="col-12">
               <label class="form-label mci-field-label" for="description">Description <span class="text-danger">*</span></label>
-              <textarea class="form-control" id="description" name="description" rows="4" maxlength="1200" placeholder="Tell customers what makes your business worth visiting…" required></textarea>
-              <div class="d-flex justify-content-end mt-1"><span class="form-text" id="descCount">0 / 1200</span></div>
+              <div class="mci-rich-editor border rounded-3 p-2 bg-white">
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                  <button type="button" class="btn btn-sm btn-outline-secondary mci-editor-btn" data-cmd="bold"><i class="bi bi-type-bold"></i></button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary mci-editor-btn" data-cmd="underline"><i class="bi bi-type-underline"></i></button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary mci-editor-btn" data-cmd="insertUnorderedList"><i class="bi bi-list-ul"></i></button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary mci-editor-btn" data-cmd="createLink"><i class="bi bi-link-45deg"></i></button>
+                </div>
+                <div id="descriptionEditor" class="form-control" contenteditable="true" style="min-height:220px;"></div>
+              </div>
+              <textarea class="form-control d-none" id="description" name="description" rows="10" placeholder="Tell customers what makes your business worth visiting…" required></textarea>
+              <div class="d-flex justify-content-end mt-1"><span class="form-text" id="descCount">0</span></div>
+            </div>
+            <div class="col-12 d-none" id="mciSeoFields">
+              <div class="row g-3 border rounded-3 p-2 mx-0 bg-light-subtle">
+                <div class="col-12">
+                  <div class="fw-semibold small">SEO metadata (edit only)</div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label mci-field-label" for="seo_page_title">Page title</label>
+                  <input class="form-control" id="seo_page_title" type="text" name="seo_page_title" maxlength="255" />
+                </div>
+                <div class="col-12">
+                  <label class="form-label mci-field-label" for="seo_meta_description">Meta description</label>
+                  <textarea class="form-control" id="seo_meta_description" name="seo_meta_description" rows="3" maxlength="500"></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label mci-field-label" for="seo_meta_keywords">Meta keywords</label>
+                  <input class="form-control" id="seo_meta_keywords" type="text" name="seo_meta_keywords" maxlength="500" placeholder="keyword1, keyword2" />
+                </div>
+              </div>
             </div>
             <div class="col-12 col-sm-7">
               <label class="form-label mci-field-label" for="category">Category <span class="text-danger">*</span></label>
@@ -372,10 +400,6 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
                   <input class="form-control" id="address_line2_0" type="text" name="address_line2[]" placeholder="Landmark, floor, etc." />
                 </div>
                 <div class="col-12 col-md-6">
-                  <label class="form-label mci-field-label" for="city">City <span class="text-danger">*</span></label>
-                  <input class="form-control" id="city" type="text" name="city[]" placeholder="City name" required />
-                </div>
-                <div class="col-12 col-md-6">
                   <label class="form-label mci-field-label" for="country_select_0">Country</label>
                   <select class="form-select mci-country-select" id="country_select_0" name="country_select[]" data-branch-index="0">
                     <option value="">Loading…</option>
@@ -384,14 +408,23 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
                     placeholder="Type your country" maxlength="100" data-branch-index="0" />
                   <input type="hidden" id="country_0" name="country[]" value="India" data-branch-index="0" />
                 </div>
-                <div class="col-12 col-md-4">
+                <div class="col-12 col-md-6">
                   <label class="form-label mci-field-label" for="state_select_0">State / Province</label>
                   <select class="form-select mci-state-select" id="state_select_0" name="state_select[]" data-branch-index="0">
-                    <option value="">Select or type below</option>
+                    <option value="">Select country first</option>
                   </select>
-                  <input class="form-control mt-2" id="state_0" type="text" name="state[]"
-                    placeholder="e.g. Maharashtra" maxlength="100" data-branch-index="0" />
-                  <div class="form-text">Select from the list or type manually.</div>
+                  <input class="form-control mt-2 d-none" id="state_other_0" type="text" name="state_other[]"
+                    placeholder="Type your state" maxlength="100" data-branch-index="0" />
+                  <input type="hidden" id="state_0" name="state[]" value="" data-branch-index="0" />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label mci-field-label" for="city_select_0">City <span class="text-danger">*</span></label>
+                  <select class="form-select mci-city-select" id="city_select_0" name="city_select[]" data-branch-index="0">
+                    <option value="">Select state first</option>
+                  </select>
+                  <input class="form-control mt-2 d-none mci-city-other" id="city_other_0" type="text"
+                    name="city_other[]" placeholder="Type city name" maxlength="100" data-branch-index="0" />
+                  <input type="hidden" id="city_0" name="city[]" value="" data-branch-index="0" />
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="form-label mci-field-label" for="pincode_0">Pincode / ZIP</label>
@@ -476,26 +509,31 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
                   <input class="form-control" type="text" name="address_line2[]" placeholder="Landmark, floor, etc." />
                 </div>
                 <div class="col-12 col-md-6">
-                  <label class="form-label mci-field-label">City</label>
-                  <input class="form-control" type="text" name="city[]" placeholder="City name" />
-                </div>
-                <div class="col-12 col-md-6">
                   <label class="form-label mci-field-label">Country</label>
                   <select class="form-select mci-country-select" name="country_select[]" data-branch-index="__INDEX__">
-                    <option value="">Loading…</option>
+                    <option value="">Select country</option>
                   </select>
                   <input class="form-control mt-2 d-none" name="country_other[]" type="text"
                     placeholder="Type your country" maxlength="100" data-branch-index="__INDEX__" />
                   <input type="hidden" name="country[]" value="India" data-branch-index="__INDEX__" />
                 </div>
-                <div class="col-12 col-md-4">
+                <div class="col-12 col-md-6">
                   <label class="form-label mci-field-label">State / Province</label>
                   <select class="form-select mci-state-select" name="state_select[]" data-branch-index="__INDEX__">
-                    <option value="">Select or type below</option>
+                    <option value="">Select country first</option>
                   </select>
-                  <input class="form-control mt-2" type="text" name="state[]"
-                    placeholder="e.g. Maharashtra" maxlength="100" data-branch-index="__INDEX__" />
-                  <div class="form-text">Select from the list or type manually.</div>
+                  <input class="form-control mt-2 d-none" name="state_other[]" type="text"
+                    placeholder="Type your state" maxlength="100" data-branch-index="__INDEX__" />
+                  <input type="hidden" name="state[]" value="" data-branch-index="__INDEX__" />
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label mci-field-label">City</label>
+                  <select class="form-select mci-city-select" name="city_select[]" data-branch-index="__INDEX__">
+                    <option value="">Select state first</option>
+                  </select>
+                  <input class="form-control mt-2 d-none mci-city-other" name="city_other[]" type="text"
+                    placeholder="Type city name" maxlength="100" data-branch-index="__INDEX__" />
+                  <input type="hidden" name="city[]" value="" data-branch-index="__INDEX__" />
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="form-label mci-field-label">Pincode / ZIP</label>
@@ -936,6 +974,7 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
             <input class="form-check-input" type="checkbox" id="agreeTerms" required />
             <label class="form-check-label" for="agreeTerms">I agree to the <a href="/terms-of-use/">Terms of Service</a> for listing on My City Info. <span class="text-danger">*</span></label>
           </div>
+          <div id="mciSubmitFeedback" class="alert d-none mb-3" role="alert" aria-live="polite"></div>
           <button class="btn btn-dark btn-lg px-5 w-100" type="submit" id="submitBtn">
             <i class="bi bi-check2-circle me-2" aria-hidden="true"></i><?= htmlspecialchars((string) $step7SubmitText, ENT_QUOTES, 'UTF-8') ?>
           </button>

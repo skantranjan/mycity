@@ -16,7 +16,7 @@
           />
         </a>
         <div class="text-muted small mci-footer__tagline">
-          Explore local business, services and places of your city.
+          Explore local businesses, services and places in your city.
         </div>
       </div>
 

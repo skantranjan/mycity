@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320" role="img" aria-labelledby="mciListingPhTitle">
+  <title id="mciListingPhTitle">No photo available</title>
+  <defs>
+    <linearGradient id="mciListingPhBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e5e7eb"/>
+      <stop offset="100%" stop-color="#d1d5db"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="320" fill="url(#mciListingPhBg)"/>
+  <g fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="168" y="104" width="144" height="112" rx="8"/>
+    <circle cx="200" cy="136" r="12"/>
+    <path d="M168 200 L220 156 L268 192 L312 148 L312 216 L168 216 Z"/>
+  </g>
+</svg>

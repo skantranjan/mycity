@@ -12,12 +12,21 @@ $returnUrl = mci_safe_return_url();
 
 $authError = null;
 
+// ── Math captcha generation ───────────────────────────────────────────────────
+$captchaA = random_int(2, 15);
+$captchaB = random_int(1, 10);
+$captchaAnswer = $captchaA + $captchaB;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $em = trim((string) ($_POST['email'] ?? ''));
     $pw = (string)($_POST['password'] ?? '');
     $pw2 = (string)($_POST['password_confirm'] ?? ($_POST['password_confirmation'] ?? ''));
+    $captchaInput = (int)($_POST['captcha_answer'] ?? -1);
+    $captchaExpected = (int)($_POST['captcha_expected'] ?? -2);
 
-    if ($pw === '' || $pw2 === '' || $pw !== $pw2) {
+    if ($captchaInput !== $captchaExpected) {
+        $authError = 'Incorrect answer to the security question. Please try again.';
+    } elseif ($pw === '' || $pw2 === '' || $pw !== $pw2) {
         $authError = 'Passwords do not match.';
     } elseif (empty($_POST['accept_terms']) || empty($_POST['accept_privacy'])) {
         $authError = 'You must accept the Terms of Use and Privacy Policy.';
@@ -74,7 +83,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $hideCta = true;
 $extraHead = <<<'HTML'
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 <link rel="stylesheet" href="/assets/css/auth-pages.css" />
 HTML;
 
@@ -94,10 +102,10 @@ ob_start();
 
       <figure class="mci-auth-benefits__figure" aria-hidden="true">
         <img
-          src="https://images.unsplash.com/photo-1556761175-4b46a572b786?auto=format&amp;fit=crop&amp;w=800&amp;h=600&amp;q=80"
-          alt="People collaborating - local community and trust"
-          width="800"
-          height="600"
+          src="/assets/images/hero-illustration.svg"
+          alt=""
+          width="640"
+          height="420"
           loading="lazy"
         />
       </figure>
@@ -139,57 +147,66 @@ ob_start();
   <div class="col-12 col-lg-6 order-1 order-lg-2">
     <div class="card border-0 shadow-sm bg-white mci-auth-form-card h-100">
       <div class="card-body d-flex flex-column">
-        <div class="mb-4">
-          <div class="fw-bold fs-4">Create account</div>
-          <div class="text-muted small mt-1">Quick signup. You can also continue with Google or Facebook when we wire them up.</div>
-          <div class="alert alert-info small mt-3 mb-0 text-start">
-            <strong>Demo:</strong> Submitting creates a session so you can rate and review businesses anonymously on listings.
+
+        <div class="fw-bold fs-4 mb-1">Create account</div>
+        <p class="text-muted small mb-3">Create an account with your email and password.</p>
+
+        <?php if ($authError): ?>
+          <div class="alert alert-danger small mb-3" role="alert">
+            <?= htmlspecialchars($authError) ?>
           </div>
-              <?php if ($authError): ?>
-                <div class="alert alert-danger small mt-3 mb-0" role="alert">
-                  <?= htmlspecialchars($authError) ?>
-                </div>
-              <?php endif; ?>
-        </div>
+        <?php endif; ?>
 
         <form action="/register/" method="post" class="flex-grow-1 d-flex flex-column">
           <input type="hidden" name="return" value="<?= htmlspecialchars($returnUrl) ?>" />
+          <input type="hidden" name="captcha_expected" value="<?= $captchaAnswer ?>" />
+
           <div class="row g-3">
-            <div class="col-12 col-md-6">
-              <label class="form-label" for="regEmail">Email</label>
+            <div class="col-12">
+              <label class="form-label" for="regDisplayName">Display Name</label>
+              <input class="form-control" id="regDisplayName" type="text" name="display_name" placeholder="How you'll appear publicly" required autocomplete="nickname" maxlength="60" />
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="regEmail">Email Address</label>
               <input class="form-control" id="regEmail" type="email" name="email" placeholder="name@example.com" required autocomplete="email" />
             </div>
-            <div class="col-12 col-md-6">
+            <div class="col-12">
               <label class="form-label" for="regPassword">Password</label>
               <input class="form-control" id="regPassword" type="password" name="password" placeholder="Create a password" required autocomplete="new-password" />
             </div>
             <div class="col-12">
-              <label class="form-label" for="regPasswordConfirm">Confirm password</label>
-              <input class="form-control" id="regPasswordConfirm" type="password" name="password_confirm" placeholder="Re-enter password" required autocomplete="new-password" />
+              <label class="form-label" for="regPasswordConfirm">Confirm Password</label>
+              <input class="form-control" id="regPasswordConfirm" type="password" name="password_confirm" placeholder="Re-enter your password" required autocomplete="new-password" />
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="regCaptcha">
+                Security check: what is <?= $captchaA ?> + <?= $captchaB ?>?
+              </label>
+              <input class="form-control" id="regCaptcha" type="number" name="captcha_answer" placeholder="Your answer" required autocomplete="off" />
+            </div>
+            <div class="col-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="accept_terms" id="regTerms" required />
+                <label class="form-check-label small" for="regTerms">
+                  I agree to the <a href="/terms-of-use/" target="_blank" class="text-decoration-none fw-semibold">Terms of Use</a>
+                </label>
+              </div>
+              <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" name="accept_privacy" id="regPrivacy" required />
+                <label class="form-check-label small" for="regPrivacy">
+                  I have read the <a href="/privacy-policy/" target="_blank" class="text-decoration-none fw-semibold">Privacy Policy</a>
+                </label>
+              </div>
             </div>
           </div>
 
-          <div class="mt-3">
+          <div class="mt-4">
             <button class="btn btn-dark w-100" type="submit">Register</button>
           </div>
 
-          <div class="my-3 text-center text-muted small">or</div>
-
-          <div class="d-grid gap-2">
-            <button type="button" class="btn btn-outline-dark" aria-label="Register with Google">
-              Continue with Google
-            </button>
-            <button type="button" class="btn btn-outline-dark" aria-label="Register with Facebook">
-              Continue with Facebook
-            </button>
-          </div>
-
-          <div class="text-muted small mt-4">
-            Use the checkboxes above to record your agreement at registration time.
-          </div>
-
-          <div class="text-muted small text-center mt-auto pt-3">
-            Already have an account? <a href="/login/?return=<?= rawurlencode($returnUrl) ?>" class="text-decoration-none fw-semibold">Login</a>
+          <div class="text-center mt-3 pt-2 border-top">
+            <span class="text-muted small">Already have an account?</span>
+            <a href="/login/?return=<?= rawurlencode($returnUrl) ?>" class="text-decoration-none fw-semibold small ms-1">Login</a>
           </div>
         </form>
       </div>

@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../includes/mci_paths.php';
 require_once __DIR__ . '/../includes/mci_config.php';
 require_once __DIR__ . '/../includes/mci_category_icons.php';
 require_once __DIR__ . '/../api/v1/lib/db.php';
@@ -33,7 +34,9 @@ if (!$categoryRow) {
     http_response_code(404);
     $pageTitle = 'Category Not Found - My City Info';
 } else {
-    $pageTitle = $selectedCategoryName . ' - My City Info';
+    $pageTitle    = $selectedCategoryName . ' - My City Info';
+    $canonicalUrl = mci_site_base_url() . '/business-category/' . rawurlencode($categorySlug) . '/';
+    $ogTitle      = $selectedCategoryName . ' Businesses - My City Info';
 }
 
 // ── Subcategories for this parent ─────────────────────────────────────────────
@@ -60,6 +63,11 @@ if ($categoryRow) {
 $selectedLocation  = trim((string)($_GET['location']    ?? ''));
 if ($selectedLocation === '') {
     $selectedLocation = trim((string)(urldecode($_COOKIE['mci_active_city'] ?? '')));
+}
+if ($categoryRow) {
+    $metaDescription = 'Browse ' . $selectedCategoryName . ' businesses'
+        . ($selectedLocation !== '' ? ' in ' . $selectedLocation : ' across India')
+        . ' on My City Info.';
 }
 $selectedSub       = trim((string)($_GET['subcategory'] ?? ''));
 $tag               = trim((string)($_GET['tag']         ?? ''));
@@ -148,7 +156,7 @@ if ($categoryRow) {
                                    ? $row['logo_path']
                                    : (!empty($row['banner_path'])
                                        ? $row['banner_path']
-                                       : 'https://picsum.photos/seed/mci-' . ($row['slug'] ?? 'biz') . '/480/320'),
+                                       : mci_listing_placeholder_url()),
                 'price_range' => $row['price_range'] ?? null,
                 'tags'        => [],
             ];
@@ -197,6 +205,20 @@ $extraJS = <<<'HTML'
 })();
 </script>
 HTML;
+$extraJS .= '<script>window.MCI_LISTING_CONFIG=' . json_encode([
+    'endpoint' => '/api/v1/public/businesses',
+    'filters' => [
+        'category_slug' => $categorySlug,
+        'city' => $selectedLocation,
+        'subcategory_slug' => $selectedSub,
+        'tag_slug' => $tag,
+        'price_range' => $priceRange,
+        'sort' => $sort,
+    ],
+    'page' => $curPage,
+    'pages' => $pages,
+    'perPage' => MCI_LISTING_PER_PAGE,
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';</script>';
 
 ob_start();
 ?>
@@ -224,6 +246,14 @@ ob_start();
           <?= number_format($total) ?> business<?= $total === 1 ? '' : 'es' ?>
           <?= $selectedLocation !== '' ? ' in <strong>' . htmlspecialchars($selectedLocation) . '</strong>' : ' across all locations' ?>
         </div>
+        <?php if ($curPage === 1): ?>
+        <p class="text-muted small mt-2 mb-0">
+          Browse <?= htmlspecialchars($selectedCategoryName) ?> businesses
+          <?= $selectedLocation !== '' ? 'in ' . htmlspecialchars($selectedLocation) : 'across India' ?>
+          on My City Info. Find verified contact details, addresses, reviews, and opening hours for
+          trusted <?= htmlspecialchars($selectedCategoryName) ?> providers near you.
+        </p>
+        <?php endif; ?>
       <?php else: ?>
         <h1 class="h3 mb-0">Category not found</h1>
       <?php endif; ?>
@@ -292,7 +322,7 @@ ob_start();
             <?php endif; ?>
           </button>
           <div class="text-muted small">
-            Showing <?= count($listings) ?> of <?= number_format($total) ?>
+            Showing <span id="mciShownCount"><?= count($listings) ?></span> of <span id="mciTotalCount"><?= number_format($total) ?></span>
           </div>
         </div>
       </div>
@@ -424,7 +454,7 @@ ob_start();
                 </button>
               </div>
               <div class="text-muted small d-none d-lg-block">
-                Showing <?= count($listings) ?> of <?= number_format($total) ?> listings
+                Showing <span id="mciShownCountDesktop"><?= count($listings) ?></span> of <span id="mciTotalCountDesktop"><?= number_format($total) ?></span> listings
               </div>
             </div>
           </div>
@@ -438,13 +468,13 @@ ob_start();
                  class="btn btn-sm btn-dark">Clear filters</a>
             </div>
           <?php else: ?>
-            <div id="listingsGridView" class="row g-3">
+            <div id="listingsGridView" class="row g-3" data-infinite-scroll="1">
               <?php foreach ($listings as $listing): ?>
                 <?php $size = 'md'; include __DIR__ . '/../views/components/listing-card.php'; ?>
               <?php endforeach; ?>
             </div>
 
-            <div id="listingsListView" class="row g-3 d-none">
+            <div id="listingsListView" class="row g-3 d-none" data-infinite-scroll="1">
               <?php foreach ($listings as $listing): ?>
                 <?php include __DIR__ . '/../views/components/listing-row.php'; ?>
               <?php endforeach; ?>
@@ -452,7 +482,7 @@ ob_start();
 
             <!-- Pagination -->
             <?php if ($pages > 1): ?>
-              <nav class="mt-4 d-flex justify-content-center" aria-label="Category listing pages">
+              <nav id="mciPagination" class="mt-4 d-flex justify-content-center" aria-label="Category listing pages">
                 <ul class="pagination pagination-sm mb-0">
                   <li class="page-item <?= $curPage <= 1 ? 'disabled' : '' ?>">
                     <a class="page-link" href="<?= htmlspecialchars(mci_cat_page_url($baseParams, $curPage - 1)) ?>">
@@ -472,6 +502,7 @@ ob_start();
                 </ul>
               </nav>
             <?php endif; ?>
+            <div id="mciInfiniteStatus" class="text-center small text-muted mt-3" style="display:none;"></div>
           <?php endif; ?>
         </div>
       </div>

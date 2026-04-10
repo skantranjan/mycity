@@ -290,11 +290,42 @@ $(function () {
   $(document).on('input change', 'input[name="city[]"], input[name="phone[]"], input[name="website[]"]', updatePreview);
   updatePreview();
 
-  // ── Description counter ──────────────────────────────────────────
+  // ── Description editor + counter ────────────────────────────────
   (function () {
-    var $d = $('#description'), $c = $('#descCount');
-    $d.on('input', function () { $c.text($d.val().length + ' / 1200'); });
-    $c.text($d.val().length + ' / 1200');
+    var $d = $('#description');
+    var $e = $('#descriptionEditor');
+    var $c = $('#descCount');
+    function syncEditorToTextarea() {
+      if (!$e.length || !$d.length) return;
+      $d.val(($e.html() || '').trim());
+      $c.text(String(($e.text() || '').length));
+    }
+    if ($e.length) {
+      $e.on('input keyup blur paste', function () {
+        syncEditorToTextarea();
+        updatePreview();
+      });
+      $('.mci-editor-btn').on('click', function () {
+        var cmd = String($(this).data('cmd') || '');
+        if (!cmd) return;
+        if (cmd === 'createLink') {
+          var url = window.prompt('Enter URL');
+          if (url) document.execCommand(cmd, false, url);
+        } else {
+          document.execCommand(cmd, false, null);
+        }
+        syncEditorToTextarea();
+        $e.focus();
+      });
+      // If description was prefilled before editor setup, mirror it.
+      if (($d.val() || '').trim() !== '' && ($e.html() || '').trim() === '') {
+        $e.html($d.val());
+      }
+      syncEditorToTextarea();
+    } else {
+      $d.on('input', function () { $c.text(String(($d.val() || '').length)); });
+      $c.text(String(($d.val() || '').length));
+    }
   }());
 
   // ── URL slug ─────────────────────────────────────────────────────
@@ -646,7 +677,34 @@ $(function () {
       $sel.append($('<option>').val(c).text(c));
     });
     $sel.append('<option value="other">Other (type below)</option>');
-    if (current) { $sel.val(current); }
+    if (current) {
+      $sel.val(current);
+      // Auto-cascade: load states (and then cities) for the pre-selected country
+      if (current !== 'other') {
+        var $block = $sel.closest('.mci-branch-block');
+        if ($block.length) { mciLoadStatesAndCities($block, current); }
+      }
+    }
+  }
+
+  function mciLoadStatesAndCities($branchBlock, country) {
+    var $stateSel = $branchBlock.find('.mci-state-select');
+    $stateSel.empty().append('<option value="">Loading\u2026</option>');
+    fetch('/api/v1/locations/states?country=' + encodeURIComponent(country))
+      .then(function (r) { return r.ok ? r.json() : { states: [] }; })
+      .then(function (data) {
+        var states = data.states || [];
+        $stateSel.empty().append('<option value="">Select state</option>');
+        states.forEach(function (s) {
+          $stateSel.append($('<option>').val(s).text(s));
+        });
+        $stateSel.append('<option value="other">Other (type below)</option>');
+        // Auto-cascade into cities with no state filter
+        mciLoadCities($branchBlock, country, '');
+      })
+      .catch(function () {
+        $stateSel.empty().append('<option value="">Select state</option>');
+      });
   }
 
   function mciLoadStates($branchBlock, country) {
@@ -656,14 +714,48 @@ $(function () {
       .then(function (r) { return r.ok ? r.json() : { states: [] }; })
       .then(function (data) {
         var states = data.states || [];
-        $stateSel.empty().append('<option value="">Select or type below</option>');
+        $stateSel.empty().append('<option value="">Select state</option>');
         states.forEach(function (s) {
           $stateSel.append($('<option>').val(s).text(s));
         });
         $stateSel.append('<option value="other">Other (type below)</option>');
+        // Reset city when states reload
+        $branchBlock.find('.mci-city-select').empty()
+          .append('<option value="">Select state first</option>');
+        $branchBlock.find('.mci-city-other').addClass('d-none').val('');
+        $branchBlock.find('input[name="city[]"]').val('');
       })
       .catch(function () {
-        $stateSel.empty().append('<option value="">Select or type below</option>');
+        $stateSel.empty().append('<option value="">Select state</option>');
+      });
+  }
+
+  function mciLoadCities($branchBlock, country, state) {
+    var $citySel    = $branchBlock.find('.mci-city-select');
+    var $cityOther  = $branchBlock.find('.mci-city-other');
+    var $cityHidden = $branchBlock.find('input[name="city[]"]');
+    $citySel.empty().append('<option value="">Loading\u2026</option>');
+    var url = '/api/v1/locations/cities?country=' + encodeURIComponent(country);
+    if (state && state !== 'other') { url += '&state=' + encodeURIComponent(state); }
+    fetch(url)
+      .then(function (r) { return r.ok ? r.json() : { cities: [] }; })
+      .then(function (data) {
+        var cities = data.cities || [];
+        $citySel.empty().append('<option value="">Select city</option>');
+        cities.forEach(function (c) {
+          $citySel.append($('<option>').val(c).text(c));
+        });
+        $citySel.append('<option value="other">Other (type below)</option>');
+        if (cities.length === 0) {
+          $citySel.val('other');
+          $cityOther.removeClass('d-none');
+          $cityHidden.val('');
+        }
+      })
+      .catch(function () {
+        $citySel.empty()
+          .append('<option value="">Select city</option>')
+          .append('<option value="other">Other (type below)</option>');
       });
   }
 
@@ -681,54 +773,91 @@ $(function () {
       var $countryHidden = $b.find('input[name="country[]"]');
       var countryVal = $countrySel.val();
       if (countryVal === 'other' || countryVal === '') {
-        var typed = $countryOther.val().trim();
-        $countryHidden.val(typed !== '' ? typed : 'India');
+        $countryHidden.val($countryOther.val().trim() || 'India');
       } else {
         $countryHidden.val(countryVal || 'India');
       }
 
       // State
-      var $stateSel   = $b.find('.mci-state-select');
-      var $stateInput = $b.find('input[name="state[]"]');
-      var stateSelVal = $stateSel.val();
+      var $stateSel    = $b.find('.mci-state-select');
+      var $stateOther  = $b.find('input[name="state_other[]"]');
+      var $stateHidden = $b.find('input[name="state[]"]');
+      var stateSelVal  = $stateSel.val();
       if (stateSelVal && stateSelVal !== 'other') {
-        $stateInput.val(stateSelVal);
+        $stateHidden.val(stateSelVal);
+      } else {
+        $stateHidden.val($stateOther.val().trim());
       }
-      // If "other" or empty, leave $stateInput as whatever the user typed
+
+      // City
+      var $citySel    = $b.find('.mci-city-select');
+      var $cityOther  = $b.find('.mci-city-other');
+      var $cityHidden = $b.find('input[name="city[]"]');
+      var citySelVal  = $citySel.val();
+      if (citySelVal && citySelVal !== 'other') {
+        $cityHidden.val(citySelVal);
+      } else {
+        $cityHidden.val($cityOther.val().trim());
+      }
     });
   }
 
-  // Wire country→state cascade on country select change
+  // Wire country → state cascade
   $(document).on('change', '.mci-country-select', function () {
-    var $sel = $(this);
+    var $sel   = $(this);
     var $block = $sel.closest('.mci-branch-block');
     var $countryOther = $block.find('input[name="country_other[]"]');
     var val = $sel.val();
-
+    // Reset state + city
+    $block.find('.mci-state-select').empty().append('<option value="">Select country first</option>');
+    $block.find('input[name="state_other[]"]').addClass('d-none').val('');
+    $block.find('input[name="state[]"]').val('');
+    $block.find('.mci-city-select').empty().append('<option value="">Select state first</option>');
+    $block.find('.mci-city-other').addClass('d-none').val('');
+    $block.find('input[name="city[]"]').val('');
     if (val === 'other') {
       $countryOther.removeClass('d-none');
-      $block.find('.mci-state-select').empty()
-        .append('<option value="">Select or type below</option>');
     } else {
       $countryOther.addClass('d-none').val('');
       if (val) { mciLoadStates($block, val); }
     }
   });
 
-  // Wire state select → state text input sync
+  // Wire state → city cascade
   $(document).on('change', '.mci-state-select', function () {
-    var $sel = $(this);
-    var $block = $sel.closest('.mci-branch-block');
-    var $stateInput = $block.find('input[name="state[]"]');
+    var $sel    = $(this);
+    var $block  = $sel.closest('.mci-branch-block');
+    var $stateOther = $block.find('input[name="state_other[]"]');
     var val = $sel.val();
     if (val && val !== 'other') {
-      $stateInput.val(val);
+      $stateOther.addClass('d-none').val('');
+      var country = $block.find('input[name="country[]"]').val() || 'India';
+      mciLoadCities($block, country, val);
     } else if (val === 'other') {
-      $stateInput.val('').focus();
+      $stateOther.removeClass('d-none').focus();
+      $block.find('.mci-city-select').empty().append('<option value="">Select state first</option>');
+      $block.find('.mci-city-other').addClass('d-none').val('');
+      $block.find('input[name="city[]"]').val('');
     }
   });
 
-  // Load countries on page load
+  // Wire city select → reveal "other" input
+  $(document).on('change', '.mci-city-select', function () {
+    var $sel    = $(this);
+    var $block  = $sel.closest('.mci-branch-block');
+    var $cityOther  = $block.find('.mci-city-other');
+    var $cityHidden = $block.find('input[name="city[]"]');
+    var val = $sel.val();
+    if (val && val !== 'other') {
+      $cityOther.addClass('d-none').val('');
+      $cityHidden.val(val);
+    } else if (val === 'other') {
+      $cityOther.removeClass('d-none').focus();
+      $cityHidden.val('');
+    }
+  });
+
+  // Load countries on page load — cascade to states + cities is handled inside mciPopulateCountrySelect
   mciLoadCountries();
 
   // ── Multi-branch: add / remove ────────────────────────────────────
@@ -897,6 +1026,9 @@ $(function () {
         tag_names:        mciTagNamesPayload(),
         price_range:      $('#price_range').val() || '',
         video_url:        $('#video_url').val().trim(),
+        page_title:       $('#seo_page_title').val().trim(),
+        meta_description: $('#seo_meta_description').val().trim(),
+        meta_keywords:    $('#seo_meta_keywords').val().trim(),
         logo_path:        '',   // deferred — set via PATCH after create
         profile_path:     '',   // deferred — set via PATCH after create
         banner_path:      ''    // deferred — set via PATCH after create
@@ -951,13 +1083,19 @@ $(function () {
     .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
     .then(function (res) {
       if (!res.ok || !res.data.ok) {
-        var msg = (res.data && res.data.error) ? res.data.error : 'Submission failed. Please try again.';
+        var msg = 'Submission failed.';
+        if (res.data && res.data.detail) {
+          msg = res.data.detail;
+        } else if (res.data && res.data.error) {
+          msg = res.data.error;
+        }
         alert(msg);
         resetBtn();
         return;
       }
 
       var groupId    = res.data.id;
+      var imageUploadToken = res.data.image_upload_token || '';
       var productIds = res.data.product_ids || [];   // insertion-order UUIDs
       var serviceIds = res.data.service_ids || [];
 
@@ -1022,6 +1160,7 @@ $(function () {
         var fd = new FormData();
         fd.append('type', entry.type);
         fd.append('business_id', groupId);
+        if (imageUploadToken) fd.append('image_upload_token', imageUploadToken);
         if (entry.subtype) fd.append('subtype', entry.subtype);
         fd.append('file', entry.file, slotKey + '.jpg');
 
@@ -1067,6 +1206,7 @@ $(function () {
         if (galleryPaths.length)  patchBody.gallery_paths  = galleryPaths;
         if (productImages.length) patchBody.product_images = productImages;
         if (serviceImages.length) patchBody.service_images = serviceImages;
+        if (imageUploadToken) patchBody.image_upload_token = imageUploadToken;
 
         // Clear pending map before redirect so beforeunload doesn't fire
         pendingUploads.clear();

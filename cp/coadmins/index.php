@@ -13,9 +13,7 @@ $cpActive = 'coadmins';
 $hideCta = true;
 $appArea = 'cp';
 
-$extraHead = <<<'HTML'
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-HTML;
+$extraHead = '';
 
 $extraJS = <<<'HTML'
 <script>

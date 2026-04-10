@@ -30,17 +30,33 @@ $pendingListings = [];
 try {
     $pdo = api_db();
 
-    $r = $pdo->query("SELECT COUNT(*) FROM mci_users WHERE role = 'subscriber' AND deleted_at IS NULL");
-    $stats['subscribers'] = (int) ($r ? $r->fetchColumn() : 0);
+    // Keep each metric isolated so one failing query doesn't blank the dashboard.
+    try {
+        $r = $pdo->query("
+            SELECT COUNT(*)
+            FROM mci_users u
+            INNER JOIN mci_roles r ON r.id = u.role_id
+            WHERE r.short_name = 'subscriber'
+              AND u.deleted_at IS NULL
+              AND u.status <> 'deleted'
+        ");
+        $stats['subscribers'] = (int) ($r ? $r->fetchColumn() : 0);
+    } catch (Throwable $ignored) {}
 
-    $r = $pdo->query("SELECT COUNT(*) FROM mci_business_groups");
-    $stats['total'] = (int) ($r ? $r->fetchColumn() : 0);
+    try {
+        $r = $pdo->query("SELECT COUNT(*) FROM mci_business_groups WHERE status <> 'deleted'");
+        $stats['total'] = (int) ($r ? $r->fetchColumn() : 0);
+    } catch (Throwable $ignored) {}
 
-    $r = $pdo->query("SELECT COUNT(*) FROM mci_business_groups WHERE status = 'draft'");
-    $stats['pending'] = (int) ($r ? $r->fetchColumn() : 0);
+    try {
+        $r = $pdo->query("SELECT COUNT(*) FROM mci_business_groups WHERE status = 'draft'");
+        $stats['pending'] = (int) ($r ? $r->fetchColumn() : 0);
+    } catch (Throwable $ignored) {}
 
-    $r = $pdo->query("SELECT COUNT(*) FROM mci_error_log WHERE created_at >= NOW() - INTERVAL 1 DAY");
-    $stats['errors_today'] = (int) ($r ? $r->fetchColumn() : 0);
+    try {
+        $r = $pdo->query("SELECT COUNT(*) FROM mci_error_log WHERE created_at >= NOW() - INTERVAL 1 DAY");
+        $stats['errors_today'] = (int) ($r ? $r->fetchColumn() : 0);
+    } catch (Throwable $ignored) {}
 
     // Recent pending listings for quick moderation
     $stmt = $pdo->query(
@@ -76,7 +92,7 @@ ob_start();
       </div>
     </div>
 
-    <?php if (($GET['notice'] ?? '') === 'forbidden'): ?>
+    <?php if (($_GET['notice'] ?? '') === 'forbidden'): ?>
       <div class="alert alert-warning py-2 small mb-3" role="status">That page is only available to super admins.</div>
     <?php endif; ?>
 
@@ -84,7 +100,7 @@ ob_start();
     <div class="row g-3 mb-4">
 
       <div class="col-6 col-md-3">
-        <a href="/cp/users/" class="text-decoration-none">
+        <a href="/cp/subscribers/" class="text-decoration-none">
           <div class="mci-stat-tile h-100">
             <div class="mci-stat-tile__icon text-primary"><i class="bi bi-people-fill" aria-hidden="true"></i></div>
             <div class="mci-stat-tile__value"><?= number_format($stats['subscribers']) ?></div>
@@ -94,7 +110,7 @@ ob_start();
       </div>
 
       <div class="col-6 col-md-3">
-        <a href="/cp/listings/" class="text-decoration-none">
+        <a href="/cp/listings/all/" class="text-decoration-none">
           <div class="mci-stat-tile h-100">
             <div class="mci-stat-tile__icon" style="color:var(--mci-color-primary-deep);"><i class="bi bi-collection-fill" aria-hidden="true"></i></div>
             <div class="mci-stat-tile__value"><?= number_format($stats['total']) ?></div>
@@ -104,7 +120,7 @@ ob_start();
       </div>
 
       <div class="col-6 col-md-3">
-        <a href="/cp/listings/?status=draft" class="text-decoration-none">
+        <a href="/cp/listings/awaiting-approval/" class="text-decoration-none">
           <div class="mci-stat-tile h-100 <?= $stats['pending'] > 0 ? 'mci-stat-tile--warn' : '' ?>">
             <div class="mci-stat-tile__icon text-warning"><i class="bi bi-hourglass-split" aria-hidden="true"></i></div>
             <div class="mci-stat-tile__value <?= $stats['pending'] > 0 ? 'text-warning' : '' ?>"><?= $stats['pending'] ?></div>
@@ -142,7 +158,7 @@ ob_start();
       <a href="/cp/anonymous-business/" class="btn btn-sm btn-outline-primary">
         <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>Add business
       </a>
-      <a href="/cp/listings/?status=draft" class="btn btn-sm btn-outline-warning">
+      <a href="/cp/listings/awaiting-approval/" class="btn btn-sm btn-outline-warning">
         <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>Review pending
       </a>
       <a href="/cp/categories/" class="btn btn-sm btn-outline-secondary">
@@ -160,7 +176,7 @@ ob_start();
       <div class="card-body p-4">
         <div class="d-flex align-items-center justify-content-between mb-3">
           <div class="fw-semibold">Pending business listings</div>
-          <a href="/cp/listings/?status=draft" class="btn btn-sm btn-outline-secondary">
+          <a href="/cp/listings/awaiting-approval/" class="btn btn-sm btn-outline-secondary">
             View all <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
           </a>
         </div>
@@ -195,7 +211,7 @@ ob_start();
                       <?= htmlspecialchars(date('F j, Y \a\t g:i:s A', strtotime((string) $r['created_at']))) ?>
                     </td>
                     <td>
-                      <a href="/cp/listings/?status=draft" class="btn btn-sm btn-outline-dark py-0">
+                      <a href="/cp/listings/awaiting-approval/?review=<?= rawurlencode((string) $r['id']) ?>" class="btn btn-sm btn-outline-dark py-0">
                         <i class="bi bi-eye me-1" aria-hidden="true"></i>Review
                       </a>
                     </td>

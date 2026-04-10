@@ -1,6 +1,19 @@
 RewriteEngine On
 
 # ------------------------------------------------------------
+# OAuth social login callbacks
+# ------------------------------------------------------------
+RewriteRule ^auth/google/callback/?$ auth/google/callback/index.php [L,QSA]
+RewriteRule ^auth/facebook/callback/?$ auth/facebook/callback/index.php [L,QSA]
+
+# OAuth initiation redirects (handled by PHP pages)
+RewriteRule ^auth/google/?$ auth/google/index.php [L,QSA]
+RewriteRule ^auth/facebook/?$ auth/facebook/index.php [L,QSA]
+
+# Common browser request fallback.
+RewriteRule ^favicon\.ico$ assets/images/logo.png [L]
+
+# ------------------------------------------------------------
 # API routing: /api/v1/* -> api/v1/index.php
 # ------------------------------------------------------------
 RewriteRule ^api/v1/?(.*)$ api/v1/index.php [L,QSA]
@@ -84,8 +97,10 @@ RewriteRule ^subscriber/listing-delete\.php$ /subscriber/listing-delete/ [R=301,
 
 RewriteCond %{THE_REQUEST} \s/+cp/dashboard\.php[\s?] [NC]
 RewriteRule ^cp/dashboard\.php$ /cp/dashboard/ [R=301,L]
+RewriteCond %{THE_REQUEST} \s/+cp/users/?[\s?] [NC]
+RewriteRule ^cp/users/?$ /cp/subscribers/ [R=301,L]
 RewriteCond %{THE_REQUEST} \s/+cp/users\.php[\s?] [NC]
-RewriteRule ^cp/users\.php$ /cp/users/ [R=301,L]
+RewriteRule ^cp/users\.php$ /cp/subscribers/ [R=301,L]
 RewriteCond %{THE_REQUEST} \s/+cp/listings\.php[\s?] [NC]
 RewriteRule ^cp/listings\.php$ /cp/listings/ [R=301,L]
 RewriteCond %{THE_REQUEST} \s/+cp/anonymous-approvals\.php[\s?] [NC]
@@ -141,6 +156,7 @@ RewriteRule ^subscriber/logout/?$ subscriber/logout/index.php [L,QSA]
 RewriteRule ^subscriber/listing-delete/?$ subscriber/listing-delete/index.php [L,QSA]
 
 RewriteRule ^cp/dashboard/?$ cp/dashboard/index.php [L,QSA]
+RewriteRule ^cp/subscribers/?$ cp/users/index.php [L,QSA]
 RewriteRule ^cp/users/?$ cp/users/index.php [L,QSA]
 RewriteRule ^cp/listings/?$ cp/listings/index.php [L,QSA]
 RewriteRule ^cp/anonymous-approvals/?$ cp/anonymous-approvals/index.php [L,QSA]

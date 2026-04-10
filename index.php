@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/includes/mci_paths.php';
 require_once __DIR__ . '/includes/mci_category_icons.php';
 require_once __DIR__ . '/api/v1/lib/db.php';
 require_once __DIR__ . '/api/v1/lib/business_service.php';
@@ -8,6 +9,8 @@ require_once __DIR__ . '/api/v1/lib/business_service.php';
 $pageTitle = 'Explore Your City - My City Info'; // updated below once city is known
 $activePage = 'home';
 $metaDescription = 'Discover local businesses, services, restaurants, and hidden gems in your city. My City Info is your local discovery platform.';
+$canonicalUrl    = mci_site_base_url() . '/';
+$ogImage         = mci_site_base_url() . '/assets/images/og-default.png';
 
 $slugify = static function (string $value): string {
     $value = strtolower(trim($value));
@@ -78,7 +81,7 @@ function mci_listing_row_to_card(array $row): array {
                           ? $row['logo_path']
                           : (!empty($row['banner_path'])
                               ? $row['banner_path']
-                              : 'https://picsum.photos/seed/mci-' . ($row['slug'] ?? 'biz') . '/800/520'),
+                              : mci_listing_placeholder_url()),
         'price_range' => $row['price_range'] ?? null,
     ];
 }
@@ -94,21 +97,22 @@ if ($activeCity !== '') {
 }
 
 // ── Load recent + popular listings from DB ────────────────────────────────────
-$recentListings  = [];
-$popularListings = [];
+$recentListings     = [];
+$establishedListings = [];
 
 try {
     $cityFilter  = $activeCity !== '' ? ['city' => $activeCity] : [];
     $recentRows  = [];
-    $popularRows = [];
+    $establishedRows = [];
 
     if ($pdo instanceof PDO) {
         $recentRows  = api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'newest'])['businesses'] ?? [];
-        $popularRows = api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'oldest'])['businesses'] ?? [];
+        // Oldest-first adds variety vs “recent”; not a popularity metric — copy matches this.
+        $establishedRows = api_business_list_public($pdo, $cityFilter + ['per_page' => 8, 'sort' => 'oldest'])['businesses'] ?? [];
     }
 
     foreach ($recentRows  as $row) { $recentListings[]  = mci_listing_row_to_card($row); }
-    foreach ($popularRows as $row) { $popularListings[] = mci_listing_row_to_card($row); }
+    foreach ($establishedRows as $row) { $establishedListings[] = mci_listing_row_to_card($row); }
 } catch (Throwable $ignored) {
     // Graceful degradation — sections will render empty
 }
@@ -130,18 +134,14 @@ ob_start();
           <span class="home-stat-pill">📍 City-wide</span>
           <span class="home-stat-pill">🆓 List for free</span>
         </div>
-        <h1
-          class="display-5 fw-bold mb-3 lh-sm home-hero-title"
-          aria-live="polite"
-          aria-atomic="true"
-        >
+        <h1 class="display-5 fw-bold mb-3 lh-sm home-hero-title">
           <span class="home-hero-explore-line">
             <span class="home-hero-explore-prefix">Explore</span>
             <span id="heroCityName" class="home-hero-city-name home-hero-highlight"><?= $activeCity !== '' ? htmlspecialchars($activeCity) : 'your city' ?></span>
           </span>
         </h1>
         <p class="lead text-white-50 mb-4 mb-lg-5 home-hero-lead home-hero-tagline">
-          Let’s uncover the best places, business and services in
+          Let’s uncover the best places, businesses and services in
           <span id="heroTaglineCity" class="text-white fw-semibold"><?= $activeCity !== '' ? htmlspecialchars($activeCity) : 'your city' ?></span>.
         </p>
 
@@ -154,13 +154,16 @@ ob_start();
       <div class="col-12 col-lg-6 text-center text-lg-end">
         <div class="position-relative d-inline-block">
           <img
-            src="https://picsum.photos/seed/mci-hero-city/640/420"
+            src="/assets/images/hero-illustration.svg"
             alt=""
             class="img-fluid rounded-4 shadow-lg border border-light border-opacity-25 home-hero-image"
+            width="640"
+            height="420"
             loading="eager"
           />
-          <div class="position-absolute bottom-0 start-0 m-2 m-md-3 px-2 px-md-3 py-2 rounded-3 small fw-semibold text-dark bg-white bg-opacity-90 shadow home-hero-badge">
-            🗺️ Discover nearby
+          <div class="position-absolute bottom-0 start-0 m-2 m-md-3 px-2 px-md-3 py-2 rounded-3 small fw-semibold text-dark bg-white bg-opacity-90 shadow home-hero-badge d-inline-flex align-items-center gap-1">
+            <i class="bi bi-map" aria-hidden="true"></i>
+            <span id="homeHeroBadgeLabel"><?= $activeCity !== '' ? 'Discover ' . htmlspecialchars($activeCity, ENT_QUOTES, 'UTF-8') : 'Discover nearby' ?></span>
           </div>
         </div>
       </div>
@@ -194,21 +197,21 @@ ob_start();
   <section class="row g-3 mb-5">
     <div class="col-12 col-md-4">
       <div class="bg-white rounded-4 border p-4 h-100 shadow-sm">
-        <div class="fs-3 mb-2">📋</div>
+        <div class="fs-3 mb-2 text-primary" aria-hidden="true"><i class="bi bi-card-checklist"></i></div>
         <div class="fw-bold mb-1">List or claim</div>
         <div class="text-muted small mb-0">List your business or claim an existing page.</div>
       </div>
     </div>
     <div class="col-12 col-md-4">
       <div class="bg-white rounded-4 border p-4 h-100 shadow-sm">
-        <div class="fs-3 mb-2">🎯</div>
+        <div class="fs-3 mb-2 text-primary" aria-hidden="true"><i class="bi bi-geo-alt"></i></div>
         <div class="fw-bold mb-1">Reach locals</div>
         <div class="text-muted small mb-0">Show up when people search your city.</div>
       </div>
     </div>
     <div class="col-12 col-md-4">
       <div class="bg-white rounded-4 border p-4 h-100 shadow-sm">
-        <div class="fs-3 mb-2">💬</div>
+        <div class="fs-3 mb-2 text-primary" aria-hidden="true"><i class="bi bi-chat-dots"></i></div>
         <div class="fw-bold mb-1">Get enquiries</div>
         <div class="text-muted small mb-0">Let customers contact you from your listing.</div>
       </div>
@@ -232,7 +235,7 @@ ob_start();
     <div class="row g-2 g-md-3">
       <?php if (empty($categories)): ?>
         <div class="col-12">
-          <p class="text-muted small">Categories are being set up — <a href="/cp/categories/">add some in the control panel</a>.</p>
+          <p class="text-muted small mb-0">Categories will appear here once they are published on the directory.</p>
         </div>
       <?php else: ?>
         <?php foreach ($categories as $cat): ?>
@@ -253,7 +256,7 @@ ob_start();
       <div class="flex-grow-1 min-w-0">
         <div class="home-section-accent mb-2"></div>
         <h2 class="home-section-title h3 mb-1">Recent listings</h2>
-        <p class="text-muted small mb-0">Newly added businesses - name, category, and full address at a glance</p>
+        <p class="text-muted small mb-0">Newly added businesses — name, category, and area at a glance</p>
       </div>
       <a class="btn btn-home-primary btn-sm text-center mci-touch-target mci-touch-target--sm" href="/submit-business-listing/">+ List your business</a>
     </div>
@@ -265,22 +268,22 @@ ob_start();
     </div>
   </section>
 
-  <!-- Popular in [city] -->
+  <!-- Established listings (oldest first — complements “recent” above) -->
   <section class="mb-2">
     <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end justify-content-sm-between gap-3 mb-4">
       <div class="flex-grow-1 min-w-0">
         <div class="home-section-accent mb-2"></div>
         <h2 class="home-section-title h3 mb-1">
-          Popular in
+          Established in
           <span id="homePopularCity" class="home-popular-city-name"><?= $activeCity !== '' ? htmlspecialchars($activeCity) : 'your city' ?></span>
         </h2>
-        <p class="text-muted small mb-0">Highly viewed listings near you - updated when we detect your area</p>
+        <p class="text-muted small mb-0">Businesses that joined the directory earlier — a different slice than new listings above</p>
       </div>
       <a href="/business-listing/" class="btn btn-home-outline btn-sm align-self-stretch align-self-sm-auto text-center mci-touch-target mci-touch-target--sm">See all in directory →</a>
     </div>
 
     <div class="row g-3 g-lg-4">
-      <?php foreach ($popularListings as $listing): ?>
+      <?php foreach ($establishedListings as $listing): ?>
         <?php $variant = 'home'; include __DIR__ . '/views/components/listing-card.php'; ?>
       <?php endforeach; ?>
     </div>

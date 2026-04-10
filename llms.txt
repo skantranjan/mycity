@@ -1,0 +1,22 @@
+# My City Info
+
+My City Info is a free, community-first local business directory for Indian cities.
+It helps residents discover trusted businesses, services, restaurants, and local places
+in their city. Business owners can submit and claim listings at no cost.
+
+## Key pages
+- Homepage: https://www.mycityinfo.com/
+- Browse all listings: https://www.mycityinfo.com/business-listing/
+- Browse by category: https://www.mycityinfo.com/business-category/
+- About: https://www.mycityinfo.com/about/
+
+## Data
+Listings include: business name, category, address, city, phone, description, FAQs,
+tags, reviews, and opening hours. All listings are moderated before going live.
+
+## Audience
+People in India looking for local businesses and services.
+Business owners who want free online visibility.
+
+## Contact
+https://www.mycityinfo.com/contact/

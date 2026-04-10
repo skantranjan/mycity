@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../includes/mci_paths.php';
 require_once __DIR__ . '/../includes/mci_category_icons.php';
 require_once __DIR__ . '/../api/v1/lib/db.php';
 require_once __DIR__ . '/../api/v1/lib/business_service.php';
@@ -89,7 +90,7 @@ try {
                               ? $row['logo_path']
                               : (!empty($row['banner_path'])
                                   ? $row['banner_path']
-                                  : 'https://picsum.photos/seed/mci-' . ($row['slug'] ?? 'biz') . '/480/320'),
+                                  : mci_listing_placeholder_url()),
             'price_range' => $row['price_range'] ?? null,
         ];
     };

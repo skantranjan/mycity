@@ -198,3 +198,10 @@
     scrollbar-color: var(--mci-border, #e2e8f0) transparent;
   }
 }
+
+/* Infinite scroll: sentinel for IntersectionObserver (prefetch before viewport bottom) */
+.mci-infinite-sentinel {
+  width: 100%;
+  height: 1px;
+  margin-top: 0.25rem;
+}

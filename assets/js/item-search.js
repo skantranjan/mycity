@@ -7,6 +7,8 @@
 (function () {
   'use strict';
 
+  var MCI_LOGO_PLACEHOLDER = '/assets/images/business-logo-placeholder.svg';
+
   // ── Quick-view modal ──────────────────────────────────────────────────────
   var modal    = document.getElementById('mciItemModal');
   var modalImg = document.getElementById('mciModalImg');
@@ -47,17 +49,12 @@
     // Business panel
     var bizSlug = d.bizSlug || '';
     var bizUrl  = bizSlug ? '/business/' + bizSlug + '/' : '#';
-    var bizLogoPath = d.bizLogo || '';
+    var bizLogoPath = d.bizLogo || MCI_LOGO_PLACEHOLDER;
 
     if (modalBizLogoImg) {
-      if (bizLogoPath) {
-        modalBizLogoImg.src = bizLogoPath;
-        modalBizLogoImg.style.display = '';
-        if (modalBizLogo) modalBizLogo.style.fontSize = '0';
-      } else {
-        modalBizLogoImg.style.display = 'none';
-        if (modalBizLogo) modalBizLogo.style.fontSize = '';
-      }
+      modalBizLogoImg.src = bizLogoPath;
+      modalBizLogoImg.style.display = '';
+      if (modalBizLogo) modalBizLogo.style.fontSize = '0';
     }
 
     if (modalBizName) modalBizName.textContent = d.bizName || '';
@@ -309,9 +306,8 @@
         ? '<div class="mci-item-card__price">' + esc(priceStr) + '</div>'
         : '';
 
-      var bizLogoHtml = item.business_logo
-        ? '<img src="' + esc(item.business_logo) + '" alt="" loading="lazy" />'
-        : '<i class="bi bi-shop" aria-hidden="true"></i>';
+      var bizLogoSrc = item.business_logo || MCI_LOGO_PLACEHOLDER;
+      var bizLogoHtml = '<img src="' + esc(bizLogoSrc) + '" alt="" loading="lazy" />';
 
       var cityHtml = item.city
         ? '<span class="mci-item-card__city">📍 ' + esc(item.city) + '</span>'
