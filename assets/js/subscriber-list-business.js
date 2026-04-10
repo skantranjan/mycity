@@ -10,6 +10,97 @@ $(function () {
   var currentStep = 1;
   var submitContext = (window._mciSubmitContext || 'guest').toString();
   var submitRedirect = (window._mciSubmitRedirect || '/').toString();
+  /** Per-image cap (must match API / schema). */
+  var MCI_MAX_BUSINESS_IMAGE_BYTES = 2 * 1024 * 1024;
+  var MCI_MAX_IMAGE_EDGE = 1920;
+
+  function mciImageToolsHint() {
+    return ' Each file must be under 2\u00a0MB. You can resize or compress images using a free browser tool such as Oneyfy (\u201cImage tools\u201d): https://oneyfy.com/tools/?category=image-tools';
+  }
+
+  /**
+   * Downscale and JPEG-encode a browser File to fit MCI_MAX_BUSINESS_IMAGE_BYTES.
+   * @param {File|Blob} file
+   * @param {function(Error|null, Blob|null)} done
+   */
+  function mciCompressImageFile(file, done) {
+    var u = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(u);
+      var w = img.naturalWidth;
+      var h = img.naturalHeight;
+      if (!w || !h) {
+        done(new Error('bad_image'), null);
+        return;
+      }
+      var long = Math.max(w, h);
+      var scale = long > MCI_MAX_IMAGE_EDGE ? MCI_MAX_IMAGE_EDGE / long : 1;
+      var tw = Math.max(1, Math.round(w * scale));
+      var th = Math.max(1, Math.round(h * scale));
+      var canvas = document.createElement('canvas');
+      canvas.width = tw;
+      canvas.height = th;
+      var ctx = canvas.getContext('2d');
+      if (!ctx) {
+        done(new Error('no_canvas'), null);
+        return;
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, tw, th);
+      ctx.drawImage(img, 0, 0, tw, th);
+
+      var quality = 0.9;
+      var minQ = 0.52;
+      var edge = MCI_MAX_IMAGE_EDGE;
+      var minEdge = 560;
+      var guard = 0;
+
+      function step() {
+        if (guard++ > 40) {
+          done(new Error('too_large'), null);
+          return;
+        }
+        canvas.toBlob(function (blob) {
+          if (!blob) {
+            done(new Error('encode'), null);
+            return;
+          }
+          if (blob.size <= MCI_MAX_BUSINESS_IMAGE_BYTES) {
+            done(null, blob);
+            return;
+          }
+          if (quality > minQ) {
+            quality -= 0.07;
+            step();
+            return;
+          }
+          if (edge > minEdge) {
+            edge = Math.max(minEdge, Math.round(edge * 0.88));
+            var origLong = Math.max(w, h);
+            var sc = Math.min(1, edge / origLong);
+            tw = Math.max(1, Math.round(w * sc));
+            th = Math.max(1, Math.round(h * sc));
+            canvas.width = tw;
+            canvas.height = th;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, tw, th);
+            ctx.drawImage(img, 0, 0, tw, th);
+            quality = 0.88;
+            step();
+            return;
+          }
+          done(new Error('too_large'), null);
+        }, 'image/jpeg', quality);
+      }
+      step();
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(u);
+      done(new Error('load'), null);
+    };
+    img.src = u;
+  }
 
   // ── Context banner (Step 7) ──────────────────────────────────────
   var BANNER_CFG = {
@@ -557,25 +648,39 @@ $(function () {
     var outH = isSquare ? 600 : Math.round(1280 / cropTarget.aspect);
     var canvas = cropperInstance.getCroppedCanvas({ width: outW, height: outH, imageSmoothingQuality: 'high' });
     var type = cropTarget.type || 'logo';
+    var ct = cropTarget;
 
-    canvas.toBlob(function (blob) {
-      // Store in slot map — upload happens at submit time
-      pendingUploads.set(type, { file: blob, type: type });
-
-      // Show local preview (no server call)
-      var dataUrl = canvas.toDataURL('image/jpeg', 0.88);
-      var $preview = cropTarget.$tile.find('.mci-img-upload-tile__preview').first();
+    function applyCroppedPreview(finalBlob, dataUrl) {
+      pendingUploads.set(type, { file: finalBlob, type: type });
+      var $preview = ct.$tile.find('.mci-img-upload-tile__preview').first();
       $preview.find('.mci-img-upload-tile__placeholder').hide();
       $preview.find('.mci-img-tile-result').remove();
       $('<img class="mci-img-tile-result" alt="preview" />').attr('src', dataUrl).appendTo($preview);
-      cropTarget.$tile.addClass('has-image');
-      cropTarget.hiddenInput.value = '';  // clear any stale server path
-      if (cropTarget.isLogo) {
+      ct.$tile.addClass('has-image');
+      ct.hiddenInput.value = '';
+      if (ct.isLogo) {
         $('#previewPhotoImg').attr('src', dataUrl).removeClass('d-none');
         $('#previewPhotoPlaceholder').addClass('d-none');
       }
+      cropModal.hide();
+    }
+
+    canvas.toBlob(function (blob) {
+      if (!blob) return;
+      if (blob.size <= MCI_MAX_BUSINESS_IMAGE_BYTES) {
+        applyCroppedPreview(blob, canvas.toDataURL('image/jpeg', 0.88));
+        return;
+      }
+      mciCompressImageFile(blob, function (err, out) {
+        if (err || !out) {
+          alert('Could not compress this image enough for upload (2\u00a0MB max per file).' + mciImageToolsHint());
+          return;
+        }
+        var r = new FileReader();
+        r.onload = function () { applyCroppedPreview(out, r.result); };
+        r.readAsDataURL(out);
+      });
     }, 'image/jpeg', 0.88);
-    cropModal.hide();
   });
 
   // ── Item image upload (products / services) ──────────────────────
@@ -591,13 +696,19 @@ $(function () {
     var $label  = $row.find('.mci-item-img-name');
     var isProduct = $row.closest('#productItems').length > 0;
     var subtype   = isProduct ? 'products' : 'services';
-    // Key by current DOM index — will be remapped to server UUID after create
     var domIndex  = $row.closest('#productItems, #serviceItems').find('.mci-item-row').index($row);
     var slotKey   = (isProduct ? 'product_' : 'service_') + domIndex;
-    pendingUploads.set(slotKey, { file: file, type: 'item_image', subtype: subtype });
-    $input.val('');
-    $label.text(file.name);
-    this.value = '';
+    var inputEl = this;
+    mciCompressImageFile(file, function (err, blob) {
+      inputEl.value = '';
+      if (err || !blob) {
+        alert('Could not prepare this image for upload (2\u00a0MB max per file).' + mciImageToolsHint());
+        return;
+      }
+      pendingUploads.set(slotKey, { file: blob, type: 'item_image', subtype: subtype });
+      $input.val('');
+      $label.text(file.name);
+    });
   });
 
   // ── Gallery drop zone ─────────────────────────────────────────────
@@ -607,31 +718,58 @@ $(function () {
 
   function uploadGalleryFiles(files) {
     if (!files || !files.length) return;
-    // Clear any previous gallery slots
     Array.from(pendingUploads.keys()).filter(function (k) {
       return k.startsWith('gallery_');
     }).forEach(function (k) { pendingUploads.delete(k); });
 
     preview.innerHTML = '';
-    for (var i = 0; i < Math.min(files.length, 12); i++) {
-      (function (f, idx) {
-        if (!f.type || !f.type.startsWith('image/')) return;
-        pendingUploads.set('gallery_' + idx, { file: f, type: 'gallery' });
-        // Show local preview
-        var url = URL.createObjectURL(f);
+    var max = Math.min(files.length, 12);
+    var galleryIdx = 0;
+    var fileIx = 0;
+    var warned = false;
+
+    function galleryFailMsg() {
+      if (warned) return;
+      warned = true;
+      alert('One or more gallery images could not be compressed under 2\u00a0MB per file.' + mciImageToolsHint());
+    }
+
+    function processNextGalleryFile() {
+      if (fileIx >= max) {
+        $('#galleryPathsHidden').val('');
+        return;
+      }
+      var f = files[fileIx];
+      fileIx++;
+      if (!f.type || !f.type.startsWith('image/')) {
+        processNextGalleryFile();
+        return;
+      }
+      mciCompressImageFile(f, function (err, blob) {
+        if (err || !blob) {
+          galleryFailMsg();
+          processNextGalleryFile();
+          return;
+        }
+        var idx = galleryIdx;
+        galleryIdx++;
+        pendingUploads.set('gallery_' + idx, { file: blob, type: 'gallery' });
+        var url = URL.createObjectURL(blob);
         var wrap = document.createElement('div');
         wrap.className = 'mci-photo-thumb';
         var img = document.createElement('img');
-        img.src = url; img.alt = f.name;
+        img.src = url;
+        img.alt = f.name;
         wrap.appendChild(img);
         preview.appendChild(wrap);
         if (idx === 0) {
           $('#previewPhotoImg').attr('src', url).attr('alt', f.name).removeClass('d-none');
           $('#previewPhotoPlaceholder').addClass('d-none');
         }
-      })(files[i], i);
+        processNextGalleryFile();
+      });
     }
-    $('#galleryPathsHidden').val('');  // clear hidden field — paths set via PATCH after submit
+    processNextGalleryFile();
   }
 
   if (dropArea && fileInput) {
@@ -1165,14 +1303,22 @@ $(function () {
         fd.append('file', entry.file, slotKey + '.jpg');
 
         fetch('/api/v1/upload/image', { method: 'POST', credentials: 'include', body: fd })
-          .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
-          .then(function (data) {
-            if (data.path) collectedPaths[slotKey] = data.path;
+          .then(function (r) {
+            return r.text().then(function (t) {
+              var d = {};
+              try { d = t ? JSON.parse(t) : {}; } catch (e) { /* ignore */ }
+              return { ok: r.ok, status: r.status, data: d };
+            });
+          })
+          .then(function (res) {
+            if (res.ok && res.data.path) collectedPaths[slotKey] = res.data.path;
+            else if (res.status === 413 || (res.data && res.data.error === 'file_too_large')) {
+              alert('An image was rejected: max 2\u00a0MB per file.' + mciImageToolsHint());
+            }
             uploaded++;
             uploadNext(idx + 1);
           })
           .catch(function () {
-            // Non-fatal: skip failed upload, continue with rest
             uploaded++;
             uploadNext(idx + 1);
           });

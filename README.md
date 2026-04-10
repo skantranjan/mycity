@@ -50,6 +50,21 @@ Keep that terminal open while you work. Stop the server with **Ctrl+C**.
   - `business/index.php` renders “Nearby” in the right sidebar below favorites.
   - `views/components/listing-card.php` supports a `compact` variant for sidebar usage.
 
+### XML sitemap (dynamic, SEO)
+- **Entry URL:** `/sitemap.xml` (rewritten to `sitemap/index.php` in Apache; mirrored in `router.php` for `php -S`).
+- **Content:** Static public URLs (home, listings, categories index, products/services indexes, tag index, legal pages) plus rows from the database:
+  - Live businesses: `/business/{slug}/`
+  - Top-level categories that have at least one live listing: `/business-category/{slug}/`
+  - Tags attached to at least one live business: `/tag/{slug}/`
+  - Parent category slugs that have active products (live businesses): `/products/{slug}/`
+  - Parent category slugs that have active services (live businesses): `/services/{slug}/`
+- **50,000 URL limit (sitemaps.org):** If the total URL count is **≤ 50,000**, `/sitemap.xml` is a single `<urlset>`. If **> 50,000**, `/sitemap.xml` is a `<sitemapindex>` that references:
+  - `/sitemap-pages-{n}.xml` — static + taxonomy URLs, chunked at 50,000 per file.
+  - `/sitemap-businesses-{n}.xml` — live business URLs, chunked at 50,000 per file (ordered by slug, `LIMIT`/`OFFSET`).
+- **Subfolder installs:** Sitemap `loc` values and the layout `<link rel="sitemap">` honor **`MCI_BASE_PATH`** via `mci_app_web_base_path()` / `mci_web_path()` in `includes/mci_paths.php`.
+- **Discovery:** `robots.txt` should list your canonical `Sitemap:` URL (see repo `robots.txt` for the production example).
+- **Caching:** Sitemap responses use a short public cache header (`max-age=1800`); adjust in `sitemap/index.php` if needed.
+
 ## Post-login experiences (Subscriber + CP)
 
 ### Themed app shell (subscriber & control panel)
@@ -126,7 +141,10 @@ Keep that terminal open while you work. Stop the server with **Ctrl+C**.
 - `subscriber/enquiries/index.php` — enquiries list + reply + status filter.
 - `subscriber/reviews/index.php` — comments/ratings reply + status filter.
 - `subscriber/listing-delete/index.php` — 2-step delete confirmation.
-- `.htaccess` — pretty URLs and legacy `*.php` rewrites to `*/index.php`.
+- `.htaccess` — pretty URLs and legacy `*.php` rewrites to `*/index.php`; `sitemap.xml` and `sitemap-pages-*.xml` / `sitemap-businesses-*.xml` → `sitemap/index.php`.
+- `router.php` — dev-server routing (includes the same sitemap patterns as `.htaccess`).
+- `sitemap/index.php` — dynamic XML sitemap / sitemap index with optional chunk files.
+- `includes/mci_paths.php` — `mci_web_path()`, `mci_site_base_url()`, `mci_app_web_base_path()`, etc.
 - `includes/mci_app_profile.php` — session-backed profile avatar/name for header dropdown.
 
 ## Notes / assumptions

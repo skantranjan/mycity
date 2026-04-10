@@ -66,6 +66,7 @@ try {
 }
 
 $extraHead = <<<'HTML'
+<link rel="preload" as="image" href="/assets/images/hero-illustration.svg" fetchpriority="high" />
 <link rel="stylesheet" href="/assets/css/home.css" />
 HTML;
 
@@ -155,11 +156,13 @@ ob_start();
         <div class="position-relative d-inline-block">
           <img
             src="/assets/images/hero-illustration.svg"
-            alt=""
+            alt="Local discovery — stylised city map and buildings illustration for My City Info"
             class="img-fluid rounded-4 shadow-lg border border-light border-opacity-25 home-hero-image"
             width="640"
             height="420"
             loading="eager"
+            fetchpriority="high"
+            decoding="async"
           />
           <div class="position-absolute bottom-0 start-0 m-2 m-md-3 px-2 px-md-3 py-2 rounded-3 small fw-semibold text-dark bg-white bg-opacity-90 shadow home-hero-badge d-inline-flex align-items-center gap-1">
             <i class="bi bi-map" aria-hidden="true"></i>
@@ -286,6 +289,52 @@ ob_start();
       <?php foreach ($establishedListings as $listing): ?>
         <?php $variant = 'home'; include __DIR__ . '/views/components/listing-card.php'; ?>
       <?php endforeach; ?>
+    </div>
+  </section>
+
+  <!-- Substantive crawlable copy: directory purpose, how to use it, and for business owners -->
+  <section class="mb-5" aria-labelledby="homeEditorialHeading">
+    <div class="rounded-4 border bg-white p-4 p-md-5 shadow-sm">
+      <h2 id="homeEditorialHeading" class="h4 fw-bold mb-3 text-dark">Find local businesses across India</h2>
+      <div class="text-body-secondary lh-lg">
+        <p class="mb-3">
+          My City Info is a free online business directory for people who want to discover
+          <strong class="text-dark">trusted local services</strong>, shops, restaurants, gyms, clinics,
+          and skilled professionals in their own city or neighbourhood. Instead of piecing together hints from
+          scattered social posts, you can search by <strong class="text-dark">what you need</strong> and
+          <strong class="text-dark">where you are</strong>, then browse listings organised by category and location.
+        </p>
+        <p class="mb-3">
+          Each listing is meant to show the essentials—business name, category, city or area, and practical ways to
+          get in touch—so you can compare options and decide who to call or visit. You can
+          <a href="/business-category/">explore all categories</a>, choose a segment from the grid above, or open the
+          <a href="/business-listing/">full listings index</a> when you want to combine keywords, filters, and place names
+          in one view.
+        </p>
+        <p class="mb-3">
+          New businesses join the directory regularly. We also surface listings that have been in the index longer,
+          because many customers still rely on <strong class="text-dark">established local names</strong> they heard about
+          from friends, neighbours, or colleagues. Seeing both helps you spot new openings and familiar options in the
+          same visit.
+        </p>
+        <p class="mb-3">
+          <strong class="text-dark">If you own or manage a business</strong>, adding or claiming your listing helps you
+          show up when nearby buyers are already looking for your type of product or service. It is free to create a page;
+          you can describe what you offer, clarify your location, and make enquiries easier without sending people through
+          outdated snippets on other sites. Accurate phone numbers, addresses, and categories mean fewer missed calls and
+          wrong directions—especially for walk-in retail and trades that serve a local area.
+        </p>
+        <p class="mb-3">
+          You can also start from dedicated hubs such as our <a href="/products/">products</a> and
+          <a href="/services/">services</a> sections when you want a narrower entry point before you refine by city or
+          search terms.
+        </p>
+        <p class="mb-0">
+          Whether you are planning a meal out, comparing tutors, booking home repairs, or sourcing a supplier, use the
+          search and categories above, then explore live listings. Read more on our <a href="/about/">about</a> page; when
+          you are ready to be discovered, use <a href="/submit-business-listing/">list your business</a> to get started.
+        </p>
+      </div>
     </div>
   </section>
 </div>

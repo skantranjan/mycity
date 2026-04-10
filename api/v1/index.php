@@ -991,16 +991,16 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'upload' && ($segments[1] ?? 
     if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
         $uploadErr = $_FILES['file']['error'] ?? -1;
         if ($uploadErr === UPLOAD_ERR_INI_SIZE || $uploadErr === UPLOAD_ERR_FORM_SIZE) {
-            api_error('file_too_large', 413);
+            api_error('file_too_large', 413, ['max_bytes' => 2 * 1024 * 1024]);
         }
         api_error('file_required', 400);
     }
     $file     = $_FILES['file'];
     $tmpPath  = (string)$file['tmp_name'];
     $origName = (string)($file['name'] ?? '');
-    $maxBytes = 2 * 1024 * 1024; // 2 MB
+    $maxBytes = 2 * 1024 * 1024; // 2 MB per image (schema / business listing cap)
     if ($file['size'] > $maxBytes) {
-        api_error('file_too_large', 413);
+        api_error('file_too_large', 413, ['max_bytes' => $maxBytes]);
     }
     $mime = mime_content_type($tmpPath);
     $allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -1034,10 +1034,23 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'upload' && ($segments[1] ?? 
         mkdir($dir, 0755, true);
     }
     require_once __DIR__ . '/lib/uuid.php';
-    $filename = api_uuid_v4() . '.' . $ext;
-    $dest     = $dir . '/' . $filename;
-    if (!move_uploaded_file($tmpPath, $dest)) {
-        api_error('upload_failed', 500);
+    require_once __DIR__ . '/lib/mci_upload_image_process.php';
+    $uuidBase = api_uuid_v4();
+    $maxEdge  = 1920;
+    $optimized = mci_business_upload_optimize($tmpPath, $mime, $dir, $uuidBase, $maxBytes, $maxEdge);
+    if ($optimized !== null) {
+        $filename = $optimized;
+    } else {
+        $filename = $uuidBase . '.' . $ext;
+        $dest     = $dir . '/' . $filename;
+        if (!move_uploaded_file($tmpPath, $dest)) {
+            api_error('upload_failed', 500);
+        }
+        $finalSize = @filesize($dest);
+        if ($finalSize === false || $finalSize > $maxBytes) {
+            @unlink($dest);
+            api_error('file_too_large', 413, ['max_bytes' => $maxBytes]);
+        }
     }
     $path = $pathBase . '/' . $filename;
     api_json(['ok' => true, 'path' => $path]);
