@@ -421,7 +421,14 @@
 }
 
 @media (min-width: 576px) and (max-width: 991.98px) {
+  .home-hero { padding: 2.5rem 1.75rem 2rem; }
   .home-hero-image { max-height: 240px; }
+  .home-search-card { padding: 1.15rem !important; }
+  .home-hero-cta-row .btn-home-cta-primary,
+  .home-hero-cta-row .btn-home-cta-secondary {
+    min-height: 3rem;
+    padding: 0.75rem 1.25rem;
+  }
 }
 @media (min-width: 1200px) {
   .home-hero-image { max-height: 300px; }

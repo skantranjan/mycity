@@ -49,7 +49,7 @@ ob_start();
         <div class="fw-semibold fs-5">Dashboard</div>
         <div class="text-muted small">Overview of your listing activity.</div>
       </div>
-      <div class="d-flex gap-2 flex-wrap">
+      <div class="mci-responsive-actions">
         <a class="btn btn-sm btn-outline-dark" href="/subscriber/listings/">
           <i class="bi bi-shop-window me-1" aria-hidden="true"></i>My listings
         </a>

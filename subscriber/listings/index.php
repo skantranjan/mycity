@@ -127,8 +127,7 @@ ob_start();
   position: fixed;
   top: 0;
   right: 0;
-  width: 42%;
-  min-width: 340px;
+  width: min(680px, 92vw);
   max-width: 680px;
   height: 100dvh;
   background: #fff;
@@ -165,6 +164,9 @@ ob_start();
 }
 @media (max-width: 767px) {
   #subReviewPanel { width: 100%; max-width: 100%; }
+  #subReviewPanelBody { padding: 1rem; }
+  #subReviewPanelFoot .btn { flex: 1 1 100%; min-height: 2.75rem; }
+  #subReviewPanelCloseBtn { order: 3; }
 }
 .sub-review-section-head {
   font-size: .7rem;

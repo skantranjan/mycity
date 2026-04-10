@@ -5,6 +5,15 @@
   padding-bottom: 2.5rem;
 }
 
+@media (max-width: 991.98px) {
+  .mci-auth-split {
+    gap: 1rem;
+  }
+  .mci-auth-benefits {
+    padding: 1.25rem 1rem;
+  }
+}
+
 @media (min-width: 992px) {
   .mci-auth-split {
     padding-top: 2.5rem;
@@ -165,6 +174,12 @@
 .mci-auth-form-card .form-control:focus {
   border-color: var(--mci-color-primary-dark, #7c3aed);
   box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+}
+
+@media (max-width: 575.98px) {
+  .mci-auth-form-card .card-body {
+    padding: 1.2rem 1rem;
+  }
 }
 
 /* ─── Dark mode — auth page surfaces ───────────────────── */

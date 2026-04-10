@@ -44,8 +44,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2.5rem;
-  min-height: 2.25rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   padding: 0.35rem 0.55rem;
   border: 0 !important;
   border-right: 1px solid var(--mci-border, #e2e8f0) !important;
@@ -154,6 +154,16 @@
 
 .mci-listing-card__distance {
   color: var(--mci-color-primary-deep, #6d28d9) !important;
+}
+
+@media (max-width: 767.98px) {
+  .mci-listing-row-card {
+    border-radius: var(--mci-radius-md, 0.75rem);
+  }
+  .mci-listing-row-img-wrap,
+  .mci-listing-row-img {
+    min-height: 6.25rem;
+  }
 }
 
 /* ─── "List your business" CTA button ───────────────── */
