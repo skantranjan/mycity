@@ -4,6 +4,7 @@ declare(strict_types=1);
 $statusFilter = null;
 $roleFilter   = null;
 $pageBase     = '/cp/listings/';
+$cpListingsSkipTableFetch = true;
 
 require_once __DIR__ . '/_load.php';
 
@@ -38,6 +39,7 @@ ob_start();
         <?php
           $showStatus = true;
           $showRole   = true;
+          $cpListingsClientMode = true;
           include __DIR__ . '/../../views/partials/cp-listings-table.php';
         ?>
       </div>

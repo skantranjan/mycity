@@ -423,8 +423,13 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') =
         $role = null;
     }
     $includeDeleted = isset($_GET['include_deleted']) && ($_GET['include_deleted'] === '1' || $_GET['include_deleted'] === 'true');
+    $sort = trim((string) ($_GET['sort'] ?? 'created_at'));
+    $sortDir = trim((string) ($_GET['sort_dir'] ?? 'desc'));
+    if ($sortDir !== 'asc' && $sortDir !== 'desc') {
+        $sortDir = 'desc';
+    }
 
-    $res = mci_cp_users_list($pdo, $page, $perPage, $q, $role, $includeDeleted);
+    $res = mci_cp_users_list($pdo, $page, $perPage, $q, $role, $includeDeleted, $sort, $sortDir);
     if (!$res['ok']) {
         api_error($res['error'], $res['status'] ?? 500);
     }
@@ -434,6 +439,8 @@ if ($method === 'GET' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') =
         'total' => $res['total'],
         'page' => $res['page'],
         'per_page' => $res['per_page'],
+        'sort' => $res['sort'],
+        'sort_dir' => $res['sort_dir'],
     ]);
 }
 
@@ -474,6 +481,20 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') 
     }
 
     api_error('invalid_action', 400);
+}
+
+// Super-admin: invalidate public site cache (listings, home snapshots, public API read models)
+if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'cache' && ($segments[2] ?? '') === 'clear-public' && !isset($segments[3])) {
+    api_require_auth(['super_admin']);
+    require_once __DIR__ . '/lib/business_service.php';
+    $cacheEnabled = mci_cache_enabled();
+    api_business_invalidate_public_directory_cache();
+    $version = mci_cache_public_version();
+    api_json([
+        'ok' => true,
+        'cache_enabled' => $cacheEnabled,
+        'public_directory_version' => $version,
+    ]);
 }
 
 // Categories CRUD (hierarchical: parent_id NULL = root; subcategories only under roots)
@@ -1436,6 +1457,10 @@ if (($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'businesses') {
     // GET /api/v1/cp/businesses
     if ($method === 'GET' && !isset($segments[2])) {
         $qp = $_GET;
+        $sortDir = trim((string)($qp['sort_dir'] ?? 'desc'));
+        if ($sortDir !== 'asc' && $sortDir !== 'desc') {
+            $sortDir = 'desc';
+        }
         $filters = [
             'status'        => $qp['status']       ?? null,
             'added_by_role' => $qp['role']          ?? null,
@@ -1443,6 +1468,8 @@ if (($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'businesses') {
             'q'             => $qp['q']             ?? null,
             'page'          => (int)($qp['page']    ?? 1),
             'per_page'      => (int)($qp['per_page'] ?? 25),
+            'sort'          => trim((string)($qp['sort'] ?? 'created_at')),
+            'sort_dir'      => $sortDir,
         ];
         api_json(api_business_list_cp($pdo, $filters));
     }
