@@ -1,0 +1,11 @@
+{
+    "name": "mycityinfo/mycity",
+    "description": "My City Info application",
+    "require": {
+        "php": ">=8.1",
+        "phpmailer/phpmailer": "^6.9"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

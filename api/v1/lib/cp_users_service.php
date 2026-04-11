@@ -6,6 +6,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/uuid.php';
 require_once __DIR__ . '/ip.php';
 require_once __DIR__ . '/business_service.php';
+require_once __DIR__ . '/mci_mailer.php';
 
 /**
  * @return array{ok:true, count:int}|array{ok:false, error:string, status:int}
@@ -184,6 +185,8 @@ function mci_cp_users_create(PDO $pdo, array $data): array
         return ['ok' => false, 'error' => 'create_failed', 'status' => 500];
     }
 
+    mci_mail_send_account_invited($email, $displayName !== '' ? $displayName : null, $roleShort);
+
     return ['ok' => true, 'id' => $userId];
 }
 
@@ -234,10 +237,12 @@ function mci_cp_users_update(PDO $pdo, string $actorUserId, array $data): array
         }
     }
 
+    $passwordWillChange = false;
     if ($password !== null && $password !== '') {
         if (strlen($password) < 8) {
             return ['ok' => false, 'error' => 'password_too_short', 'status' => 400];
         }
+        $passwordWillChange = true;
     }
 
     if ($roleShort !== null && $roleShort !== '') {
@@ -304,6 +309,16 @@ function mci_cp_users_update(PDO $pdo, string $actorUserId, array $data): array
         $pdo->prepare($sql)->execute($params);
     } catch (Throwable $e) {
         return ['ok' => false, 'error' => 'update_failed', 'status' => 500];
+    }
+
+    if ($passwordWillChange) {
+        $emStmt = $pdo->prepare('SELECT email FROM mci_users WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+        $emStmt->execute([$id]);
+        $emRow = $emStmt->fetch();
+        $acctEmail = is_array($emRow) && isset($emRow['email']) ? (string) $emRow['email'] : '';
+        if ($acctEmail !== '') {
+            mci_mail_send_password_changed($acctEmail, 'admin');
+        }
     }
 
     return ['ok' => true];
