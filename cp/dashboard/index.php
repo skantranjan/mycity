@@ -15,6 +15,65 @@ $hideCta = true;
 $appArea = 'cp';
 $cpRole  = (string) ($_SESSION['mci_cp_role'] ?? 'co_admin');
 
+$extraJS = '';
+if ($cpRole === 'super_admin') {
+    $extraJS = <<<'HTML'
+<script>
+(function () {
+  var btn = document.getElementById('mciCpClearPublicCacheBtn');
+  var st = document.getElementById('mciCpClearPublicCacheStatus');
+  if (!btn) return;
+  var api = typeof window.mciApiUrl === 'function' ? window.mciApiUrl : function (p) { return '/api/v1' + p; };
+  btn.addEventListener('click', function () {
+    if (!window.confirm('Clear cached public listings, categories, tags, and home page data? Visitors will see fresh data on the next request.')) return;
+    btn.disabled = true;
+    if (st) {
+      st.textContent = 'Working…';
+      st.className = 'small text-muted ms-2';
+    }
+    fetch(api('/cp/cache/clear-public'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    })
+      .then(function (r) {
+        return r.text().then(function (t) {
+          var j;
+          try {
+            j = JSON.parse(t);
+          } catch (e) {
+            throw new Error(t || 'Invalid response');
+          }
+          if (!r.ok) throw new Error(String(j.error || j.message || 'Request failed'));
+          return j;
+        });
+      })
+      .then(function (d) {
+        if (!st) return;
+        if (d.cache_enabled === false) {
+          st.textContent = 'Caching is disabled (MCI_CACHE_DISABLE); nothing to invalidate.';
+          st.className = 'small text-warning ms-2';
+        } else {
+          st.textContent = 'Public cache cleared (version ' + (d.public_directory_version != null ? d.public_directory_version : '—') + ').';
+          st.className = 'small text-success ms-2';
+        }
+      })
+      .catch(function (e) {
+        if (st) {
+          st.textContent = e.message || 'Failed';
+          st.className = 'small text-danger ms-2';
+        }
+      })
+      .finally(function () {
+        btn.disabled = false;
+      });
+  });
+})();
+</script>
+HTML;
+}
+
 require_once __DIR__ . '/../../api/v1/lib/db.php';
 
 // ── Stats from DB ─────────────────────────────────────────
@@ -170,6 +229,28 @@ ob_start();
         </a>
       <?php endif; ?>
     </div>
+
+    <?php if ($cpRole === 'super_admin'): ?>
+    <div class="card border-0 shadow-sm mb-4" id="mciCpPublicCacheCard">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-start gap-3 flex-wrap">
+          <div class="text-secondary" style="font-size:1.5rem;" aria-hidden="true"><i class="bi bi-arrow-clockwise"></i></div>
+          <div class="flex-grow-1" style="min-width:220px;">
+            <div class="fw-semibold mb-1">Public site cache</div>
+            <p class="text-muted small mb-3 mb-md-0">
+              Bumps the cache version for visitor-facing listings, category/tag API responses, and home page snapshots (APCu or <code class="small">storage/cache/app</code>). Use after bulk data fixes or if the public site looks out of date.
+            </p>
+          </div>
+          <div class="d-flex flex-column align-items-stretch align-items-md-end gap-2">
+            <button type="button" class="btn btn-sm btn-outline-dark" id="mciCpClearPublicCacheBtn">
+              <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Clear public cache
+            </button>
+            <span class="small text-muted" id="mciCpClearPublicCacheStatus" aria-live="polite"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <?php endif; ?>
 
     <!-- ── Pending listings queue ───────────────────────── -->
     <div class="card border-0 shadow-sm">

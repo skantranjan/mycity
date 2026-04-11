@@ -40,16 +40,25 @@ if ($q !== '') {
     $dbFilters['q'] = $q;
 }
 
-try {
-    $result = api_business_list_cp(api_db(), $dbFilters);
-    $rows   = $result['businesses'] ?? [];
-    $total  = $result['total'] ?? 0;
-    $pages  = $result['pages'] ?? 1;
-} catch (Throwable $e) {
-    $rows  = [];
-    $total = 0;
-    $pages = 1;
-    $flash = 'error:Could not load listings: ' . $e->getMessage();
+$cpListingsSkipTableFetch = $cpListingsSkipTableFetch ?? false;
+
+if (!empty($cpListingsSkipTableFetch)) {
+    $rows    = [];
+    $total   = 0;
+    $pages   = 1;
+    $curPage = 1;
+} else {
+    try {
+        $result = api_business_list_cp(api_db(), $dbFilters);
+        $rows   = $result['businesses'] ?? [];
+        $total  = $result['total'] ?? 0;
+        $pages  = $result['pages'] ?? 1;
+    } catch (Throwable $e) {
+        $rows  = [];
+        $total = 0;
+        $pages = 1;
+        $flash = 'error:Could not load listings: ' . $e->getMessage();
+    }
 }
 
 // ── Badge counts for the sidebar sub-nav ─────────────────

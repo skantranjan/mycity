@@ -29,7 +29,10 @@ function mci_cp_count_active_super_admins(PDO $pdo): array
 }
 
 /**
- * @return array{ok:true, users: array<int, array>, total: int, page: int, per_page: int}|array{ok:false, error:string, status:int}
+ * @param 'created_at' $sortBy  Whitelisted sort field (API may extend later).
+ * @param 'asc'|'desc' $sortDir
+ *
+ * @return array{ok:true, users: array<int, array>, total: int, page: int, per_page: int, sort: string, sort_dir: string}|array{ok:false, error:string, status:int}
  */
 function mci_cp_users_list(
     PDO $pdo,
@@ -37,11 +40,18 @@ function mci_cp_users_list(
     int $perPage,
     ?string $q,
     ?string $roleShort,
-    bool $includeDeleted
+    bool $includeDeleted,
+    string $sortBy = 'created_at',
+    string $sortDir = 'desc'
 ): array {
     $perPage = max(1, min(100, $perPage));
     $page = max(1, $page);
     $offset = ($page - 1) * $perPage;
+
+    if ($sortBy !== 'created_at') {
+        $sortBy = 'created_at';
+    }
+    $orderDir = strtoupper($sortDir) === 'ASC' ? 'ASC' : 'DESC';
 
     $where = ['1=1'];
     $params = [];
@@ -82,7 +92,7 @@ function mci_cp_users_list(
             FROM mci_users u
             JOIN mci_roles r ON r.id = u.role_id
             WHERE {$whereSql}
-            ORDER BY u.created_at DESC
+            ORDER BY u.created_at {$orderDir}
             LIMIT {$perPage} OFFSET {$offset}
         ";
         $stmt = $pdo->prepare($sql);
@@ -112,6 +122,8 @@ function mci_cp_users_list(
             'total' => $total,
             'page' => $page,
             'per_page' => $perPage,
+            'sort' => $sortBy,
+            'sort_dir' => strtolower($orderDir),
         ];
     } catch (Throwable $e) {
         return ['ok' => false, 'error' => 'server_error', 'status' => 500];

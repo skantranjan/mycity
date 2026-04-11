@@ -23,7 +23,20 @@ $extraJS = <<<'HTML'
   var API = (typeof window.mciApiUrl === 'function' ? window.mciApiUrl : function (p) { return '/api/v1' + p; })('/cp/users');
   var currentUserId = document.getElementById('mciCpUsersCurrentId').textContent.trim();
 
-  var state = { page: 1, perPage: 15, q: '', includeDeleted: false, last: null };
+  var state = {
+    perPage: 25,
+    q: '',
+    includeDeleted: false,
+    sort: 'created_at',
+    sortDir: 'desc',
+    nextPage: 1,
+    loading: false,
+    exhausted: true,
+    total: 0,
+    displayedCount: 0,
+    last: null
+  };
+  var listRequestGen = 0;
 
   function el(id) { return document.getElementById(id); }
 
@@ -58,79 +71,202 @@ $extraJS = <<<'HTML'
     });
   }
 
-  function loadUsers() {
+  function listQuery(pageNum) {
     var qs = new URLSearchParams();
-    qs.set('page', String(state.page));
+    qs.set('page', String(pageNum));
     qs.set('per_page', String(state.perPage));
     if (state.q) qs.set('q', state.q);
     qs.set('role', 'subscriber');
     if (state.includeDeleted) qs.set('include_deleted', '1');
-
-    return fetchJson(API + '?' + qs.toString(), { credentials: 'include' });
+    qs.set('sort', state.sort);
+    qs.set('sort_dir', state.sortDir);
+    return qs.toString();
   }
 
-  function maxPage() {
-    var d = state.last;
-    if (!d || !d.total) return 1;
-    var pp = d.per_page || state.perPage;
-    return Math.max(1, Math.ceil(d.total / pp));
+  function fetchPage(pageNum) {
+    return fetchJson(API + '?' + listQuery(pageNum), { credentials: 'include' });
   }
 
-  function renderTable(data) {
+  function updateSortUi() {
+    var btn = el('mciCpUsersSortCreated');
+    var ic = el('mciCpUsersSortCreatedIcon');
+    if (btn) {
+      btn.setAttribute('aria-sort', state.sortDir === 'desc' ? 'descending' : 'ascending');
+    }
+    if (ic) {
+      ic.className = 'bi ' + (state.sortDir === 'desc' ? 'bi-sort-down' : 'bi-sort-up');
+    }
+  }
+
+  function updateMeta() {
+    var meta = el('mciCpUsersMeta');
+    if (!meta) return;
+    var sortPhrase = state.sortDir === 'desc' ? 'newest first' : 'oldest first';
+    var tail = '';
+    if (state.total > 0 && !state.exhausted) {
+      tail = ' · Scroll the list to load more';
+    } else if (state.total > 0 && state.exhausted && state.displayedCount >= state.total) {
+      tail = ' · End of list';
+    }
+    meta.textContent = 'Loaded ' + state.displayedCount + ' of ' + state.total + ' · Sorted by created (' + sortPhrase + ')' + tail;
+  }
+
+  function setSentinel(loading, text) {
+    var s = el('mciCpUsersSentinel');
+    if (!s) return;
+    s.className = 'py-2 text-center small text-muted border-top';
+    if (loading) {
+      s.textContent = 'Loading more…';
+      s.setAttribute('aria-busy', 'true');
+    } else {
+      s.textContent = text || '';
+      s.removeAttribute('aria-busy');
+    }
+  }
+
+  function clearSentinel() {
+    var s = el('mciCpUsersSentinel');
+    if (!s) return;
+    s.textContent = '';
+    s.removeAttribute('aria-busy');
+  }
+
+  function buildRow(u) {
+    var tr = document.createElement('tr');
+    if (u.deleted_at) tr.classList.add('table-secondary');
+
+    tr.innerHTML =
+      '<td class="small text-muted"><button type="button" class="btn btn-link btn-sm p-0 text-start mci-user-detail-link">' + escapeHtml(u.display_name || '—') + '</button></td>' +
+      '<td class="small text-muted">' + escapeHtml(u.email || '') + '</td>' +
+      '<td><span class="badge text-bg-light border">' + escapeHtml(u.status || '') + '</span></td>' +
+      '<td class="small text-muted">' + escapeHtml(u.phone || '—') + '</td>' +
+      '<td class="small text-muted text-nowrap">' + fmtDate(u.created_at) + '</td>' +
+      '<td class="text-end"></td>';
+
+    var tdAct = tr.querySelector('td:last-child');
+    tr.querySelector('.mci-user-detail-link').addEventListener('click', function () { openDetailPanel(u); });
+    var btnEdit = document.createElement('button');
+    btnEdit.type = 'button';
+    btnEdit.className = 'btn btn-sm btn-outline-secondary mci-icon-btn';
+    btnEdit.title = 'Edit';
+    btnEdit.innerHTML = '<i class="bi bi-pencil" aria-hidden="true"></i>';
+    btnEdit.disabled = !!u.deleted_at;
+    btnEdit.addEventListener('click', function () { openPanel('edit', u); });
+
+    var btnDel = document.createElement('button');
+    btnDel.type = 'button';
+    btnDel.className = 'btn btn-sm btn-outline-danger mci-icon-btn';
+    btnDel.title = (u.id === currentUserId) ? 'Cannot delete your own account' : 'Delete';
+    btnDel.innerHTML = '<i class="bi bi-trash" aria-hidden="true"></i>';
+    btnDel.disabled = !!u.deleted_at || (u.id === currentUserId);
+    btnDel.addEventListener('click', function () { confirmDelete(u); });
+
+    var wrap = document.createElement('div');
+    wrap.className = 'd-flex gap-1 justify-content-end';
+    wrap.appendChild(btnEdit);
+    wrap.appendChild(btnDel);
+    tdAct.appendChild(wrap);
+    return tr;
+  }
+
+  function applyFirstPage(data) {
     state.last = data;
     var tbody = el('mciCpUsersBody');
-    var meta = el('mciCpUsersMeta');
     if (!tbody) return;
 
+    state.total = (data && data.total) ? data.total : 0;
     var rows = (data && data.users) ? data.users : [];
-    var total = (data && data.total) ? data.total : 0;
-    if (meta) {
-      meta.textContent = 'Total: ' + total + ' — page ' + (data.page || 1) + ' of ' + Math.max(1, Math.ceil(total / (data.per_page || state.perPage)));
-    }
-
     tbody.innerHTML = '';
+    state.displayedCount = 0;
+    state.nextPage = 2;
+    clearSentinel();
+
     if (!rows.length) {
       tbody.innerHTML = '<tr><td colspan="6" class="text-muted small">No subscribers found.</td></tr>';
+      state.exhausted = true;
+      updateMeta();
       return;
     }
 
-    rows.forEach(function (u) {
-      var tr = document.createElement('tr');
-      if (u.deleted_at) tr.classList.add('table-secondary');
+    rows.forEach(function (u) { tbody.appendChild(buildRow(u)); });
+    state.displayedCount = rows.length;
+    state.exhausted = rows.length < state.perPage || state.displayedCount >= state.total;
+    updateSortUi();
+    updateMeta();
+  }
 
-      tr.innerHTML =
-        '<td class="small text-muted"><button type="button" class="btn btn-link btn-sm p-0 text-start mci-user-detail-link">' + escapeHtml(u.display_name || '—') + '</button></td>' +
-        '<td class="small text-muted">' + escapeHtml(u.email || '') + '</td>' +
-        '<td><span class="badge text-bg-light border">' + escapeHtml(u.status || '') + '</span></td>' +
-        '<td class="small text-muted">' + escapeHtml(u.phone || '—') + '</td>' +
-        '<td class="small text-muted text-nowrap">' + fmtDate(u.created_at) + '</td>' +
-        '<td class="text-end"></td>';
+  function appendPage(data) {
+    state.last = data;
+    var tbody = el('mciCpUsersBody');
+    if (!tbody) return;
 
-      var tdAct = tr.querySelector('td:last-child');
-      tr.querySelector('.mci-user-detail-link').addEventListener('click', function () { openDetailPanel(u); });
-      var btnEdit = document.createElement('button');
-      btnEdit.type = 'button';
-      btnEdit.className = 'btn btn-sm btn-outline-secondary mci-icon-btn';
-      btnEdit.title = 'Edit';
-      btnEdit.innerHTML = '<i class="bi bi-pencil" aria-hidden="true"></i>';
-      btnEdit.disabled = !!u.deleted_at;
-      btnEdit.addEventListener('click', function () { openPanel('edit', u); });
+    var rows = (data && data.users) ? data.users : [];
+    if (!rows.length) {
+      state.exhausted = true;
+      updateMeta();
+      return;
+    }
+    rows.forEach(function (u) { tbody.appendChild(buildRow(u)); });
+    state.displayedCount += rows.length;
+    state.exhausted = rows.length < state.perPage || state.displayedCount >= state.total;
+    updateMeta();
+  }
 
-      var btnDel = document.createElement('button');
-      btnDel.type = 'button';
-      btnDel.className = 'btn btn-sm btn-outline-danger mci-icon-btn';
-      btnDel.title = (u.id === currentUserId) ? 'Cannot delete your own account' : 'Delete';
-      btnDel.innerHTML = '<i class="bi bi-trash" aria-hidden="true"></i>';
-      btnDel.disabled = !!u.deleted_at || (u.id === currentUserId);
-      btnDel.addEventListener('click', function () { confirmDelete(u); });
+  function reloadList() {
+    var gen = ++listRequestGen;
+    state.loading = true;
+    state.exhausted = false;
+    state.nextPage = 1;
+    var tbody = el('mciCpUsersBody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-muted small">Loading…</td></tr>';
+    clearSentinel();
+    updateSortUi();
 
-      var wrap = document.createElement('div');
-      wrap.className = 'd-flex gap-1 justify-content-end';
-      wrap.appendChild(btnEdit);
-      wrap.appendChild(btnDel);
-      tdAct.appendChild(wrap);
-      tbody.appendChild(tr);
-    });
+    return fetchPage(1)
+      .then(function (data) {
+        if (gen !== listRequestGen) return;
+        applyFirstPage(data);
+      })
+      .catch(function (e) {
+        if (gen !== listRequestGen) return;
+        var tb = el('mciCpUsersBody');
+        if (tb) tb.innerHTML = '<tr><td colspan="6" class="text-muted small">Could not load subscribers.</td></tr>';
+        showToast(e.message || 'Failed to load users', true);
+      })
+      .finally(function () {
+        if (gen === listRequestGen) state.loading = false;
+      });
+  }
+
+  function loadMore() {
+    if (state.loading || state.exhausted || state.displayedCount >= state.total) {
+      if (state.displayedCount >= state.total) state.exhausted = true;
+      return Promise.resolve();
+    }
+    var gen = listRequestGen;
+    state.loading = true;
+    setSentinel(true);
+    var pageToLoad = state.nextPage;
+
+    return fetchPage(pageToLoad)
+      .then(function (data) {
+        if (gen !== listRequestGen) return;
+        appendPage(data);
+        state.nextPage = pageToLoad + 1;
+      })
+      .catch(function (e) {
+        if (gen !== listRequestGen) return;
+        showToast(e.message || 'Failed to load more', true);
+      })
+      .finally(function () {
+        if (gen !== listRequestGen) return;
+        state.loading = false;
+        if (state.exhausted) {
+          setSentinel(false, state.total > 0 && state.displayedCount >= state.total ? 'All subscribers loaded.' : '');
+        } else {
+          clearSentinel();
+        }
+      });
   }
 
   function escapeHtml(s) {
@@ -194,9 +330,8 @@ $extraJS = <<<'HTML'
     })
       .then(function () {
         showToast('User marked as deleted.', false);
-        return loadUsers();
+        return reloadList();
       })
-      .then(renderTable)
       .catch(function (e) { showToast(e.message || 'Failed', true); });
   }
 
@@ -225,10 +360,8 @@ $extraJS = <<<'HTML'
           var p = el('mciUserOffcanvas');
           var o = bootstrap.Offcanvas.getInstance(p);
           if (o) o.hide();
-          state.page = 1;
-          return loadUsers();
+          return reloadList();
         })
-        .then(renderTable)
         .catch(function (e) { showToast(e.message || 'Failed', true); });
       return;
     }
@@ -249,34 +382,42 @@ $extraJS = <<<'HTML'
         var p = el('mciUserOffcanvas');
         var o = bootstrap.Offcanvas.getInstance(p);
         if (o) o.hide();
-        return loadUsers();
+        return reloadList();
       })
-      .then(renderTable)
       .catch(function (e) { showToast(e.message || 'Failed', true); });
   }
 
   el('mciCpUsersSearchBtn').addEventListener('click', function () {
     state.q = el('mciCpUsersSearch').value.trim();
     state.includeDeleted = el('mciCpUsersIncludeDeleted').checked;
-    state.page = 1;
-    loadUsers().then(renderTable).catch(function (e) { showToast(e.message || 'Failed', true); });
+    reloadList();
   });
 
-  el('mciCpUsersPrev').addEventListener('click', function () {
-    if (state.page <= 1) return;
-    state.page--;
-    loadUsers().then(renderTable).catch(function (e) { state.page++; showToast(e.message || 'Failed', true); });
-  });
-  el('mciCpUsersNext').addEventListener('click', function () {
-    if (state.page >= maxPage()) return;
-    state.page++;
-    loadUsers().then(renderTable).catch(function (e) { state.page--; showToast(e.message || 'Failed', true); });
-  });
+  var sortCreatedBtn = el('mciCpUsersSortCreated');
+  if (sortCreatedBtn) {
+    sortCreatedBtn.addEventListener('click', function () {
+      state.sortDir = state.sortDir === 'desc' ? 'asc' : 'desc';
+      reloadList();
+    });
+  }
 
   el('mciCpUsersAddBtn').addEventListener('click', function () { openPanel('add', null); });
   el('mciUserForm').addEventListener('submit', saveUser);
 
-  loadUsers().then(renderTable).catch(function (e) { showToast(e.message || 'Failed to load users', true); });
+  var scrollRoot = el('mciCpUsersScroll');
+  var sentinel = el('mciCpUsersSentinel');
+  if (scrollRoot && sentinel && typeof IntersectionObserver !== 'undefined') {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        if (state.loading || state.exhausted || state.displayedCount >= state.total) return;
+        loadMore();
+      });
+    }, { root: scrollRoot, rootMargin: '100px', threshold: 0 });
+    io.observe(sentinel);
+  }
+
+  reloadList();
 })();
 </script>
 HTML;
@@ -321,27 +462,31 @@ ob_start();
 
         <div class="text-muted small mb-2" id="mciCpUsersMeta"></div>
 
-        <div class="table-responsive">
-          <table class="table table-sm table-bordered align-middle bg-white">
-            <thead class="table-light">
-              <tr>
-                <th style="min-width:140px;">Display name</th>
-                <th>Email</th>
-                <th style="width:80px;">Status</th>
-                <th style="width:120px;">Phone</th>
-                <th style="min-width:200px;">Created</th>
-                <th class="text-end" style="width:80px;">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="mciCpUsersBody">
-              <tr><td colspan="6" class="text-muted small">Loading…</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="d-flex justify-content-between align-items-center mt-2">
-          <button type="button" class="btn btn-sm btn-outline-secondary" id="mciCpUsersPrev">Previous</button>
-          <button type="button" class="btn btn-sm btn-outline-secondary" id="mciCpUsersNext">Next</button>
+        <div id="mciCpUsersScroll" class="border rounded bg-white" style="max-height:min(70vh,640px);overflow-y:auto;">
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle bg-white mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="min-width:140px;">Display name</th>
+                  <th>Email</th>
+                  <th style="width:80px;">Status</th>
+                  <th style="width:120px;">Phone</th>
+                  <th style="min-width:200px;">
+                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-body fw-semibold d-inline-flex align-items-center gap-1"
+                      id="mciCpUsersSortCreated" aria-sort="descending" title="Toggle sort by created date">
+                      Created
+                      <i class="bi bi-sort-down" id="mciCpUsersSortCreatedIcon" aria-hidden="true"></i>
+                    </button>
+                  </th>
+                  <th class="text-end" style="width:80px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="mciCpUsersBody">
+                <tr><td colspan="6" class="text-muted small">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="mciCpUsersSentinel" class="border-top py-2 text-center small text-muted" aria-live="polite"></div>
         </div>
       </div>
     </div>

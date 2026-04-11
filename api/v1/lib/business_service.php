@@ -425,9 +425,11 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
 function api_business_fetch(PDO $pdo, string $groupId): ?array
 {
     $stmt = $pdo->prepare('
-        SELECT g.*, c.name AS category_name, c.slug AS category_slug
+        SELECT g.*, c.name AS category_name, c.slug AS category_slug,
+               u.display_name AS added_by_display_name, u.email AS added_by_email
         FROM mci_business_groups g
         LEFT JOIN mci_categories c ON g.parent_category_id = c.id
+        LEFT JOIN mci_users u ON u.id = g.added_by_user_id AND u.deleted_at IS NULL
         WHERE g.id = ? AND g.status != \'deleted\'
         LIMIT 1
     ');
@@ -839,7 +841,7 @@ function api_business_update(PDO $pdo, string $groupId, array $data, string $act
 // ---------------------------------------------------------------------------
 
 /**
- * @param array{status?:string|null, added_by_role?:string|null, category_id?:int|null, q?:string|null, page?:int, per_page?:int} $filters
+ * @param array{status?:string|null, added_by_role?:string|null, category_id?:int|null, q?:string|null, page?:int, per_page?:int, sort?:string, sort_dir?:string} $filters
  */
 function api_business_list_cp(PDO $pdo, array $filters = []): array
 {
@@ -865,6 +867,12 @@ function api_business_list_cp(PDO $pdo, array $filters = []): array
         $params[] = $like;
     }
 
+    $sortBy = (string)($filters['sort'] ?? 'created_at');
+    if ($sortBy !== 'created_at') {
+        $sortBy = 'created_at';
+    }
+    $orderDir = strtoupper((string)($filters['sort_dir'] ?? 'desc')) === 'ASC' ? 'ASC' : 'DESC';
+
     $perPage = max(1, min(100, (int)($filters['per_page'] ?? 25)));
     $page    = max(1, (int)($filters['page'] ?? 1));
     $offset  = ($page - 1) * $perPage;
@@ -879,11 +887,14 @@ function api_business_list_cp(PDO $pdo, array $filters = []): array
         SELECT g.id, g.name, g.slug, g.status, g.added_by_role, g.added_by_user_id,
                g.logo_path, g.price_range, g.created_at,
                c.name AS category_name,
+               u.display_name AS added_by_display_name,
+               u.email AS added_by_email,
                (SELECT COUNT(*) FROM mci_business_branches WHERE business_group_id = g.id AND status != 'deleted') AS branch_count
         FROM mci_business_groups g
         LEFT JOIN mci_categories c ON g.parent_category_id = c.id
+        LEFT JOIN mci_users u ON u.id = g.added_by_user_id AND u.deleted_at IS NULL
         WHERE $whereStr
-        ORDER BY g.created_at DESC
+        ORDER BY g.created_at {$orderDir}
         LIMIT $perPage OFFSET $offset
     ");
     $stmt->execute($params);
@@ -895,6 +906,8 @@ function api_business_list_cp(PDO $pdo, array $filters = []): array
         'page'       => $page,
         'per_page'   => $perPage,
         'pages'      => (int)ceil($total / $perPage),
+        'sort'       => $sortBy,
+        'sort_dir'   => strtolower($orderDir),
     ];
 }
 

@@ -158,11 +158,8 @@ ob_start();
           <span class="home-stat-pill">📍 City-wide</span>
           <span class="home-stat-pill">🆓 List for free</span>
         </div>
-        <h1 class="fw-bold mb-2 lh-sm home-hero-title">
-          <span class="home-hero-explore-line">
-            <span class="home-hero-explore-prefix">Explore</span>
-            <span id="heroCityName" class="home-hero-city-name home-hero-highlight"><?= $activeCity !== '' ? htmlspecialchars($activeCity) : 'your city' ?></span>
-          </span>
+        <h1 class="fw-bold mb-2 home-hero-title">
+          <span class="home-hero-explore-line"><span class="home-hero-explore-prefix">Explore</span><span id="heroCityName" class="home-hero-city-name home-hero-highlight"><?= $activeCity !== '' ? htmlspecialchars($activeCity) : 'your city' ?></span></span>
         </h1>
         <p class="text-white-50 mb-2 mb-md-3 home-hero-lead home-hero-tagline">
           Top places, real businesses — zero guesswork in
@@ -170,24 +167,19 @@ ob_start();
         </p>
 
         <div class="home-search-card home-search-card--compact home-search-card--shine position-relative mci-z-content mb-0">
-          <form action="/business-listing/" method="get">
-            <div class="row g-2 align-items-end">
-              <div class="col-12 col-md">
-                <label class="form-label home-search-card__label" for="homeWhat">What</label>
-                <div class="home-search-field">
-                  <span class="home-search-field__icon" aria-hidden="true"><i class="bi bi-search"></i></span>
-                  <input id="homeWhat" class="form-control home-search-card__input home-search-card__input--icon" type="text" name="what" placeholder="Food, salon, hotel…" />
-                </div>
+          <form action="/business-listing/" method="get" class="home-search-form">
+            <div class="home-search-form__grid">
+              <label class="form-label home-search-card__label home-search-form__label-what" for="homeWhat">What</label>
+              <div class="home-search-field home-search-field--what">
+                <span class="home-search-field__icon" aria-hidden="true"><i class="bi bi-search"></i></span>
+                <input id="homeWhat" class="form-control home-search-card__input home-search-card__input--icon" type="text" name="what" placeholder="Food, salon, hotel…" />
               </div>
-              <div class="col-12 col-md">
-                <label class="form-label home-search-card__label" for="homeWhere">Where</label>
-                <div class="home-search-field">
-                  <span class="home-search-field__icon" aria-hidden="true"><i class="bi bi-geo-alt"></i></span>
-                  <input id="homeWhere" class="form-control home-search-card__input home-search-card__input--icon" type="text" name="where" placeholder="City or area" autocomplete="address-level2" />
-                </div>
+              <label class="form-label home-search-card__label home-search-form__label-where" for="homeWhere">Where</label>
+              <div class="home-search-field home-search-field--where">
+                <span class="home-search-field__icon" aria-hidden="true"><i class="bi bi-geo-alt"></i></span>
+                <input id="homeWhere" class="form-control home-search-card__input home-search-card__input--icon" type="text" name="where" placeholder="City or area" autocomplete="address-level2" />
               </div>
-              <div class="col-12 col-md-auto">
-                <label class="form-label d-none d-md-block invisible user-select-none" for="homeSearchSubmit">Search</label>
+              <div class="home-search-form__submit">
                 <button id="homeSearchSubmit" class="btn btn-home-primary home-search-card__btn w-100" type="submit">
                   <span class="home-search-card__btn-text">Search</span>
                   <i class="bi bi-arrow-right-short home-search-card__btn-ico" aria-hidden="true"></i>

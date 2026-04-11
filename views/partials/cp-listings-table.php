@@ -19,6 +19,8 @@ $showStatus = $showStatus ?? true;
 $showRole   = $showRole   ?? true;
 $q          = $q          ?? '';
 $pageBase   = rtrim($pageBase ?? '/cp/listings/', '/') . '/';
+$cpListingsClientMode = $cpListingsClientMode ?? false;
+$cpColspan = 4 + ($showStatus ? 1 : 0) + ($showRole ? 1 : 0);
 
 $statusBadgeMap = [
     'live'      => 'text-bg-success',
@@ -36,6 +38,16 @@ $statusBadgeMap = [
 <?php endif; ?>
 
 <!-- Search bar -->
+<?php if (!empty($cpListingsClientMode)): ?>
+<div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+  <input type="search" id="mciCpListingsSearch" value="<?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?>"
+    class="form-control form-control-sm" placeholder="Search by name or slug…" style="max-width:280px;" autocomplete="off" />
+  <button type="button" class="btn btn-sm btn-outline-secondary" id="mciCpListingsSearchBtn" title="Search">
+    <i class="bi bi-search" aria-hidden="true"></i>
+  </button>
+  <button type="button" class="btn btn-sm btn-outline-secondary" id="mciCpListingsSearchClear">Clear</button>
+</div>
+<?php else: ?>
 <form method="get" action="" class="d-flex gap-2 mb-3">
   <input type="text" name="q" value="<?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?>"
     class="form-control form-control-sm" placeholder="Search by name or slug…" style="max-width:280px;" />
@@ -46,7 +58,12 @@ $statusBadgeMap = [
     <a href="<?= htmlspecialchars($pageBase) ?>" class="btn btn-sm btn-outline-secondary">Clear</a>
   <?php endif; ?>
 </form>
+<?php endif; ?>
 
+<?php if (!empty($cpListingsClientMode)): ?>
+<div class="text-muted small mb-2" id="mciCpListingsMeta"></div>
+<div id="mciCpListingsScroll" class="border rounded bg-white" style="max-height:min(70vh,640px);overflow-y:auto;">
+<?php endif; ?>
 <div class="table-responsive">
   <table class="table table-hover align-middle mb-0" style="font-size:var(--mci-text-sm);">
     <thead class="table-light">
@@ -55,14 +72,28 @@ $statusBadgeMap = [
         <?php if ($showRole): ?><th>Posted by</th><?php endif; ?>
         <th>Category</th>
         <?php if ($showStatus): ?><th>Status</th><?php endif; ?>
-        <th>Added</th>
+        <th>
+          <?php if (!empty($cpListingsClientMode)): ?>
+            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-body fw-semibold d-inline-flex align-items-center gap-1"
+              id="mciCpListingsSortAdded" aria-sort="descending" title="Toggle sort by date added">
+              Added
+              <i class="bi bi-sort-down" id="mciCpListingsSortAddedIcon" aria-hidden="true"></i>
+            </button>
+          <?php else: ?>
+            Added
+          <?php endif; ?>
+        </th>
         <th style="min-width:100px;">Actions</th>
       </tr>
     </thead>
-    <tbody>
-      <?php if (count($rows) === 0): ?>
+    <tbody<?= !empty($cpListingsClientMode) ? ' id="mciCpListingsBody"' : '' ?>>
+      <?php if (!empty($cpListingsClientMode)): ?>
         <tr>
-          <td colspan="<?= 4 + ($showStatus ? 1 : 0) + ($showRole ? 1 : 0) ?>" class="text-center text-muted py-4 small">
+          <td colspan="<?= (int) $cpColspan ?>" class="text-center text-muted py-4 small">Loading…</td>
+        </tr>
+      <?php elseif (count($rows) === 0): ?>
+        <tr>
+          <td colspan="<?= (int) $cpColspan ?>" class="text-center text-muted py-4 small">
             <?= $q !== '' ? 'No listings match your search.' : 'No listings in this view.' ?>
           </td>
         </tr>
@@ -71,6 +102,11 @@ $statusBadgeMap = [
           $rowStatus   = strtolower((string)($r['status'] ?? ''));
           $statusBadge = $statusBadgeMap[$rowStatus] ?? 'text-bg-light border';
           $addedByRole = (string)($r['added_by_role'] ?? '');
+          $posterName  = trim((string)($r['added_by_display_name'] ?? ''));
+          $posterEmail = trim((string)($r['added_by_email'] ?? ''));
+          $posterLine  = $addedByRole === 'anonymous'
+            ? ''
+            : ($posterName !== '' ? $posterName : ($posterEmail !== '' ? $posterEmail : ''));
           $bizId       = htmlspecialchars((string)$r['id'], ENT_QUOTES, 'UTF-8');
           $bizName     = htmlspecialchars((string)($r['name'] ?? ''), ENT_QUOTES, 'UTF-8');
           $bizSlug     = (string)($r['slug'] ?? '');
@@ -90,9 +126,19 @@ $statusBadgeMap = [
                 <?php if ($addedByRole === 'anonymous'): ?>
                   <span class="badge text-bg-light border"><i class="bi bi-incognito me-1" aria-hidden="true"></i>Anonymous</span>
                 <?php elseif ($addedByRole === 'cp_admin'): ?>
-                  <span class="badge text-bg-primary"><i class="bi bi-shield-fill me-1" aria-hidden="true"></i>Admin</span>
+                  <div class="d-flex flex-column gap-1 align-items-start">
+                    <span class="badge text-bg-primary"><i class="bi bi-shield-fill me-1" aria-hidden="true"></i>Admin</span>
+                    <?php if ($posterLine !== ''): ?>
+                      <span class="small text-dark"><?= htmlspecialchars($posterLine, ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php endif; ?>
+                  </div>
                 <?php else: ?>
-                  <span class="badge text-bg-info text-dark"><i class="bi bi-person-fill me-1" aria-hidden="true"></i>Subscriber</span>
+                  <div class="d-flex flex-column gap-1 align-items-start">
+                    <?php if ($posterLine !== ''): ?>
+                      <span class="fw-semibold small"><?= htmlspecialchars($posterLine, ENT_QUOTES, 'UTF-8') ?></span>
+                    <?php endif; ?>
+                    <span class="badge text-bg-info text-dark"><i class="bi bi-person-fill me-1" aria-hidden="true"></i>Subscriber</span>
+                  </div>
                 <?php endif; ?>
               </td>
             <?php endif; ?>
@@ -115,7 +161,22 @@ $statusBadgeMap = [
     </tbody>
   </table>
 </div>
+<?php if (!empty($cpListingsClientMode)): ?>
+<div id="mciCpListingsSentinel" class="border-top py-2 text-center small text-muted" aria-live="polite"></div>
+</div>
+<?php
+  $__mciCpListingsCfg = [
+      'perPage' => (int) MCI_CP_LISTING_PER_PAGE,
+      'showStatus' => (bool) $showStatus,
+      'showRole' => (bool) $showRole,
+      'status' => isset($statusFilter) ? $statusFilter : null,
+      'role' => isset($roleFilter) ? $roleFilter : null,
+  ];
+?>
+<script type="application/json" id="mciCpListingsClientCfg"><?= json_encode($__mciCpListingsCfg, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE) ?></script>
+<?php endif; ?>
 
+<?php if (empty($cpListingsClientMode)): ?>
 <!-- Pagination + count -->
 <div class="mt-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
   <div class="text-muted small">
@@ -143,6 +204,7 @@ $statusBadgeMap = [
     </nav>
   <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <!-- ── Right flyout panel ──────────────────────────────────────────────── -->
 <style>
@@ -267,6 +329,19 @@ $statusBadgeMap = [
     return String(s == null ? '' : s)
       .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
+
+  function scheduleReviewFromQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search || '');
+      var reviewId = params.get('review') || params.get('review_id');
+      if (!reviewId) return;
+      var targetBtn = document.querySelector('.js-review-btn[data-id="' + reviewId + '"]');
+      if (targetBtn) targetBtn.click();
+    } catch (e) {
+      // ignore
+    }
+  }
+
   function row(label, val) {
     if (val === null || val === undefined || val === '') return '';
     return '<tr><th class="text-muted fw-normal pe-3 align-top" style="width:150px;white-space:nowrap;font-weight:400;">'
@@ -322,6 +397,21 @@ $statusBadgeMap = [
     return s || null;
   }
 
+  /** Human-readable submitter for flyout (matches list column intent). */
+  function formatAddedBy(b) {
+    var role = String(b.added_by_role || '').toLowerCase();
+    var name = String(b.added_by_display_name || '').trim();
+    var email = String(b.added_by_email || '').trim();
+    var parts = [];
+    if (name) parts.push(name);
+    if (email && email !== name) parts.push(email);
+    var who = parts.join(' · ');
+    if (role === 'anonymous') return 'Anonymous';
+    var roleLabel = role === 'cp_admin' ? 'Admin' : 'Subscriber';
+    if (!who) return roleLabel;
+    return who + ' (' + roleLabel + ')';
+  }
+
   function renderBusiness(b) {
     var html = '';
 
@@ -348,7 +438,7 @@ $statusBadgeMap = [
       + row('Email',        b.email)
       + row('Video URL',    b.video_url)
       + row('Status',       b.status)
-      + row('Added by',     b.added_by_role)
+      + row('Added by',     formatAddedBy(b))
       + row('Submitted',    b.created_at)
       + '</table>';
 
@@ -626,19 +716,292 @@ $statusBadgeMap = [
       .catch(function () { alert('Network error.'); confirmOk.disabled = false; });
   });
 
-  // Deep-link support: /cp/listings/awaiting-approval/?review=<business_id>
-  (function autoOpenReviewFromQuery() {
+  if (!document.getElementById('mciCpListingsClientCfg')) {
+    scheduleReviewFromQuery();
+  }
+
+  /* ── All listings: sort + infinite scroll (server-paginated API) ── */
+  (function cpListingsClientInfinite() {
+    var cfgEl = document.getElementById('mciCpListingsClientCfg');
+    if (!cfgEl) return;
+    var cfg;
     try {
-      var params = new URLSearchParams(window.location.search || '');
-      var reviewId = params.get('review') || params.get('review_id');
-      if (!reviewId) return;
-      var targetBtn = document.querySelector('.js-review-btn[data-id="' + reviewId + '"]');
-      if (!targetBtn) return;
-      targetBtn.click();
+      cfg = JSON.parse(cfgEl.textContent);
     } catch (e) {
-      // Ignore URL parsing errors; normal manual review still works.
+      return;
     }
-  }());
+    var apiBase = (typeof window.mciApiUrl === 'function' ? window.mciApiUrl : function (p) { return '/api/v1' + p; })('/cp/businesses');
+    var showRole = !!cfg.showRole;
+    var showStatus = !!cfg.showStatus;
+    var perPage = Math.max(1, Math.min(100, parseInt(cfg.perPage, 10) || 25));
+    var colspan = 4 + (showStatus ? 1 : 0) + (showRole ? 1 : 0);
+
+    var state = {
+      q: '',
+      sortDir: 'desc',
+      nextPage: 1,
+      loading: false,
+      exhausted: true,
+      total: 0,
+      displayedCount: 0
+    };
+    var listRequestGen = 0;
+
+    function el(id) { return document.getElementById(id); }
+
+    function statusBadgeClass(st) {
+      var m = { live: 'text-bg-success', draft: 'text-bg-warning', rejected: 'text-bg-danger', suspended: 'text-bg-secondary' };
+      return m[String(st || '').toLowerCase()] || 'text-bg-light border';
+    }
+
+    function fmtAdded(iso) {
+      if (!iso) return '—';
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function postedByCell(r) {
+      var role = String(r.added_by_role || '');
+      var posterName = String(r.added_by_display_name || '').trim();
+      var posterEmail = String(r.added_by_email || '').trim();
+      var posterLine = role === 'anonymous' ? '' : (posterName || posterEmail || '');
+      if (role === 'anonymous') {
+        return '<span class="badge text-bg-light border"><i class="bi bi-incognito me-1" aria-hidden="true"></i>Anonymous</span>';
+      }
+      if (role === 'cp_admin') {
+        var adm = '<div class="d-flex flex-column gap-1 align-items-start">'
+          + '<span class="badge text-bg-primary"><i class="bi bi-shield-fill me-1" aria-hidden="true"></i>Admin</span>';
+        if (posterLine) adm += '<span class="small text-dark">' + esc(posterLine) + '</span>';
+        return adm + '</div>';
+      }
+      var sub = '<div class="d-flex flex-column gap-1 align-items-start">';
+      if (posterLine) sub += '<span class="fw-semibold small">' + esc(posterLine) + '</span>';
+      sub += '<span class="badge text-bg-info text-dark"><i class="bi bi-person-fill me-1" aria-hidden="true"></i>Subscriber</span></div>';
+      return sub;
+    }
+
+    function buildRow(r) {
+      var rowStatus = String(r.status || '').toLowerCase();
+      var bizId = esc(r.id);
+      var bizName = esc(r.name || '');
+      var slug = r.slug ? '<div class="text-muted" style="font-size:var(--mci-text-micro);">' + esc(r.slug) + '</div>' : '';
+      var tr = document.createElement('tr');
+      tr.setAttribute('data-listing-id', String(r.id));
+      tr.setAttribute('data-listing-status', rowStatus);
+      var html = '<td><button type="button" class="btn btn-link p-0 text-start fw-semibold js-review-btn" data-id="' + bizId
+        + '" style="text-decoration:none;color:inherit;">' + bizName + '</button>' + slug + '</td>';
+      if (showRole) html += '<td>' + postedByCell(r) + '</td>';
+      html += '<td class="text-muted small">' + esc(r.category_name || '—') + '</td>';
+      if (showStatus) {
+        html += '<td><span class="badge ' + statusBadgeClass(rowStatus) + '">' + esc(rowStatus ? rowStatus.charAt(0).toUpperCase() + rowStatus.slice(1) : '') + '</span></td>';
+      }
+      html += '<td class="text-muted small text-nowrap">' + esc(fmtAdded(r.created_at)) + '</td>';
+      html += '<td><button type="button" class="btn btn-sm btn-outline-secondary py-0 js-review-btn" data-id="' + bizId + '">'
+        + '<i class="bi bi-eye" aria-hidden="true"></i> Review</button></td>';
+      tr.innerHTML = html;
+      return tr;
+    }
+
+    function listQs(pageNum) {
+      var qs = new URLSearchParams();
+      qs.set('page', String(pageNum));
+      qs.set('per_page', String(perPage));
+      if (state.q) qs.set('q', state.q);
+      if (cfg.status) qs.set('status', String(cfg.status));
+      if (cfg.role) qs.set('role', String(cfg.role));
+      qs.set('sort', 'created_at');
+      qs.set('sort_dir', state.sortDir);
+      return qs.toString();
+    }
+
+    function fetchJson(url) {
+      return fetch(url, { credentials: 'include' }).then(function (r) {
+        return r.text().then(function (text) {
+          var j;
+          try { j = JSON.parse(text); } catch (e) {
+            throw new Error('Invalid JSON from API');
+          }
+          if (!r.ok) throw new Error(String(j.error || j.message || 'Request failed'));
+          return j;
+        });
+      });
+    }
+
+    function fetchPage(pageNum) {
+      return fetchJson(apiBase + '?' + listQs(pageNum));
+    }
+
+    function updateSortUi() {
+      var btn = el('mciCpListingsSortAdded');
+      var ic = el('mciCpListingsSortAddedIcon');
+      if (btn) btn.setAttribute('aria-sort', state.sortDir === 'desc' ? 'descending' : 'ascending');
+      if (ic) ic.className = 'bi ' + (state.sortDir === 'desc' ? 'bi-sort-down' : 'bi-sort-up');
+    }
+
+    function updateMeta() {
+      var meta = el('mciCpListingsMeta');
+      if (!meta) return;
+      var ord = state.sortDir === 'desc' ? 'newest first' : 'oldest first';
+      var tail = '';
+      if (state.total > 0 && !state.exhausted) tail = ' · Scroll for more';
+      else if (state.total > 0 && state.exhausted && state.displayedCount >= state.total) tail = ' · End of list';
+      meta.textContent = 'Loaded ' + state.displayedCount + ' of ' + state.total + ' · Added ' + ord + tail;
+    }
+
+    function clearSentinel() {
+      var s = el('mciCpListingsSentinel');
+      if (!s) return;
+      s.textContent = '';
+      s.removeAttribute('aria-busy');
+    }
+
+    function setSentinel(loading, text) {
+      var s = el('mciCpListingsSentinel');
+      if (!s) return;
+      s.className = 'border-top py-2 text-center small text-muted';
+      if (loading) {
+        s.textContent = 'Loading more…';
+        s.setAttribute('aria-busy', 'true');
+      } else {
+        s.textContent = text || '';
+        s.removeAttribute('aria-busy');
+      }
+    }
+
+    function applyFirstPage(data) {
+      var tbody = el('mciCpListingsBody');
+      if (!tbody) return;
+      state.total = data && data.total != null ? data.total : 0;
+      var rows = (data && data.businesses) ? data.businesses : [];
+      tbody.innerHTML = '';
+      state.displayedCount = 0;
+      state.nextPage = 2;
+      clearSentinel();
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="' + colspan + '" class="text-center text-muted py-4 small">'
+          + (state.q ? 'No listings match your search.' : 'No listings in this view.') + '</td></tr>';
+        state.exhausted = true;
+        updateSortUi();
+        updateMeta();
+        return;
+      }
+      rows.forEach(function (r) { tbody.appendChild(buildRow(r)); });
+      state.displayedCount = rows.length;
+      state.exhausted = rows.length < perPage || state.displayedCount >= state.total;
+      updateSortUi();
+      updateMeta();
+    }
+
+    function appendPage(data) {
+      var tbody = el('mciCpListingsBody');
+      if (!tbody) return;
+      var rows = (data && data.businesses) ? data.businesses : [];
+      if (!rows.length) {
+        state.exhausted = true;
+        updateMeta();
+        return;
+      }
+      rows.forEach(function (r) { tbody.appendChild(buildRow(r)); });
+      state.displayedCount += rows.length;
+      state.exhausted = rows.length < perPage || state.displayedCount >= state.total;
+      updateMeta();
+    }
+
+    function reloadList() {
+      var gen = ++listRequestGen;
+      state.loading = true;
+      state.exhausted = false;
+      state.nextPage = 1;
+      var tbody = el('mciCpListingsBody');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="' + colspan + '" class="text-center text-muted py-4 small">Loading…</td></tr>';
+      clearSentinel();
+      updateSortUi();
+      return fetchPage(1)
+        .then(function (data) {
+          if (gen !== listRequestGen) return;
+          applyFirstPage(data);
+        })
+        .catch(function (e) {
+          if (gen !== listRequestGen) return;
+          if (tbody) tbody.innerHTML = '<tr><td colspan="' + colspan + '" class="text-center text-muted py-4 small">Could not load listings.</td></tr>';
+          alert(e.message || 'Failed to load');
+        })
+        .finally(function () {
+          if (gen === listRequestGen) state.loading = false;
+        });
+    }
+
+    function loadMore() {
+      if (state.loading || state.exhausted || state.displayedCount >= state.total) {
+        if (state.displayedCount >= state.total) state.exhausted = true;
+        return Promise.resolve();
+      }
+      var gen = listRequestGen;
+      state.loading = true;
+      setSentinel(true);
+      var pageToLoad = state.nextPage;
+      return fetchPage(pageToLoad)
+        .then(function (data) {
+          if (gen !== listRequestGen) return;
+          appendPage(data);
+          state.nextPage = pageToLoad + 1;
+        })
+        .catch(function (e) {
+          if (gen !== listRequestGen) return;
+          alert(e.message || 'Failed to load more');
+        })
+        .finally(function () {
+          if (gen !== listRequestGen) return;
+          state.loading = false;
+          if (state.exhausted) {
+            setSentinel(false, state.total > 0 && state.displayedCount >= state.total ? 'All listings loaded.' : '');
+          } else {
+            clearSentinel();
+          }
+        });
+    }
+
+    var searchInp = el('mciCpListingsSearch');
+    if (searchInp) {
+      state.q = searchInp.value.trim();
+      searchInp.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          el('mciCpListingsSearchBtn').click();
+        }
+      });
+    }
+
+    el('mciCpListingsSearchBtn').addEventListener('click', function () {
+      state.q = searchInp ? searchInp.value.trim() : '';
+      reloadList().then(function () { scheduleReviewFromQuery(); });
+    });
+    el('mciCpListingsSearchClear').addEventListener('click', function () {
+      if (searchInp) searchInp.value = '';
+      state.q = '';
+      reloadList().then(function () { scheduleReviewFromQuery(); });
+    });
+    el('mciCpListingsSortAdded').addEventListener('click', function () {
+      state.sortDir = state.sortDir === 'desc' ? 'asc' : 'desc';
+      reloadList().then(function () { scheduleReviewFromQuery(); });
+    });
+
+    var scrollRoot = el('mciCpListingsScroll');
+    var sentinel = el('mciCpListingsSentinel');
+    if (scrollRoot && sentinel && typeof IntersectionObserver !== 'undefined') {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (!en.isIntersecting) return;
+          if (state.loading || state.exhausted || state.displayedCount >= state.total) return;
+          loadMore();
+        });
+      }, { root: scrollRoot, rootMargin: '100px', threshold: 0 });
+      io.observe(sentinel);
+    }
+
+    reloadList().then(function () { scheduleReviewFromQuery(); });
+  })();
 
   /* ── close panel on Escape ── */
   document.addEventListener('keydown', function (e) {

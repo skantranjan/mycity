@@ -130,6 +130,7 @@ $isSuperAdmin = ($cpRole === 'super_admin');
     <!-- ── System (super_admin only) ────────── -->
     <?php if ($isSuperAdmin): ?>
       <div class="mci-sidebar-group-label mt-2">System</div>
+      <?php cpNavLink('cache-help', '/cp/dashboard/#mciCpPublicCacheCard', 'bi-arrow-clockwise', 'Clear public cache', $cpActive); ?>
       <?php cpNavLink('error-log', '/cp/error-log/', 'bi-bug', 'Error log', $cpActive, $cpBadgeCounts['errors'] ?: null, 'text-bg-danger'); ?>
     <?php endif; ?>
 
