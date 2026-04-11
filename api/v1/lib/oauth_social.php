@@ -20,6 +20,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/jwt.php';
 require_once __DIR__ . '/uuid.php';
 require_once __DIR__ . '/ip.php';
+require_once __DIR__ . '/mci_mailer.php';
 
 // ── State token (CSRF guard for OAuth) ───────────────────────────────────────
 
@@ -247,6 +248,8 @@ function mci_oauth_find_or_create_user(
         if ($pdo->inTransaction()) { $pdo->rollBack(); }
         return ['ok' => false, 'error' => 'register_failed', 'status' => 500];
     }
+
+    mci_mail_send_welcome($cleanEmail, $cleanName !== '' ? $cleanName : null, true);
 
     return _mci_oauth_issue_token($userId, $cleanEmail, $role);
 }

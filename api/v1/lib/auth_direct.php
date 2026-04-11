@@ -14,6 +14,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/jwt.php';
 require_once __DIR__ . '/uuid.php';
 require_once __DIR__ . '/ip.php';
+require_once __DIR__ . '/mci_mailer.php';
 
 /**
  * Unified login — same contract as `POST /api/v1/auth/login` (`audience` / `type`).
@@ -238,6 +239,8 @@ function api_direct_subscriber_register(array $data): array
         $ip,
         $ip,
     ]);
+
+    mci_mail_send_welcome($email, $displayName !== '' ? $displayName : null, false);
 
     $exp = time() + 28800;
     $jwt = api_jwt_sign(['sub' => $userId, 'role' => $role, 'iat' => time(), 'exp' => $exp]);

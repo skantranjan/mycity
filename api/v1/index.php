@@ -820,6 +820,8 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') 
         );
         $ins->execute([$userId, $email, $hash, 'co_admin', $displayName !== '' ? $displayName : null, $ip, $ip]);
 
+        mci_mail_send_account_invited($email, $displayName !== '' ? $displayName : null, 'co_admin');
+
         api_json(['ok' => true, 'id' => $userId]);
     }
 
@@ -863,6 +865,17 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') 
         $sql = 'UPDATE mci_users SET ' . implode(', ', $fields) . ' WHERE id = ? AND role_id = (SELECT id FROM mci_roles WHERE short_name = "co_admin" LIMIT 1)';
         $upd = $pdo->prepare($sql);
         $upd->execute($params);
+
+        if ($password !== '') {
+            $emStmt = $pdo->prepare('SELECT email FROM mci_users WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+            $emStmt->execute([$id]);
+            $emRow = $emStmt->fetch();
+            $acctEmail = is_array($emRow) && isset($emRow['email']) ? (string) $emRow['email'] : '';
+            if ($acctEmail !== '') {
+                mci_mail_send_password_changed($acctEmail, 'admin');
+            }
+        }
+
         api_json(['ok' => true]);
     }
 

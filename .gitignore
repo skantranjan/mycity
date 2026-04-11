@@ -1,6 +1,10 @@
 # Local secrets — never commit
 .env
 
+# Composer
+/vendor/
+/composer.phar
+
 # Runtime logs
 logs/*.log
 

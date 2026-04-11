@@ -6,6 +6,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/uuid.php';
 require_once __DIR__ . '/ip.php';
 require_once dirname(__DIR__, 3) . '/includes/mci_timezone.php';
+require_once __DIR__ . '/mci_mailer.php';
 
 /** @return array{ok:true, profile_id:string}|array{ok:false, error:string} */
 function mci_account_ensure_profile_row(PDO $pdo, string $userId): array
@@ -202,6 +203,14 @@ function mci_account_change_password(string $userId, string $currentPassword, st
     $upd = $pdo->prepare('UPDATE mci_users SET password_hash = ?, password_changed_at = NOW(6), last_update_ip = ? WHERE id = ?');
     $upd->execute([$hash, $ip, $userId]);
 
+    $emStmt = $pdo->prepare('SELECT email FROM mci_users WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+    $emStmt->execute([$userId]);
+    $emRow = $emStmt->fetch();
+    $acctEmail = is_array($emRow) && isset($emRow['email']) ? (string) $emRow['email'] : '';
+    if ($acctEmail !== '') {
+        mci_mail_send_password_changed($acctEmail, 'self');
+    }
+
     return ['ok' => true];
 }
 
@@ -245,6 +254,8 @@ function mci_account_request_password_reset(string $email): array
         // Table might not exist yet — still return generic message
         return ['ok' => true, 'message' => $msg];
     }
+
+    mci_mail_send_password_reset($email, $raw);
 
     $out = ['ok' => true, 'message' => $msg];
     if (api_env_flag('MCI_DEBUG_PASSWORD_RESET')) {
@@ -302,6 +313,14 @@ function mci_account_reset_password_with_token(string $rawToken, string $newPass
         $pdo->rollBack();
 
         return ['ok' => false, 'error' => 'reset_failed', 'status' => 500];
+    }
+
+    $emStmt = $pdo->prepare('SELECT email FROM mci_users WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+    $emStmt->execute([$userId]);
+    $emRow = $emStmt->fetch();
+    $acctEmail = is_array($emRow) && isset($emRow['email']) ? (string) $emRow['email'] : '';
+    if ($acctEmail !== '') {
+        mci_mail_send_password_changed($acctEmail, 'reset_token');
     }
 
     return ['ok' => true];
