@@ -82,7 +82,10 @@ if ($appArea === '') {
             <a class="nav-link rounded px-3 <?= navActive('services', $activePage) ?>" href="/services/">Services</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link rounded px-3 <?= navActive('submit', $activePage) ?>" href="/submit-business-listing/">Add Business</a>
+            <a
+              class="nav-link rounded px-3 mci-nav-add-business <?= navActive('submit', $activePage) ?>"
+              href="/submit-business-listing/"
+            ><span class="mci-nav-add-business__icon" aria-hidden="true"><i class="bi bi-plus-lg"></i></span>Add Business</a>
           </li>
           <!-- City picker pill -->
           <li class="nav-item position-relative d-flex align-items-center ms-lg-1">

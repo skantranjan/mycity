@@ -46,11 +46,6 @@
       whereInput.value = city;
     }
 
-    var badge = document.querySelector('.home-hero-badge');
-    if (badge) {
-      badge.textContent = '🗺️ Discover ' + city;
-    }
-
     if (document.title.indexOf('Explore Your City') !== -1) {
       document.title = 'Explore ' + city + ' - My City Info';
     }

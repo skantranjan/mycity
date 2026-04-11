@@ -76,7 +76,6 @@ try {
 }
 
 $extraHead = <<<'HTML'
-<link rel="preload" as="image" href="/assets/images/hero-illustration.svg" fetchpriority="high" />
 <link rel="stylesheet" href="/assets/css/home.css" />
 HTML;
 
@@ -145,112 +144,94 @@ try {
 ob_start();
 ?>
 
-<div class="home-page pb-5">
+<div class="home-page pb-4 pb-md-5">
   <!-- Hero -->
-  <section class="home-hero text-white mb-5">
+  <section class="home-hero home-hero--compact text-white mb-3">
     <div class="home-hero-blob home-hero-blob--1" aria-hidden="true"></div>
     <div class="home-hero-blob home-hero-blob--2" aria-hidden="true"></div>
 
-    <div class="row g-4 align-items-center position-relative mci-z-content">
-      <div class="col-12 col-lg-6">
-        <div class="d-flex flex-wrap gap-2 mb-3">
+    <div class="row g-3 align-items-start position-relative mci-z-content">
+      <div class="col-12">
+        <p class="home-hero-kicker mb-2">Find local favourites — fast.</p>
+        <div class="d-flex flex-wrap gap-2 mb-2 home-hero-pills">
           <span class="home-stat-pill">✨ Local discovery</span>
           <span class="home-stat-pill">📍 City-wide</span>
           <span class="home-stat-pill">🆓 List for free</span>
         </div>
-        <h1 class="display-5 fw-bold mb-3 lh-sm home-hero-title">
+        <h1 class="fw-bold mb-2 lh-sm home-hero-title">
           <span class="home-hero-explore-line">
             <span class="home-hero-explore-prefix">Explore</span>
             <span id="heroCityName" class="home-hero-city-name home-hero-highlight"><?= $activeCity !== '' ? htmlspecialchars($activeCity) : 'your city' ?></span>
           </span>
         </h1>
-        <p class="lead text-white-50 mb-4 mb-lg-5 home-hero-lead home-hero-tagline">
-          Let’s uncover the best places, businesses and services in
+        <p class="text-white-50 mb-2 mb-md-3 home-hero-lead home-hero-tagline">
+          Top places, real businesses — zero guesswork in
           <span id="heroTaglineCity" class="text-white fw-semibold"><?= $activeCity !== '' ? htmlspecialchars($activeCity) : 'your city' ?></span>.
         </p>
 
-        <div class="d-none d-lg-flex flex-wrap align-items-center home-hero-cta-row gap-3">
-          <a href="/submit-business-listing/" class="btn btn-home-primary btn-home-cta-primary">List your business</a>
-          <a href="/business-listing/" class="btn btn-home-ghost btn-home-cta-secondary">Browse all</a>
+        <div class="home-search-card home-search-card--compact home-search-card--shine position-relative mci-z-content mb-0">
+          <form action="/business-listing/" method="get">
+            <div class="row g-2 align-items-end">
+              <div class="col-12 col-md">
+                <label class="form-label home-search-card__label" for="homeWhat">What</label>
+                <div class="home-search-field">
+                  <span class="home-search-field__icon" aria-hidden="true"><i class="bi bi-search"></i></span>
+                  <input id="homeWhat" class="form-control home-search-card__input home-search-card__input--icon" type="text" name="what" placeholder="Food, salon, hotel…" />
+                </div>
+              </div>
+              <div class="col-12 col-md">
+                <label class="form-label home-search-card__label" for="homeWhere">Where</label>
+                <div class="home-search-field">
+                  <span class="home-search-field__icon" aria-hidden="true"><i class="bi bi-geo-alt"></i></span>
+                  <input id="homeWhere" class="form-control home-search-card__input home-search-card__input--icon" type="text" name="where" placeholder="City or area" autocomplete="address-level2" />
+                </div>
+              </div>
+              <div class="col-12 col-md-auto">
+                <label class="form-label d-none d-md-block invisible user-select-none" for="homeSearchSubmit">Search</label>
+                <button id="homeSearchSubmit" class="btn btn-home-primary home-search-card__btn w-100" type="submit">
+                  <span class="home-search-card__btn-text">Search</span>
+                  <i class="bi bi-arrow-right-short home-search-card__btn-ico" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+          </form>
         </div>
       </div>
-
-      <div class="col-12 col-lg-6 text-center text-lg-end">
-        <div class="position-relative d-inline-block">
-          <img
-            src="/assets/images/hero-illustration.svg"
-            alt="Local discovery — stylised city map and buildings illustration for My City Info"
-            class="img-fluid rounded-4 shadow-lg border border-light border-opacity-25 home-hero-image"
-            width="640"
-            height="420"
-            loading="eager"
-            fetchpriority="high"
-            decoding="async"
-          />
-          <div class="position-absolute bottom-0 start-0 m-2 m-md-3 px-2 px-md-3 py-2 rounded-3 small fw-semibold text-dark bg-white bg-opacity-90 shadow home-hero-badge d-inline-flex align-items-center gap-1">
-            <i class="bi bi-map" aria-hidden="true"></i>
-            <span id="homeHeroBadgeLabel"><?= $activeCity !== '' ? 'Discover ' . htmlspecialchars($activeCity, ENT_QUOTES, 'UTF-8') : 'Discover nearby' ?></span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="home-search-card mt-4 mt-lg-5 p-3 p-md-4 position-relative mci-z-content">
-      <form action="/business-listing/" method="get">
-        <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-5">
-            <label class="form-label" for="homeWhat">What</label>
-            <input id="homeWhat" class="form-control form-control-lg" type="text" name="what" placeholder="Ex: food, service, barber, hotel" />
-          </div>
-          <div class="col-12 col-md-5">
-            <label class="form-label" for="homeWhere">Where</label>
-            <input id="homeWhere" class="form-control form-control-lg" type="text" name="where" placeholder="City or area" autocomplete="address-level2" />
-          </div>
-          <div class="col-12 col-md-2">
-            <button class="btn btn-home-primary w-100 py-2 py-md-3" type="submit">Search</button>
-          </div>
-        </div>
-      </form>
-    </div>
-
-    <div class="d-flex d-lg-none flex-wrap align-items-stretch home-hero-cta-row gap-3 mt-3 position-relative mci-z-content">
-      <a href="/submit-business-listing/" class="btn btn-home-primary btn-home-cta-primary flex-grow-1 text-center">List your business</a>
-      <a href="/business-listing/" class="btn btn-home-ghost btn-home-cta-secondary flex-grow-1 text-center">Browse</a>
     </div>
   </section>
 
   <!-- Quick value strip -->
-  <section class="row g-3 mb-5">
+  <section class="row g-2 g-md-3 mb-4 home-value-strip">
     <div class="col-12 col-md-4">
-      <div class="bg-white rounded-4 border p-4 h-100 shadow-sm">
-        <div class="fs-3 mb-2 text-primary" aria-hidden="true"><i class="bi bi-card-checklist"></i></div>
-        <div class="fw-bold mb-1">List or claim</div>
-        <div class="text-muted small mb-0">List your business or claim an existing page.</div>
+      <div class="home-value-card bg-white rounded-3 border p-3 h-100 shadow-sm">
+        <div class="home-value-card__icon text-primary mb-2" aria-hidden="true"><i class="bi bi-card-checklist"></i></div>
+        <div class="home-value-card__title fw-bold mb-1">List or claim</div>
+        <div class="home-value-card__text text-muted mb-0">List your business or claim an existing page.</div>
       </div>
     </div>
     <div class="col-12 col-md-4">
-      <div class="bg-white rounded-4 border p-4 h-100 shadow-sm">
-        <div class="fs-3 mb-2 text-primary" aria-hidden="true"><i class="bi bi-geo-alt"></i></div>
-        <div class="fw-bold mb-1">Reach locals</div>
-        <div class="text-muted small mb-0">Show up when people search your city.</div>
+      <div class="home-value-card bg-white rounded-3 border p-3 h-100 shadow-sm">
+        <div class="home-value-card__icon text-primary mb-2" aria-hidden="true"><i class="bi bi-geo-alt"></i></div>
+        <div class="home-value-card__title fw-bold mb-1">Reach locals</div>
+        <div class="home-value-card__text text-muted mb-0">Show up when people search your city.</div>
       </div>
     </div>
     <div class="col-12 col-md-4">
-      <div class="bg-white rounded-4 border p-4 h-100 shadow-sm">
-        <div class="fs-3 mb-2 text-primary" aria-hidden="true"><i class="bi bi-chat-dots"></i></div>
-        <div class="fw-bold mb-1">Get enquiries</div>
-        <div class="text-muted small mb-0">Let customers contact you from your listing.</div>
+      <div class="home-value-card bg-white rounded-3 border p-3 h-100 shadow-sm">
+        <div class="home-value-card__icon text-primary mb-2" aria-hidden="true"><i class="bi bi-chat-dots"></i></div>
+        <div class="home-value-card__title fw-bold mb-1">Get enquiries</div>
+        <div class="home-value-card__text text-muted mb-0">Let customers contact you from your listing.</div>
       </div>
     </div>
   </section>
 
   <!-- Categories -->
-  <section class="mb-5">
-    <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end justify-content-sm-between gap-3 mb-4">
+  <section class="mb-4 mb-md-5">
+    <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end justify-content-sm-between gap-3 mb-3">
       <div class="flex-grow-1 min-w-0">
         <div class="home-section-accent mb-2"></div>
         <h2 class="home-section-title h3 mb-1">Browse categories</h2>
-        <p class="text-muted small mb-0">Jump into popular services and places</p>
+        <p class="text-muted home-section-sub mb-0">Jump into popular services and places</p>
       </div>
       <div class="d-flex flex-column flex-sm-row gap-2 align-self-stretch align-self-sm-auto">
         <a href="/business-listing/" class="btn btn-home-outline btn-sm text-center mci-touch-target mci-touch-target--sm">See all listings →</a>
@@ -277,12 +258,12 @@ ob_start();
   </section>
 
   <!-- Recent listings -->
-  <section class="mb-5 pb-lg-2">
-    <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-sm-between gap-3 mb-4">
+  <section class="mb-4 mb-md-5 pb-lg-2">
+    <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-center justify-content-sm-between gap-3 mb-3">
       <div class="flex-grow-1 min-w-0">
         <div class="home-section-accent mb-2"></div>
         <h2 class="home-section-title h3 mb-1">Recent listings</h2>
-        <p class="text-muted small mb-0">Newly added businesses — name, category, and area at a glance</p>
+        <p class="text-muted home-section-sub mb-0">Newly added businesses — name, category, and area at a glance</p>
       </div>
       <a class="btn btn-home-primary btn-sm text-center mci-touch-target mci-touch-target--sm" href="/submit-business-listing/">+ List your business</a>
     </div>
@@ -296,14 +277,14 @@ ob_start();
 
   <!-- Established listings (oldest first — complements “recent” above) -->
   <section class="mb-2">
-    <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end justify-content-sm-between gap-3 mb-4">
+    <div class="d-flex flex-column flex-sm-row align-items-stretch align-items-sm-end justify-content-sm-between gap-3 mb-3">
       <div class="flex-grow-1 min-w-0">
         <div class="home-section-accent mb-2"></div>
         <h2 class="home-section-title h3 mb-1">
           Established in
           <span id="homePopularCity" class="home-popular-city-name"><?= $activeCity !== '' ? htmlspecialchars($activeCity) : 'your city' ?></span>
         </h2>
-        <p class="text-muted small mb-0">Businesses that joined the directory earlier — a different slice than new listings above</p>
+        <p class="text-muted home-section-sub mb-0">Businesses that joined the directory earlier — a different slice than new listings above</p>
       </div>
       <a href="/business-listing/" class="btn btn-home-outline btn-sm align-self-stretch align-self-sm-auto text-center mci-touch-target mci-touch-target--sm">See all in directory →</a>
     </div>
@@ -317,9 +298,9 @@ ob_start();
 
   <!-- Substantive crawlable copy: directory purpose, how to use it, and for business owners -->
   <section class="mb-5" aria-labelledby="homeEditorialHeading">
-    <div class="rounded-4 border bg-white p-4 p-md-5 shadow-sm">
-      <h2 id="homeEditorialHeading" class="h4 fw-bold mb-3 text-dark">Find local businesses across India</h2>
-      <div class="text-body-secondary lh-lg">
+    <div class="rounded-4 border bg-white p-3 p-md-4 shadow-sm home-editorial">
+      <h2 id="homeEditorialHeading" class="home-editorial__title fw-bold mb-2 text-dark">Find local businesses across India</h2>
+      <div class="text-body-secondary home-editorial__body">
         <p class="mb-3">
           My City Info is a free online business directory for people who want to discover
           <strong class="text-dark">trusted local services</strong>, shops, restaurants, gyms, clinics,
