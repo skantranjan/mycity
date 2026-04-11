@@ -105,16 +105,6 @@ ob_start();
         Sign in to rate businesses, manage your profile, and discover what's new in your neighbourhood.
       </p>
 
-      <figure class="mci-auth-benefits__figure" aria-hidden="true">
-        <img
-          src="/assets/images/hero-illustration.svg"
-          alt="Local discovery — stylised city map and buildings illustration for My City Info"
-          width="640"
-          height="420"
-          loading="lazy"
-        />
-      </figure>
-
       <ul class="mci-auth-benefits__list">
         <li class="mci-auth-benefits__item">
           <span class="mci-auth-benefits__icon" aria-hidden="true"><i class="bi bi-chat-heart"></i></span>

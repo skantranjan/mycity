@@ -210,11 +210,7 @@ try {
                 'location'    => (string)($row['city']          ?? ''),
                 'address'     => (string)($row['city']          ?? ''),
                 'slug'        => (string)($row['slug']          ?? ''),
-                'image'       => !empty($row['logo_path'])
-                                   ? $row['logo_path']
-                                   : (!empty($row['banner_path'])
-                                       ? $row['banner_path']
-                                       : mci_listing_placeholder_url()),
+                'image'       => mci_listing_card_image_url($row['logo_path'] ?? null, $row['banner_path'] ?? null),
                 'price_range' => $row['price_range'] ?? null,
                 'tags'        => [],
             ];

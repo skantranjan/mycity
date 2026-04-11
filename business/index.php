@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/mci_paths.php';
+require_once __DIR__ . '/../includes/mci_cache.php';
 require_once __DIR__ . '/../includes/mci_text.php';
 require_once __DIR__ . '/../includes/mci_session.php';
 require_once __DIR__ . '/../includes/mci_reviews.php';
@@ -143,8 +144,19 @@ if ($slug === '') {
 
 $pdo   = api_db();
 $dbBiz = null;
+$ttlBiz = mci_cache_ttl_default();
 try {
-    $dbBiz = api_business_fetch_by_slug($pdo, $slug);
+    $dbBiz = mci_cache_remember(
+        mci_cache_public_key('bizdetail:' . hash('sha256', $slug)),
+        $ttlBiz,
+        static function () use ($pdo, $slug): ?array {
+            try {
+                return api_business_fetch_by_slug($pdo, $slug);
+            } catch (Throwable) {
+                return null;
+            }
+        }
+    );
 } catch (Throwable $ignored) {
 }
 
@@ -228,11 +240,7 @@ $listing = [
     'whatsapp' => (string)($branch['whatsapp_number']  ?? ''),
     'email'    => (string)($dbBiz['email']             ?? ''),
     'website'  => (string)($dbBiz['website_url']       ?? ''),
-    'image'    => !empty($dbBiz['banner_path'])
-                    ? $dbBiz['banner_path']
-                    : (!empty($dbBiz['logo_path'])
-                        ? $dbBiz['logo_path']
-                        : mci_listing_placeholder_url()),
+    'image'    => mci_listing_preview_image_url($dbBiz['banner_path'] ?? null, $dbBiz['logo_path'] ?? null),
     'map_lat'  => (float)($branch['latitude']  ?? 0),
     'map_lon'  => (float)($branch['longitude'] ?? 0),
     'about'    => mci_plain_paragraphs_from_html((string)($dbBiz['description'] ?? '')),
@@ -342,8 +350,14 @@ $hasOriginCoords = ($originLat !== 0.0 || $originLon !== 0.0);
 
 if ($hasOriginCoords) {
     try {
-        // Load a batch of live businesses from DB to compute proximity
-        $nearbyBatch = api_business_list_public($pdo, ['per_page' => 50])['businesses'] ?? [];
+        // Shared pool (newest 50) — cached app-wide; filtered by distance per page.
+        $nearbyBatch = mci_cache_remember(
+            mci_cache_public_key('page:business:nearby_pool50:v1'),
+            $ttlBiz,
+            static function () use ($pdo): array {
+                return api_business_list_public($pdo, ['per_page' => 50, 'skip_total' => true])['businesses'] ?? [];
+            }
+        );
         foreach ($nearbyBatch as $row) {
             $otherSlug = (string)($row['slug'] ?? '');
             if ($otherSlug === $slug || $otherSlug === '') {
@@ -361,11 +375,7 @@ if ($hasOriginCoords) {
                     'category'    => (string)($row['category_name'] ?? ''),
                     'location'    => (string)($row['city']          ?? ''),
                     'slug'        => $otherSlug,
-                    'image'       => !empty($row['logo_path'])
-                                       ? $row['logo_path']
-                                       : (!empty($row['banner_path'])
-                                           ? $row['banner_path']
-                                           : mci_listing_placeholder_url()),
+                    'image'       => mci_listing_card_image_url($row['logo_path'] ?? null, $row['banner_path'] ?? null),
                     'map_lat'     => $olat,
                     'map_lon'     => $olon,
                     'distance_km' => $d,
@@ -728,28 +738,28 @@ ob_start();
     </div>
   </div>
 
-  <!-- Profile image (listing photo again, like a storefront avatar) -->
-  <div class="mci-business-profile-wrap">
-    <img
-      class="mci-business-profile"
-      src="<?= htmlspecialchars($profilePhotoUrl) ?>"
-      alt="<?= htmlspecialchars($listing['title']) ?>"
-      width="132"
-      height="132"
-      loading="lazy"
-    />
+  <!-- Profile + breadcrumb: one band (reduces empty white gap under the banner) -->
+  <div class="mci-business-top-meta">
+    <div class="mci-business-profile-wrap">
+      <img
+        class="mci-business-profile"
+        src="<?= htmlspecialchars($profilePhotoUrl) ?>"
+        alt="<?= htmlspecialchars($listing['title']) ?>"
+        width="132"
+        height="132"
+        loading="lazy"
+      />
+    </div>
+    <nav class="mci-breadcrumb mci-business-top-meta__crumb" aria-label="Breadcrumb">
+      <a href="/">Home</a>
+      <span class="mci-breadcrumb__sep" aria-hidden="true">›</span>
+      <a href="/business-listing/">Listings</a>
+      <span class="mci-breadcrumb__sep" aria-hidden="true">›</span>
+      <span class="mci-breadcrumb__current"><?= htmlspecialchars($listing['title']) ?></span>
+    </nav>
   </div>
 
-  <!-- Breadcrumb -->
-  <nav class="mci-breadcrumb px-1 mb-1" aria-label="Breadcrumb">
-    <a href="/">Home</a>
-    <span class="mci-breadcrumb__sep" aria-hidden="true">›</span>
-    <a href="/business-listing/">Listings</a>
-    <span class="mci-breadcrumb__sep" aria-hidden="true">›</span>
-    <span class="mci-breadcrumb__current"><?= htmlspecialchars($listing['title']) ?></span>
-  </nav>
-
-  <div class="px-1 px-sm-2">
+  <div class="px-1 px-sm-2 mci-business-tabs-wrap">
     <!-- Section tab bar -->
     <nav class="mci-biz-tabs" aria-label="Jump to section">
       <a class="mci-biz-tab" href="#section-about">About</a>

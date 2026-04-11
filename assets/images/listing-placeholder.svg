@@ -1,15 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320" role="img" aria-labelledby="mciListingPhTitle">
-  <title id="mciListingPhTitle">No photo available</title>
+  <title id="mciListingPhTitle">Default listing image — no photo uploaded</title>
   <defs>
     <linearGradient id="mciListingPhBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#e5e7eb"/>
-      <stop offset="100%" stop-color="#d1d5db"/>
+      <stop offset="0%" stop-color="#ede9fe"/>
+      <stop offset="55%" stop-color="#e5e7eb"/>
+      <stop offset="100%" stop-color="#d8dee9"/>
     </linearGradient>
   </defs>
   <rect width="480" height="320" fill="url(#mciListingPhBg)"/>
-  <g fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="168" y="104" width="144" height="112" rx="8"/>
-    <circle cx="200" cy="136" r="12"/>
-    <path d="M168 200 L220 156 L268 192 L312 148 L312 216 L168 216 Z"/>
+  <!-- Simple storefront / city silhouette (reads as “business” at card size) -->
+  <g fill="#a78bfa" opacity="0.35">
+    <rect x="96" y="168" width="56" height="88" rx="4"/>
+    <rect x="164" y="148" width="72" height="108" rx="4"/>
+    <rect x="248" y="176" width="48" height="80" rx="4"/>
+    <rect x="308" y="156" width="76" height="100" rx="4"/>
   </g>
+  <g fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85">
+    <rect x="168" y="96" width="144" height="112" rx="10"/>
+    <circle cx="204" cy="132" r="14" fill="#c4b5fd" stroke="#7c3aed"/>
+    <path d="M168 192 L228 148 L276 184 L324 138 L324 208 L168 208 Z" fill="#ddd6fe" fill-opacity="0.5"/>
+  </g>
+  <text x="240" y="268" text-anchor="middle" fill="#64748b" font-family="system-ui,Segoe UI,sans-serif" font-size="14" font-weight="600">No photo yet</text>
 </svg>

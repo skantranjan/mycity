@@ -1119,6 +1119,9 @@ function api_business_list_public(PDO $pdo, array $filters = []): array
     $perPage = min(100, max(1, (int)($filters['per_page'] ?? 12)));
     $offset  = ($page - 1) * $perPage;
     $sort    = (($filters['sort'] ?? 'newest') === 'oldest') ? 'ASC' : 'DESC';
+    // Skip COUNT(*) when callers only need rows (home snippets, nearby pool). Saves one DB round-trip.
+    // Only valid for page 1; pagination UIs must omit this flag.
+    $skipTotal = !empty($filters['skip_total']) && $page === 1;
 
     $where  = ["g.status = 'live'"];
     $params = [];
@@ -1175,10 +1178,15 @@ function api_business_list_public(PDO $pdo, array $filters = []): array
                   )
     ';
 
-    $countStmt = $pdo->prepare("SELECT COUNT(DISTINCT g.id) $baseJoins WHERE $whereClause");
-    $countStmt->execute($params);
-    $total = (int)($countStmt->fetchColumn() ?? 0);
-    $pages = $total > 0 ? (int)ceil($total / $perPage) : 1;
+    if (!$skipTotal) {
+        $countStmt = $pdo->prepare("SELECT COUNT(DISTINCT g.id) $baseJoins WHERE $whereClause");
+        $countStmt->execute($params);
+        $total = (int)($countStmt->fetchColumn() ?? 0);
+        $pages = $total > 0 ? (int)ceil($total / $perPage) : 1;
+    } else {
+        $total = 0;
+        $pages = 1;
+    }
 
     $dataStmt = $pdo->prepare("
         SELECT
@@ -1203,8 +1211,14 @@ function api_business_list_public(PDO $pdo, array $filters = []): array
     $dataStmt->bindValue(':offset', $offset,  PDO::PARAM_INT);
     $dataStmt->execute();
 
+    $businesses = $dataStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    if ($skipTotal) {
+        $total = count($businesses);
+        $pages = 1;
+    }
+
     return [
-        'businesses' => $dataStmt->fetchAll(PDO::FETCH_ASSOC) ?: [],
+        'businesses' => $businesses,
         'total'      => $total,
         'page'       => $page,
         'per_page'   => $perPage,

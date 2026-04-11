@@ -92,8 +92,8 @@ try {
         $listFilters['city'] = $selectedLocation;
     }
 
-    $recentRows = api_business_list_public($pdo, array_merge($listFilters, ['sort' => 'newest']))['businesses'] ?? [];
-    $oldestRows = api_business_list_public($pdo, array_merge($listFilters, ['sort' => 'oldest']))['businesses'] ?? [];
+    $recentRows = api_business_list_public($pdo, array_merge($listFilters, ['sort' => 'newest', 'skip_total' => true]))['businesses'] ?? [];
+    $oldestRows = api_business_list_public($pdo, array_merge($listFilters, ['sort' => 'oldest', 'skip_total' => true]))['businesses'] ?? [];
 
     $rowToCard = static function (array $row): array {
         return [
@@ -102,11 +102,7 @@ try {
             'location'   => (string)($row['city']          ?? ''),
             'address'    => (string)($row['city']          ?? ''),
             'slug'       => (string)($row['slug']          ?? ''),
-            'image'      => !empty($row['logo_path'])
-                              ? $row['logo_path']
-                              : (!empty($row['banner_path'])
-                                  ? $row['banner_path']
-                                  : mci_listing_placeholder_url()),
+            'image'      => mci_listing_card_image_url($row['logo_path'] ?? null, $row['banner_path'] ?? null),
             'price_range' => $row['price_range'] ?? null,
         ];
     };

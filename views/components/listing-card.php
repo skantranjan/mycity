@@ -7,6 +7,10 @@
 // - $size: 'sm'|'md'
 // - $variant: null|'home' — 4-column grid on large screens; stacked: name, category, address
 
+if (!function_exists('mci_listing_placeholder_url')) {
+  require_once dirname(__DIR__, 2) . '/includes/mci_paths.php';
+}
+
 $listing = $listing ?? [];
 $size = $size ?? 'md';
 $variant = $variant ?? null;
@@ -40,11 +44,10 @@ $dotColor  = $catSlug !== '' ? $dotColors[crc32($catSlug) % 6] : $dotColors[0];
 // Ensure positive index
 $dotColor  = $dotColors[abs(crc32($catSlug)) % 6];
 
-$image = $listing['image'] ?? '';
-if (!$image) {
-  $image = 'data:image/svg+xml;charset=utf-8,' . rawurlencode(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#e2e8f0"/><text x="50%" y="50%" font-size="18" text-anchor="middle" fill="#64748b" dy=".35em">Photo</text></svg>'
-  );
+$mciListingPh = mci_listing_placeholder_url();
+$image = trim((string)($listing['image'] ?? ''));
+if ($image === '') {
+  $image = $mciListingPh;
 }
 
 if ($isHome) {
@@ -65,10 +68,12 @@ $cardExtraClass .= $isCompact ? ' mci-listing-card--compact' : '';
     <div class="card h-100 border-0 shadow-sm mci-listing-card<?= $cardExtraClass ?>">
       <div class="card-img-wrap">
         <img
-          src="<?= htmlspecialchars($image) ?>"
+          src="<?= htmlspecialchars($image, ENT_QUOTES, 'UTF-8') ?>"
           class="card-img-top"
-          alt="<?= htmlspecialchars($title) ?>"
+          alt="<?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?>"
           loading="lazy"
+          decoding="async"
+          onerror='this.onerror=null;this.src=<?= json_encode($mciListingPh, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS) ?>'
         />
       </div>
       <div class="card-body">

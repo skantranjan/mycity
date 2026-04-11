@@ -83,24 +83,6 @@
   z-index: 1;
 }
 
-.mci-auth-benefits__figure {
-  margin: 0 0 1.5rem;
-  border-radius: var(--mci-radius-lg);
-  overflow: hidden;
-  box-shadow: var(--mci-shadow-md);
-  border: 1px solid rgba(255,255,255,0.12);
-  position: relative;
-  z-index: 1;
-}
-
-.mci-auth-benefits__figure img {
-  display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-}
-
 .mci-auth-benefits__list {
   list-style: none;
   padding: 0;

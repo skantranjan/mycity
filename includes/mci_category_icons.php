@@ -33,6 +33,20 @@ $mciCategoryIcons = [
     'spa'                            => '🧖',
     'airport'                        => '✈️',
     'amusement-park'                 => '🎡',
+    'adventure-park'                 => '🎢',
+    'adventure-parks'                => '🎢',
+    'adventurepark'                  => '🎢',
+    'uncategorized'                  => '🏷️',
+    'uncategorised'                  => '🏷️',
+    'water-park'                     => '🌊',
+    'water-parks'                    => '🌊',
+    'waterpark'                      => '🌊',
+    'waterparks'                     => '🌊',
+    'one-day-picnic'                 => '🧺',
+    'one-day-picnics'                => '🧺',
+    'day-picnic'                     => '🧺',
+    'picnic'                         => '🧺',
+    'picnics'                        => '🧺',
     'aquarium'                       => '🐠',
     'art-gallery'                    => '🖼️',
     'atm'                            => '💳',
@@ -88,6 +102,7 @@ $mciCategoryIcons = [
     'post-office'                    => '📮',
     'pre-schools-and-day-care'       => '🧒',
     'private-coaching-institutes'    => '📝',
+    'resort'                         => '🏖️',
     'resorts'                        => '🏖️',
     'school'                         => '🏫',
     'services'                       => '🛠️',
@@ -133,5 +148,14 @@ function mci_render_category_icon(string $icon, string $extraClass = ''): string
 function mci_category_icon(string $slug, string $default = '📁'): string
 {
     global $mciCategoryIcons;
-    return $mciCategoryIcons[strtolower(trim($slug))] ?? $default;
+    $key = strtolower(trim(str_replace('_', '-', $slug)));
+    if (isset($mciCategoryIcons[$key])) {
+        return $mciCategoryIcons[$key];
+    }
+    // Uniqueness suffix from api_category_next_unique_slug: water-park-1 → water-park
+    if (preg_match('/^(.+)-(\d+)$/', $key, $m) === 1 && isset($mciCategoryIcons[$m[1]])) {
+        return $mciCategoryIcons[$m[1]];
+    }
+
+    return $default;
 }

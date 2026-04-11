@@ -100,28 +100,80 @@ function mci_site_base_url(): string
     return $scheme . '://' . $host;
 }
 
+/**
+ * Normalize DB upload paths for HTML src/href: trim, make root-relative, apply {@see mci_app_web_base_path}.
+ * Empty input returns ''. http(s) URLs are returned unchanged.
+ */
+function mci_public_media_src(?string $path): string
+{
+    $path = trim((string)($path ?? ''));
+    if ($path === '') {
+        return '';
+    }
+    if (preg_match('#^https?://#i', $path) === 1) {
+        return $path;
+    }
+    if ($path[0] !== '/') {
+        $path = '/' . ltrim($path, '/');
+    }
+
+    return mci_web_path($path);
+}
+
 /** Web path for a local listing/banner placeholder (no third-party image CDNs). */
 function mci_listing_placeholder_url(): string
 {
-    return '/assets/images/listing-placeholder.svg';
+    return mci_web_path('/assets/images/listing-placeholder.svg');
+}
+
+/**
+ * Listing card image: prefer logo, then banner; use {@see mci_listing_placeholder_url} when both empty.
+ * Trims values; whitespace-only paths are treated as missing.
+ */
+function mci_listing_card_image_url(?string $logoPath, ?string $bannerPath): string
+{
+    $logo = mci_public_media_src($logoPath);
+    if ($logo !== '') {
+        return $logo;
+    }
+    $banner = mci_public_media_src($bannerPath);
+    if ($banner !== '') {
+        return $banner;
+    }
+
+    return mci_listing_placeholder_url();
+}
+
+/**
+ * Hero-style preview (e.g. business page summary): prefer banner, then logo, then listing placeholder.
+ */
+function mci_listing_preview_image_url(?string $bannerPath, ?string $logoPath): string
+{
+    $banner = mci_public_media_src($bannerPath);
+    if ($banner !== '') {
+        return $banner;
+    }
+    $logo = mci_public_media_src($logoPath);
+
+    return $logo !== '' ? $logo : mci_listing_placeholder_url();
 }
 
 /** Wide hero/banner slot when a business has no banner image. */
 function mci_business_banner_placeholder_url(): string
 {
-    return '/assets/images/business-banner-placeholder.svg';
+    return mci_web_path('/assets/images/business-banner-placeholder.svg');
 }
 
 /** Square logo slot placeholder (cards, modals, admin previews). */
 function mci_business_logo_placeholder_url(): string
 {
-    return '/assets/images/business-logo-placeholder.svg';
+    return mci_web_path('/assets/images/business-logo-placeholder.svg');
 }
 
 /** Profile / storefront avatar circle when no profile (or logo fallback) image. */
 function mci_business_profile_placeholder_url(): string
 {
-    return '/assets/images/business-profile-placeholder.svg';
+    return mci_web_path('/assets/images/business-profile-placeholder.svg');
 }
 
 /**

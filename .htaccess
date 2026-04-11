@@ -247,3 +247,15 @@ RewriteRule ^services/([^/]+)/?$ services/index.php?slug=$1 [L,QSA]
 # Final fallback: avoid rewriting existing files (but allow directories to be rewritten)
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
+
+# Browser caching for static assets (reduces repeat visits; bump asset URLs on deploy if needed)
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 30 days"
+  ExpiresByType application/javascript "access plus 30 days"
+  ExpiresByType image/png "access plus 30 days"
+  ExpiresByType image/jpeg "access plus 30 days"
+  ExpiresByType image/webp "access plus 30 days"
+  ExpiresByType image/svg+xml "access plus 30 days"
+  ExpiresByType font/woff2 "access plus 180 days"
+</IfModule>

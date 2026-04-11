@@ -6,6 +6,9 @@ declare(strict_types=1);
  * Load key=value pairs from a .env file into getenv() / $_ENV / $_SERVER.
  * No external dependency — safe for simple dev/hosting setups.
  *
+ * Resolution when $envFilePath is omitted: project root `.env`, else root `env`
+ * (some Windows setups create `env` without the leading dot — that file is ignored otherwise).
+ *
  * Rules:
  * - Lines starting with # are comments (after optional leading whitespace).
  * - Format: KEY=value or KEY="value" or KEY='value'
@@ -19,8 +22,14 @@ function mci_load_dotenv(?string $envFilePath = null): void
     }
 
     $root = dirname(__DIR__);
-    $path = $envFilePath ?? ($root . DIRECTORY_SEPARATOR . '.env');
-    if (!is_readable($path)) {
+    if ($envFilePath !== null) {
+        $path = $envFilePath;
+    } else {
+        $dotenv = $root . DIRECTORY_SEPARATOR . '.env';
+        $plain = $root . DIRECTORY_SEPARATOR . 'env';
+        $path = is_readable($dotenv) ? $dotenv : (is_readable($plain) ? $plain : '');
+    }
+    if ($path === '' || !is_readable($path)) {
         return;
     }
 
