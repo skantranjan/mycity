@@ -38,6 +38,10 @@ const MCI_ADSENSE_CLIENT_ID = 'ca-pub-8738802980664354';
 function mci_log_error(string $context, Throwable $e): void
 {
     $logFile = dirname(__DIR__) . '/logs/api-errors.log';
+    $logDir = dirname($logFile);
+    if (!is_dir($logDir)) {
+        mkdir($logDir, 0775, true);
+    }
     $line = implode(' | ', [
         date('Y-m-d H:i:s'),
         $context,

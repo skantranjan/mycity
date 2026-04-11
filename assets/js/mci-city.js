@@ -72,9 +72,6 @@
     var heroTagline = document.getElementById('heroTaglineCity');
     if (heroTagline) heroTagline.textContent = city;
 
-    var heroBadgeLabel = document.getElementById('homeHeroBadgeLabel');
-    if (heroBadgeLabel) heroBadgeLabel.textContent = 'Discover ' + city;
-
     // "Popular in [city]" section
     var popularCity = document.getElementById('homePopularCity');
     if (popularCity) popularCity.textContent = city;
