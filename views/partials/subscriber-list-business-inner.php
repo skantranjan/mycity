@@ -928,7 +928,7 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
               <div class="mci-preview-photo__placeholder" id="previewPhotoPlaceholder">
                 <i class="bi bi-image" aria-hidden="true"></i><span>Photos appear here</span>
               </div>
-              <img id="previewPhotoImg" src="" alt="" class="d-none" />
+              <img id="previewPhotoImg" src="" alt="Listing photo preview" class="d-none" />
             </div>
 
             <div class="mci-preview-body">
@@ -1036,7 +1036,7 @@ $step7SubmitText = $step7SubmitText ?? 'Submit listing';
       </div>
       <div class="modal-body py-2">
         <div class="mci-crop-container">
-          <img id="cropModalImage" src="" alt="" style="max-width:100%;display:block;" />
+          <img id="cropModalImage" src="" alt="Image to crop" style="max-width:100%;display:block;" />
         </div>
         <p class="text-muted small text-center mt-2 mb-0">
           <i class="bi bi-arrows-move me-1" aria-hidden="true"></i>Drag to reposition · <i class="bi bi-zoom-in me-1" aria-hidden="true"></i>Scroll to zoom
