@@ -83,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $hideCta = true;
 $extraHead = <<<'HTML'
+<meta name="robots" content="noindex, follow" />
 <link rel="stylesheet" href="/assets/css/auth-pages.css" />
 HTML;
 

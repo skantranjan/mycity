@@ -299,7 +299,7 @@ ob_start();
               <?php endif; ?>
               <div class="mci-item-card__biz-strip">
                 <div class="mci-item-card__biz-logo">
-                  <img src="<?= htmlspecialchars($item['business_logo'] !== '' ? $item['business_logo'] : mci_business_logo_placeholder_url()) ?>" alt="" loading="lazy" />
+                  <img src="<?= htmlspecialchars($item['business_logo'] !== '' ? $item['business_logo'] : mci_business_logo_placeholder_url()) ?>" alt="<?= htmlspecialchars($item['business_name'] !== '' ? $item['business_name'] . ' logo' : 'Business logo', ENT_QUOTES, 'UTF-8') ?>" loading="lazy" />
                 </div>
                 <span class="mci-item-card__biz-name"><?= htmlspecialchars($item['business_name']) ?></span>
                 <?php if ($item['city'] !== ''): ?>
@@ -336,7 +336,7 @@ ob_start();
 <div class="mci-item-modal" id="mciItemModal" role="dialog" aria-modal="true" aria-labelledby="mciModalName">
   <div class="mci-item-modal__box">
     <div class="mci-item-modal__img" id="mciModalImg">
-      <img id="mciModalImgEl" src="" alt="" style="display:none;" />
+      <img id="mciModalImgEl" src="" alt="Item photo" style="display:none;" />
       <button class="mci-item-modal__close" data-modal-close aria-label="Close">✕</button>
     </div>
     <div class="mci-item-modal__body">
@@ -348,7 +348,7 @@ ob_start();
       <p class="mci-item-modal__desc" id="mciModalDesc"></p>
       <div class="mci-item-modal__biz">
         <div class="mci-item-modal__biz-logo" id="mciModalBizLogo">
-          <img id="mciModalBizLogoImg" src="" alt="" style="display:none;" />
+          <img id="mciModalBizLogoImg" src="" alt="Business logo" style="display:none;" />
           <i class="bi bi-shop" aria-hidden="true"></i>
         </div>
         <div>

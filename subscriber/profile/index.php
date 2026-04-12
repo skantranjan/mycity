@@ -215,7 +215,7 @@ ob_start();
             <?php if ($avatarPreview !== null): ?>
             <div class="col-12">
               <div class="text-muted small mb-1">Current photo in menu</div>
-              <img src="<?= htmlspecialchars($avatarPreview, ENT_QUOTES, 'UTF-8') ?>" alt="" class="mci-profile-avatar-preview rounded-circle border" width="96" height="96" style="object-fit:cover" />
+              <img src="<?= htmlspecialchars($avatarPreview, ENT_QUOTES, 'UTF-8') ?>" alt="Profile photo preview" class="mci-profile-avatar-preview rounded-circle border" width="96" height="96" style="object-fit:cover" />
             </div>
             <?php endif; ?>
           </div>

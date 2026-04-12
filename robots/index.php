@@ -25,8 +25,6 @@ Disallow: /storage/
 Disallow: /tools/
 Disallow: /migrate.php
 Disallow: /listing-preview/
-Disallow: /login/
-Disallow: /register/
 Disallow: /forgot-password/
 Disallow: /reset-password/
 Disallow: /logout/

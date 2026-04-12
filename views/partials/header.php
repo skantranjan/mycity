@@ -134,6 +134,9 @@ if ($appArea === '') {
           <?php
           $mciHdrName   = mci_app_profile_display_name('subscriber');
           $mciHdrAvatar = mci_app_profile_avatar_for_header('subscriber');
+          $mciHdrAvatarAlt = trim($mciHdrName) !== ''
+              ? htmlspecialchars($mciHdrName . ' profile photo', ENT_QUOTES, 'UTF-8')
+              : htmlspecialchars('Your profile photo', ENT_QUOTES, 'UTF-8');
           $mciSiteUrl   = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http')
                           . '://' . ($_SERVER['HTTP_HOST'] ?? 'www.mycityinfo.com');
           ?>
@@ -148,7 +151,7 @@ if ($appArea === '') {
                 aria-label="Open account menu"
               >
                 <?php if ($mciHdrAvatar !== null): ?>
-                  <img src="<?= htmlspecialchars($mciHdrAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" class="mci-header-user__avatar" width="36" height="36" decoding="async" />
+                  <img src="<?= htmlspecialchars($mciHdrAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="<?= $mciHdrAvatarAlt ?>" class="mci-header-user__avatar" width="36" height="36" decoding="async" />
                 <?php else: ?>
                   <span class="mci-header-user__avatar mci-header-user__avatar--placeholder" aria-hidden="true"><i class="bi bi-person-fill"></i></span>
                 <?php endif; ?>
@@ -160,7 +163,7 @@ if ($appArea === '') {
                 <div class="mci-hud__identity">
                   <div class="mci-hud__avatar-wrap">
                     <?php if ($mciHdrAvatar !== null): ?>
-                      <img src="<?= htmlspecialchars($mciHdrAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" class="mci-hud__avatar" width="44" height="44" decoding="async" />
+                      <img src="<?= htmlspecialchars($mciHdrAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="<?= $mciHdrAvatarAlt ?>" class="mci-hud__avatar" width="44" height="44" decoding="async" />
                     <?php else: ?>
                       <span class="mci-hud__avatar mci-hud__avatar--placeholder" aria-hidden="true"><i class="bi bi-person-fill"></i></span>
                     <?php endif; ?>
@@ -203,6 +206,9 @@ if ($appArea === '') {
           <?php
           $mciHdrName   = mci_app_profile_display_name('cp');
           $mciHdrAvatar = mci_app_profile_avatar_for_header('cp');
+          $mciHdrAvatarAlt = trim($mciHdrName) !== ''
+              ? htmlspecialchars($mciHdrName . ' profile photo', ENT_QUOTES, 'UTF-8')
+              : htmlspecialchars('Your profile photo', ENT_QUOTES, 'UTF-8');
           $mciCpRole    = (string) ($_SESSION['mci_cp_role'] ?? 'co_admin');
           $mciRoleLabel = $mciCpRole === 'super_admin' ? 'Super admin' : 'Co-admin';
           $mciSiteUrl   = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http')
@@ -219,7 +225,7 @@ if ($appArea === '') {
                 aria-label="Open admin account menu"
               >
                 <?php if ($mciHdrAvatar !== null): ?>
-                  <img src="<?= htmlspecialchars($mciHdrAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" class="mci-header-user__avatar" width="36" height="36" decoding="async" />
+                  <img src="<?= htmlspecialchars($mciHdrAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="<?= $mciHdrAvatarAlt ?>" class="mci-header-user__avatar" width="36" height="36" decoding="async" />
                 <?php else: ?>
                   <span class="mci-header-user__avatar mci-header-user__avatar--placeholder" aria-hidden="true"><i class="bi bi-shield-lock-fill"></i></span>
                 <?php endif; ?>
@@ -231,7 +237,7 @@ if ($appArea === '') {
                 <div class="mci-hud__identity mci-hud__identity--cp">
                   <div class="mci-hud__avatar-wrap">
                     <?php if ($mciHdrAvatar !== null): ?>
-                      <img src="<?= htmlspecialchars($mciHdrAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="" class="mci-hud__avatar" width="44" height="44" decoding="async" />
+                      <img src="<?= htmlspecialchars($mciHdrAvatar, ENT_QUOTES, 'UTF-8') ?>" alt="<?= $mciHdrAvatarAlt ?>" class="mci-hud__avatar" width="44" height="44" decoding="async" />
                     <?php else: ?>
                       <span class="mci-hud__avatar mci-hud__avatar--placeholder mci-hud__avatar--cp" aria-hidden="true"><i class="bi bi-shield-lock-fill"></i></span>
                     <?php endif; ?>

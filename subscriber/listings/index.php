@@ -78,7 +78,7 @@ ob_start();
                         : mci_business_logo_placeholder_url();
                     ?>
                     <img src="<?= htmlspecialchars($thumbLogo, ENT_QUOTES, 'UTF-8') ?>"
-                      alt="" width="48" height="48" class="rounded-2" style="object-fit:cover;" loading="lazy" decoding="async" />
+                      alt="<?= htmlspecialchars($rowName !== '' ? $rowName . ' logo' : 'Business logo', ENT_QUOTES, 'UTF-8') ?>" width="48" height="48" class="rounded-2" style="object-fit:cover;" loading="lazy" decoding="async" />
                   </td>
                   <td>
                     <button type="button" class="btn btn-link p-0 text-start fw-semibold js-sub-view-btn"
@@ -258,10 +258,11 @@ ob_start();
     var phLogo   = '/assets/images/business-logo-placeholder.svg';
     var phBanner = '/assets/images/business-banner-placeholder.svg';
     var phProfile = '/assets/images/business-profile-placeholder.svg';
+    var bizLabel = esc((b.name || 'Listing').trim() || 'Listing');
     html += '<div class="d-flex gap-2 mb-3 flex-wrap">';
-    html += '<div><div class="text-muted mb-1" style="font-size:.75rem;">Logo</div><img src="' + esc(b.logo_path || phLogo) + '" alt="logo" style="height:56px;max-width:160px;object-fit:contain;border:1px solid #dee2e6;border-radius:4px;background:#f8f9fa;padding:4px;"></div>';
-    html += '<div><div class="text-muted mb-1" style="font-size:.75rem;">Banner</div><img src="' + esc(b.banner_path || phBanner) + '" alt="banner" style="height:56px;max-width:200px;object-fit:cover;border-radius:4px;"></div>';
-    html += '<div><div class="text-muted mb-1" style="font-size:.75rem;">Profile</div><img src="' + esc(b.profile_path || phProfile) + '" alt="profile" style="height:56px;width:56px;object-fit:cover;border:1px solid #dee2e6;border-radius:50%;background:#f8f9fa;"></div>';
+    html += '<div><div class="text-muted mb-1" style="font-size:.75rem;">Logo</div><img src="' + esc(b.logo_path || phLogo) + '" alt="' + bizLabel + ' logo" style="height:56px;max-width:160px;object-fit:contain;border:1px solid #dee2e6;border-radius:4px;background:#f8f9fa;padding:4px;"></div>';
+    html += '<div><div class="text-muted mb-1" style="font-size:.75rem;">Banner</div><img src="' + esc(b.banner_path || phBanner) + '" alt="' + bizLabel + ' banner" style="height:56px;max-width:200px;object-fit:cover;border-radius:4px;"></div>';
+    html += '<div><div class="text-muted mb-1" style="font-size:.75rem;">Profile</div><img src="' + esc(b.profile_path || phProfile) + '" alt="' + bizLabel + ' profile photo" style="height:56px;width:56px;object-fit:cover;border:1px solid #dee2e6;border-radius:50%;background:#f8f9fa;"></div>';
     html += '</div>';
 
     /* Status badge */
@@ -348,7 +349,7 @@ ob_start();
       b.products.forEach(function(p) {
         var price = priceStr(p.price_min, p.price_max, p.price_unit);
         html += '<li class="py-2 border-bottom"><div class="d-flex gap-2 align-items-start">';
-        if (p.image_path) html += '<img src="' + esc(p.image_path) + '" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:4px;flex-shrink:0;">';
+        if (p.image_path) html += '<img src="' + esc(p.image_path) + '" alt="' + esc(p.name) + ' thumbnail" style="width:44px;height:44px;object-fit:cover;border-radius:4px;flex-shrink:0;">';
         html += '<div><div class="fw-semibold small">' + esc(p.name) + '</div>'
           + (price ? '<div class="text-muted small">' + esc(price) + '</div>' : '')
           + (p.description ? '<div class="text-muted small mt-1">' + esc(p.description) + '</div>' : '')
@@ -364,7 +365,7 @@ ob_start();
       b.services.forEach(function(s) {
         var price = priceStr(s.price_min, s.price_max, s.price_unit);
         html += '<li class="py-2 border-bottom"><div class="d-flex gap-2 align-items-start">';
-        if (s.image_path) html += '<img src="' + esc(s.image_path) + '" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:4px;flex-shrink:0;">';
+        if (s.image_path) html += '<img src="' + esc(s.image_path) + '" alt="' + esc(s.name) + ' thumbnail" style="width:44px;height:44px;object-fit:cover;border-radius:4px;flex-shrink:0;">';
         html += '<div><div class="fw-semibold small">' + esc(s.name) + '</div>'
           + (price ? '<div class="text-muted small">' + esc(price) + '</div>' : '')
           + (s.description ? '<div class="text-muted small mt-1">' + esc(s.description) + '</div>' : '')

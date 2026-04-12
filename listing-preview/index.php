@@ -80,7 +80,7 @@ ob_start();
 
   <!-- Hero banner -->
   <div class="mci-business-hero mb-0">
-    <img class="mci-business-hero__img" id="pvHeroImg" src="" alt="" />
+    <img class="mci-business-hero__img" id="pvHeroImg" src="" alt="Listing banner preview" />
     <div class="mci-business-hero__overlay" aria-hidden="true"></div>
     <div class="mci-business-hero__content">
       <div class="mci-business-hero__title-row w-100 min-w-0">
@@ -92,7 +92,7 @@ ob_start();
 
   <!-- Profile image -->
   <div class="mci-business-profile-wrap">
-    <img class="mci-business-profile" id="pvProfileImg" src="" alt="" width="132" height="132" />
+    <img class="mci-business-profile" id="pvProfileImg" src="" alt="Listing profile photo preview" width="132" height="132" />
   </div>
 
   <div class="px-1 px-sm-2">

@@ -579,9 +579,11 @@ if ($listing['phone'] !== '')   { $__schema['telephone'] = $listing['phone']; }
 if ($listing['email'] !== '')   { $__schema['email']     = $listing['email']; }
 if ($listing['website'] !== '') { $__schema['sameAs']    = [$listing['website']]; }
 if (!empty($reviewSummary['count']) && (int)$reviewSummary['count'] > 0) {
+    $aggRating = round((float)($reviewSummary['average'] ?? 0), 1);
+    $aggRating = max(1.0, min(5.0, $aggRating));
     $__schema['aggregateRating'] = [
         '@type'       => 'AggregateRating',
-        'ratingValue' => round((float)($reviewSummary['avg'] ?? 0), 1),
+        'ratingValue' => $aggRating,
         'reviewCount' => (int)$reviewSummary['count'],
         'bestRating'  => 5,
         'worstRating' => 1,
@@ -624,7 +626,9 @@ $extraJS = <<<'HTML'
 
   function show(index) {
     current = (index + images.length) % images.length;
-    imgEl.src = images[current].dataset.full || images[current].src;
+    var thumb = images[current];
+    imgEl.src = thumb.dataset.full || thumb.src;
+    imgEl.alt = thumb.getAttribute('alt') || 'Gallery photo';
     overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
   }
@@ -716,7 +720,7 @@ ob_start();
     <img
       class="mci-business-hero__img"
       src="<?= htmlspecialchars($heroBannerUrl) ?>"
-      alt=""
+      alt="<?= htmlspecialchars($listing['title'] . ' — banner image', ENT_QUOTES, 'UTF-8') ?>"
       loading="eager"
     />
     <div class="mci-business-hero__overlay" aria-hidden="true"></div>

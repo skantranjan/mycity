@@ -33,6 +33,8 @@
     var imgPath = d.image || '';
     if (imgPath && modalImgEl) {
       modalImgEl.src = imgPath;
+      var itemName = d.name || '';
+      modalImgEl.alt = itemName ? itemName + ' — item photo' : 'Item photo';
       modalImgEl.style.display = '';
       if (modalImg) modalImg.style.fontSize = '0';
     } else {
@@ -53,6 +55,8 @@
 
     if (modalBizLogoImg) {
       modalBizLogoImg.src = bizLogoPath;
+      var bn = d.bizName || '';
+      modalBizLogoImg.alt = bn ? bn + ' logo' : 'Business logo';
       modalBizLogoImg.style.display = '';
       if (modalBizLogo) modalBizLogo.style.fontSize = '0';
     }
@@ -307,7 +311,8 @@
         : '';
 
       var bizLogoSrc = item.business_logo || MCI_LOGO_PLACEHOLDER;
-      var bizLogoHtml = '<img src="' + esc(bizLogoSrc) + '" alt="" loading="lazy" />';
+      var bizLogoAlt = item.business_name ? esc(item.business_name) + ' logo' : 'Business logo';
+      var bizLogoHtml = '<img src="' + esc(bizLogoSrc) + '" alt="' + bizLogoAlt + '" loading="lazy" />';
 
       var cityHtml = item.city
         ? '<span class="mci-item-card__city">📍 ' + esc(item.city) + '</span>'
