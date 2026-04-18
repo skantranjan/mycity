@@ -32,6 +32,8 @@ if (!$__needsAppCss) {
 }
 
 $__seoTitle = mci_seo_document_title(isset($pageTitle) ? (string)$pageTitle : null);
+$__themeCssVersion = (string) (@filemtime(__DIR__ . '/../assets/css/theme.css') ?: '1');
+$__appAreasCssVersion = (string) (@filemtime(__DIR__ . '/../assets/css/app-areas.css') ?: '1');
 ?>
 <!doctype html>
 <html lang="en">
@@ -96,7 +98,7 @@ $__seoTitle = mci_seo_document_title(isset($pageTitle) ? (string)$pageTitle : nu
       rel="stylesheet"
     />
     <!-- Site tokens + base overrides (after Bootstrap) -->
-    <link rel="stylesheet" href="/assets/css/theme.css" />
+    <link rel="stylesheet" href="<?= htmlspecialchars(mci_web_path('/assets/css/theme.css?v=' . $__themeCssVersion), ENT_QUOTES, 'UTF-8') ?>" />
     <!-- Icons: non-blocking load (brief period without icon font is acceptable) -->
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
@@ -108,7 +110,7 @@ $__seoTitle = mci_seo_document_title(isset($pageTitle) ? (string)$pageTitle : nu
       <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     </noscript>
     <?php if ($__needsAppCss): ?>
-      <link rel="stylesheet" href="/assets/css/app-areas.css" />
+      <link rel="stylesheet" href="<?= htmlspecialchars(mci_web_path('/assets/css/app-areas.css?v=' . $__appAreasCssVersion), ENT_QUOTES, 'UTF-8') ?>" />
     <?php endif; ?>
   </head>
   <body class="<?= htmlspecialchars($__mciBodyClass, ENT_QUOTES, 'UTF-8') ?>">
@@ -168,6 +170,13 @@ $__seoTitle = mci_seo_document_title(isset($pageTitle) ? (string)$pageTitle : nu
   }
   nav.addEventListener('shown.bs.collapse', syncBodyScrollLock);
   nav.addEventListener('hidden.bs.collapse', syncBodyScrollLock);
+  // During the close transition, remove the body lock immediately so
+  // mobile browsers don't get stuck in a non-interactive state.
+  nav.addEventListener('hide.bs.collapse', function () {
+    if (window.matchMedia('(max-width: 991.98px)').matches) {
+      document.body.classList.remove('mci-nav-open');
+    }
+  });
   window.addEventListener('resize', function () {
     if (window.matchMedia('(min-width: 992px)').matches) {
       document.body.classList.remove('mci-nav-open');
