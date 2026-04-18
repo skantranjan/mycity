@@ -766,6 +766,18 @@ iframe { max-width: 100%; }
   color: rgba(255,255,255,0.35) !important;
 }
 
+@media (max-width: 575.98px) {
+  /* Make the footer feel less cramped on phones */
+  .site-footer .container {
+    padding-top: 2rem !important;
+    padding-bottom: 2rem !important;
+  }
+  .site-footer .mci-footer__title {
+    font-size: 0.9rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+}
+
 /* ─── Mobile nav drawer ─────────────────────────────── */
 /*
  * On small screens Bootstrap's collapse becomes a full-height
@@ -777,29 +789,17 @@ iframe { max-width: 100%; }
   :root { --mci-header-height: 52px; }
   body.mci-body.mci-nav-open {
     overflow: hidden;
-    touch-action: none;
   }
-  /* Backdrop — shown when drawer is open */
-  .site-header .navbar-collapse::before {
+  /* Backdrop — driven by body class for cross-browser stability */
+  body.mci-body.mci-nav-open::before {
     content: "";
     position: fixed;
     inset: 0;
     background: rgba(10,15,30,0.65);
-    backdrop-filter: blur(4px);
-    z-index: 0;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-  }
-  /* Keep drawer content above backdrop so links remain tappable */
-  .site-header .navbar-collapse > * {
-    position: relative;
-    z-index: 1;
-  }
-  .site-header .navbar-collapse.show::before,
-  .site-header .navbar-collapse.collapsing::before {
+    z-index: 1040;
     opacity: 1;
-    pointer-events: auto;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
   }
 
   /* Drawer panel */
@@ -814,6 +814,8 @@ iframe { max-width: 100%; }
     box-shadow: -8px 0 40px rgba(0,0,0,0.45);
     z-index: 1050;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     padding: 3.5rem 1.25rem 2rem;
     /* Start off-screen to the right */
     transform: translateX(100%);
@@ -823,11 +825,14 @@ iframe { max-width: 100%; }
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     display: block !important;   /* prevent Bootstrap hiding it */
     visibility: hidden;
+    pointer-events: none;
+    will-change: transform;
   }
 
   .site-header .navbar-collapse.show {
     transform: translateX(0);
     visibility: visible;
+    pointer-events: auto;
   }
 
   .site-header .navbar-collapse.collapsing {
@@ -835,6 +840,7 @@ iframe { max-width: 100%; }
     transform: translateX(0);
     visibility: visible;
     height: 100dvh !important;
+    pointer-events: auto;
   }
 
   /* Drawer nav links — larger, full-width */
@@ -882,8 +888,9 @@ iframe { max-width: 100%; }
 
   .site-header .mci-mobile-nav-close {
     position: absolute;
-    top: 0.75rem;
-    right: 0.9rem;
+    /* Align with drawer padding and avoid iOS safe-area cutoffs */
+    top: calc(0.75rem + env(safe-area-inset-top));
+    right: calc(1.0rem + env(safe-area-inset-right));
     width: 2.25rem;
     height: 2.25rem;
     padding: 0;

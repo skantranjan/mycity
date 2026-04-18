@@ -21,7 +21,7 @@
       </div>
 
       <!-- Legal: order-2 on mobile (most useful), order-3 on md+ -->
-      <div class="col-6 col-md-3 order-2 order-md-3">
+      <div class="col-12 col-md-3 order-2 order-md-3">
         <div class="mci-footer__title">Legal</div>
         <ul class="mci-footer__links" aria-label="Legal links">
           <li><a class="mci-footer__link" href="/privacy-policy/">Privacy Policy</a></li>
@@ -32,7 +32,7 @@
       </div>
 
       <!-- Help CTA: order-3 on mobile, order-4 on md+ -->
-      <div class="col-6 col-md-3 order-3 order-md-4">
+      <div class="col-12 col-md-3 order-3 order-md-4">
         <div class="mci-footer__title">Need help?</div>
         <div class="text-muted small mci-footer__help">
           Have a question or need assistance? We are here to help.
@@ -45,7 +45,7 @@
       </div>
 
       <!-- Company: order-4 on mobile (last), order-2 on md+ -->
-      <div class="col-6 col-md-2 order-4 order-md-2">
+      <div class="col-12 col-md-2 order-4 order-md-2">
         <div class="mci-footer__title">Company</div>
         <ul class="mci-footer__links" aria-label="Company links">
           <li><a class="mci-footer__link" href="/about/">About</a></li>
