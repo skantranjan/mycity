@@ -38,15 +38,14 @@ if (str_starts_with($uri, '/api/v1')) {
     return true;
 }
 
-if (preg_match('#^/sitemap-pages-([1-9][0-9]*)\.xml$#', $uri, $m)) {
-    $_GET['kind'] = 'pages';
-    $_GET['part'] = (int) $m[1];
+if (preg_match('#^/sitemap-(common|businesses|business-categories|products|services|locations|tags)-([1-9][0-9]*)\.xml$#', $uri, $m)) {
+    $_GET['kind'] = (string) $m[1];
+    $_GET['part'] = (int) $m[2];
     require __DIR__ . '/sitemap/index.php';
     return true;
 }
-if (preg_match('#^/sitemap-businesses-([1-9][0-9]*)\.xml$#', $uri, $m)) {
-    $_GET['kind'] = 'businesses';
-    $_GET['part'] = (int) $m[1];
+if (preg_match('#^/sitemap-(common|businesses|business-categories|products|services|locations|tags)\.xml$#', $uri, $m)) {
+    $_GET['kind'] = (string) $m[1];
     require __DIR__ . '/sitemap/index.php';
     return true;
 }

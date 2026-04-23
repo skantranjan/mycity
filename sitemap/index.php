@@ -3,11 +3,18 @@
 declare(strict_types=1);
 
 /**
- * Dynamic XML sitemap with automatic splitting at 50,000 URLs per file (sitemaps.org).
+ * Master sitemap index + dedicated child sitemap files.
  *
- * - Total URLs ≤ limit: /sitemap.xml is a single <urlset>.
- * - Total URLs > limit: /sitemap.xml is a <sitemapindex> pointing at
- *   /sitemap-pages-{n}.xml and /sitemap-businesses-{n}.xml as needed.
+ * - /sitemap.xml is always a <sitemapindex>.
+ * - Child sitemap families:
+ *   - common pages
+ *   - businesses
+ *   - business categories
+ *   - products
+ *   - services
+ *   - locations
+ *   - tags
+ * - Each family auto-splits when rows exceed 50,000 URLs.
  */
 
 require_once __DIR__ . '/../includes/mci_paths.php';
@@ -15,15 +22,30 @@ require_once __DIR__ . '/../api/v1/lib/db.php';
 
 const MCI_SITEMAP_MAX_URLS = 50000;
 
+/** @return list<string> */
+function mci_sitemap_kinds(): array
+{
+    return [
+        'common',
+        'businesses',
+        'business-categories',
+        'products',
+        'services',
+        'locations',
+        'tags',
+    ];
+}
+
 /** @return list<array{0: string, 1: string, 2: string}> */
-function mci_sitemap_static_pages(): array
+function mci_sitemap_common_pages(): array
 {
     return [
         ['/', 'daily', '1.0'],
         ['/business-listing/', 'daily', '0.9'],
-        ['/business-category/', 'weekly', '0.8'],
         ['/products/', 'daily', '0.8'],
         ['/services/', 'daily', '0.8'],
+        ['/business-category/', 'weekly', '0.8'],
+        ['/location/', 'weekly', '0.7'],
         ['/tag/', 'weekly', '0.6'],
         ['/about/', 'monthly', '0.6'],
         ['/contact/', 'monthly', '0.5'],
@@ -34,7 +56,6 @@ function mci_sitemap_static_pages(): array
     ];
 }
 
-/** City name → URL slug for /location/{slug}/ (matches location/index.php de-slugify). */
 function mci_sitemap_city_slug(string $city): string
 {
     $city = strtolower(trim($city));
@@ -60,18 +81,6 @@ function mci_sitemap_xml_text(string $s): string
     return htmlspecialchars($s, ENT_XML1 | ENT_QUOTES, 'UTF-8');
 }
 
-function mci_sitemap_emit_url(string $loc, string $changefreq, string $priority, ?string $lastmod = null): void
-{
-    echo '  <url>';
-    echo '<loc>', mci_sitemap_xml_text($loc), '</loc>';
-    if ($lastmod !== null && $lastmod !== '') {
-        echo '<lastmod>', mci_sitemap_xml_text($lastmod), '</lastmod>';
-    }
-    echo '<changefreq>', mci_sitemap_xml_text($changefreq), '</changefreq>';
-    echo '<priority>', mci_sitemap_xml_text($priority), '</priority>';
-    echo "</url>\n";
-}
-
 function mci_sitemap_date(?string $datetime): ?string
 {
     if ($datetime === null || $datetime === '') {
@@ -82,61 +91,16 @@ function mci_sitemap_date(?string $datetime): ?string
     return $t !== false ? gmdate('Y-m-d', $t) : null;
 }
 
-/**
- * @return array{np: int, nb: int, cat: int, tag: int, prod: int, svc: int, loc: int}
- */
-function mci_sitemap_counts(PDO $pdo): array
+function mci_sitemap_emit_url(string $loc, string $changefreq, string $priority, ?string $lastmod = null): void
 {
-    $staticN = count(mci_sitemap_static_pages());
-
-    $cat = (int)$pdo->query("
-        SELECT COUNT(DISTINCT c.id)
-        FROM mci_categories c
-        INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
-        WHERE c.parent_id IS NULL AND c.slug <> ''
-    ")->fetchColumn();
-
-    $tag = (int)$pdo->query("
-        SELECT COUNT(DISTINCT t.id)
-        FROM mci_tags t
-        INNER JOIN mci_business_tags bt ON bt.tag_id = t.id
-        INNER JOIN mci_business_groups g ON g.id = bt.business_group_id AND g.status = 'live'
-        WHERE t.slug <> ''
-    ")->fetchColumn();
-
-    $prod = (int)$pdo->query("
-        SELECT COUNT(DISTINCT c.id)
-        FROM mci_categories c
-        INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
-        INNER JOIN mci_business_products p ON p.business_group_id = g.id AND p.is_active = 1
-        WHERE c.parent_id IS NULL AND c.slug <> ''
-    ")->fetchColumn();
-
-    $svc = (int)$pdo->query("
-        SELECT COUNT(DISTINCT c.id)
-        FROM mci_categories c
-        INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
-        INNER JOIN mci_business_services s ON s.business_group_id = g.id AND s.is_active = 1
-        WHERE c.parent_id IS NULL AND c.slug <> ''
-    ")->fetchColumn();
-
-    $nb = (int)$pdo->query("
-        SELECT COUNT(*) FROM mci_business_groups
-        WHERE status = 'live' AND slug <> ''
-    ")->fetchColumn();
-
-    $loc = (int)$pdo->query("
-        SELECT COUNT(*) FROM (
-            SELECT DISTINCT TRIM(b.city) AS c
-            FROM mci_business_branches b
-            INNER JOIN mci_business_groups g ON g.id = b.business_group_id AND g.status = 'live'
-            WHERE b.status = 'active' AND TRIM(b.city) <> ''
-        ) t
-    ")->fetchColumn();
-
-    $np = $staticN + $cat + $tag + $prod + $svc + $loc;
-
-    return ['np' => $np, 'nb' => $nb, 'cat' => $cat, 'tag' => $tag, 'prod' => $prod, 'svc' => $svc, 'loc' => $loc];
+    echo '  <url>';
+    echo '<loc>', mci_sitemap_xml_text($loc), '</loc>';
+    if ($lastmod !== null && $lastmod !== '') {
+        echo '<lastmod>', mci_sitemap_xml_text($lastmod), '</lastmod>';
+    }
+    echo '<changefreq>', mci_sitemap_xml_text($changefreq), '</changefreq>';
+    echo '<priority>', mci_sitemap_xml_text($priority), '</priority>';
+    echo "</url>\n";
 }
 
 function mci_sitemap_begin_urlset(): void
@@ -175,32 +139,146 @@ function mci_sitemap_end_index(): void
     echo '</sitemapindex>';
 }
 
-/**
- * Skip $skip URLs then emit up to $limit from static + DB buckets (non-business only).
- *
- * @return int Number of URLs emitted
- */
-function mci_sitemap_emit_pages_slice(PDO $pdo, int $skip, int $limit): int
+function mci_sitemap_kind_basename(string $kind): string
 {
-    $emitted = 0;
-    if ($limit <= 0) {
-        return 0;
-    }
+    return match ($kind) {
+        'common' => 'sitemap-common',
+        'businesses' => 'sitemap-businesses',
+        'business-categories' => 'sitemap-business-categories',
+        'products' => 'sitemap-products',
+        'services' => 'sitemap-services',
+        'locations' => 'sitemap-locations',
+        'tags' => 'sitemap-tags',
+        default => 'sitemap-common',
+    };
+}
 
-    foreach (mci_sitemap_static_pages() as $row) {
-        if ($skip > 0) {
-            $skip--;
-            continue;
-        }
+/** @return array<string, int> */
+function mci_sitemap_counts(PDO $pdo): array
+{
+    return [
+        'common' => count(mci_sitemap_common_pages()),
+        'businesses' => (int)$pdo->query("
+            SELECT COUNT(*) FROM mci_business_groups
+            WHERE status = 'live' AND slug <> ''
+        ")->fetchColumn(),
+        'business-categories' => (int)$pdo->query("
+            SELECT COUNT(DISTINCT c.id)
+            FROM mci_categories c
+            INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
+            WHERE c.parent_id IS NULL AND c.slug <> ''
+        ")->fetchColumn(),
+        'products' => (int)$pdo->query("
+            SELECT COUNT(DISTINCT c.id)
+            FROM mci_categories c
+            INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
+            INNER JOIN mci_business_products p ON p.business_group_id = g.id AND p.is_active = 1
+            WHERE c.parent_id IS NULL AND c.slug <> ''
+        ")->fetchColumn(),
+        'services' => (int)$pdo->query("
+            SELECT COUNT(DISTINCT c.id)
+            FROM mci_categories c
+            INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
+            INNER JOIN mci_business_services s ON s.business_group_id = g.id AND s.is_active = 1
+            WHERE c.parent_id IS NULL AND c.slug <> ''
+        ")->fetchColumn(),
+        'locations' => (int)$pdo->query("
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT TRIM(b.city) AS city_name
+                FROM mci_business_branches b
+                INNER JOIN mci_business_groups g ON g.id = b.business_group_id AND g.status = 'live'
+                WHERE b.status = 'active' AND TRIM(b.city) <> ''
+            ) t
+        ")->fetchColumn(),
+        'tags' => (int)$pdo->query("
+            SELECT COUNT(DISTINCT t.id)
+            FROM mci_tags t
+            INNER JOIN mci_business_tags bt ON bt.tag_id = t.id
+            INNER JOIN mci_business_groups g ON g.id = bt.business_group_id AND g.status = 'live'
+            WHERE t.slug <> ''
+        ")->fetchColumn(),
+    ];
+}
+
+function mci_sitemap_lastmod(PDO $pdo, string $kind): string
+{
+    $sql = match ($kind) {
+        'businesses' => "
+            SELECT MAX(COALESCE(updated_at, created_at))
+            FROM mci_business_groups
+            WHERE status = 'live' AND slug <> ''
+        ",
+        'business-categories' => "
+            SELECT MAX(c.created_at)
+            FROM mci_categories c
+            INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
+            WHERE c.parent_id IS NULL AND c.slug <> ''
+        ",
+        'products' => "
+            SELECT MAX(COALESCE(p.created_at, g.updated_at, g.created_at))
+            FROM mci_business_products p
+            INNER JOIN mci_business_groups g ON g.id = p.business_group_id AND g.status = 'live'
+            WHERE p.is_active = 1
+        ",
+        'services' => "
+            SELECT MAX(COALESCE(s.created_at, g.updated_at, g.created_at))
+            FROM mci_business_services s
+            INNER JOIN mci_business_groups g ON g.id = s.business_group_id AND g.status = 'live'
+            WHERE s.is_active = 1
+        ",
+        'locations' => "
+            SELECT MAX(COALESCE(b.updated_at, b.created_at, g.updated_at, g.created_at))
+            FROM mci_business_branches b
+            INNER JOIN mci_business_groups g ON g.id = b.business_group_id AND g.status = 'live'
+            WHERE b.status = 'active' AND TRIM(b.city) <> ''
+        ",
+        'tags' => "
+            SELECT MAX(t.created_at)
+            FROM mci_tags t
+            INNER JOIN mci_business_tags bt ON bt.tag_id = t.id
+            INNER JOIN mci_business_groups g ON g.id = bt.business_group_id AND g.status = 'live'
+            WHERE t.slug <> ''
+        ",
+        default => null,
+    };
+
+    if ($sql === null) {
+        return gmdate('Y-m-d');
+    }
+    $raw = $pdo->query($sql)?->fetchColumn();
+    $d = mci_sitemap_date(is_string($raw) ? $raw : null);
+
+    return $d ?? gmdate('Y-m-d');
+}
+
+function mci_sitemap_emit_common_slice(int $part): void
+{
+    $offset = ($part - 1) * MCI_SITEMAP_MAX_URLS;
+    $rows = array_slice(mci_sitemap_common_pages(), $offset, MCI_SITEMAP_MAX_URLS);
+    foreach ($rows as $row) {
         mci_sitemap_emit_url(mci_sitemap_location($row[0]), $row[1], $row[2]);
-        $emitted++;
-        if ($emitted >= $limit) {
-            return $emitted;
-        }
     }
+}
 
-    $buckets = [
-        [
+function mci_sitemap_emit_db_slice(PDO $pdo, string $kind, int $part): void
+{
+    $offset = ($part - 1) * MCI_SITEMAP_MAX_URLS;
+    $lastmodFmt = static fn(array $r): ?string => mci_sitemap_date((string)($r['ts'] ?? ''));
+
+    $cfg = match ($kind) {
+        'businesses' => [
+            'sql' => "
+                SELECT slug, COALESCE(updated_at, created_at) AS ts
+                FROM mci_business_groups
+                WHERE status = 'live' AND slug <> ''
+                ORDER BY slug
+                LIMIT :lim OFFSET :off
+            ",
+            'freq' => 'weekly',
+            'pri' => '0.85',
+            'loc' => static fn(array $r): string => mci_sitemap_location('/business/' . rawurlencode((string)$r['slug']) . '/'),
+        ],
+        'business-categories' => [
             'sql' => "
                 SELECT c.slug, MAX(c.created_at) AS ts
                 FROM mci_categories c
@@ -208,26 +286,43 @@ function mci_sitemap_emit_pages_slice(PDO $pdo, int $skip, int $limit): int
                 WHERE c.parent_id IS NULL AND c.slug <> ''
                 GROUP BY c.id, c.slug
                 ORDER BY c.slug
+                LIMIT :lim OFFSET :off
             ",
-            'path' => static fn(string $slug): string => '/business-category/' . rawurlencode($slug) . '/',
             'freq' => 'weekly',
-            'pri'  => '0.75',
+            'pri' => '0.75',
+            'loc' => static fn(array $r): string => mci_sitemap_location('/business-category/' . rawurlencode((string)$r['slug']) . '/'),
         ],
-        [
+        'products' => [
             'sql' => "
-                SELECT t.slug, MAX(t.created_at) AS ts
-                FROM mci_tags t
-                INNER JOIN mci_business_tags bt ON bt.tag_id = t.id
-                INNER JOIN mci_business_groups g ON g.id = bt.business_group_id AND g.status = 'live'
-                WHERE t.slug <> ''
-                GROUP BY t.id, t.slug
-                ORDER BY t.slug
+                SELECT c.slug, MAX(COALESCE(p.created_at, g.updated_at, g.created_at)) AS ts
+                FROM mci_categories c
+                INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
+                INNER JOIN mci_business_products p ON p.business_group_id = g.id AND p.is_active = 1
+                WHERE c.parent_id IS NULL AND c.slug <> ''
+                GROUP BY c.id, c.slug
+                ORDER BY c.slug
+                LIMIT :lim OFFSET :off
             ",
-            'path' => static fn(string $slug): string => '/tag/' . rawurlencode($slug) . '/',
             'freq' => 'weekly',
-            'pri'  => '0.65',
+            'pri' => '0.70',
+            'loc' => static fn(array $r): string => mci_sitemap_location('/products/' . rawurlencode((string)$r['slug']) . '/'),
         ],
-        [
+        'services' => [
+            'sql' => "
+                SELECT c.slug, MAX(COALESCE(s.created_at, g.updated_at, g.created_at)) AS ts
+                FROM mci_categories c
+                INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
+                INNER JOIN mci_business_services s ON s.business_group_id = g.id AND s.is_active = 1
+                WHERE c.parent_id IS NULL AND c.slug <> ''
+                GROUP BY c.id, c.slug
+                ORDER BY c.slug
+                LIMIT :lim OFFSET :off
+            ",
+            'freq' => 'weekly',
+            'pri' => '0.70',
+            'loc' => static fn(array $r): string => mci_sitemap_location('/services/' . rawurlencode((string)$r['slug']) . '/'),
+        ],
+        'locations' => [
             'sql' => "
                 SELECT TRIM(b.city) AS city_name,
                        MAX(COALESCE(b.updated_at, b.created_at, g.updated_at, g.created_at)) AS ts
@@ -236,255 +331,115 @@ function mci_sitemap_emit_pages_slice(PDO $pdo, int $skip, int $limit): int
                 WHERE b.status = 'active' AND TRIM(b.city) <> ''
                 GROUP BY TRIM(b.city)
                 ORDER BY TRIM(b.city)
+                LIMIT :lim OFFSET :off
             ",
-            'path_from_row' => true,
-            'path' => static function (array $r): string {
-                $city = trim((string)($r['city_name'] ?? ''));
-                $slug = mci_sitemap_city_slug($city);
-
-                return $slug !== '' ? '/location/' . rawurlencode($slug) . '/' : '';
+            'freq' => 'weekly',
+            'pri' => '0.72',
+            'loc' => static function (array $r): string {
+                $slug = mci_sitemap_city_slug((string)($r['city_name'] ?? ''));
+                return mci_sitemap_location('/location/' . rawurlencode($slug) . '/');
             },
-            'freq' => 'weekly',
-            'pri'  => '0.72',
         ],
-        [
+        'tags' => [
             'sql' => "
-                SELECT c.slug, MAX(c.created_at) AS ts
-                FROM mci_categories c
-                INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
-                INNER JOIN mci_business_products p ON p.business_group_id = g.id AND p.is_active = 1
-                WHERE c.parent_id IS NULL AND c.slug <> ''
-                GROUP BY c.id, c.slug
-                ORDER BY c.slug
+                SELECT t.slug, MAX(t.created_at) AS ts
+                FROM mci_tags t
+                INNER JOIN mci_business_tags bt ON bt.tag_id = t.id
+                INNER JOIN mci_business_groups g ON g.id = bt.business_group_id AND g.status = 'live'
+                WHERE t.slug <> ''
+                GROUP BY t.id, t.slug
+                ORDER BY t.slug
+                LIMIT :lim OFFSET :off
             ",
-            'path' => static fn(string $slug): string => '/products/' . rawurlencode($slug) . '/',
             'freq' => 'weekly',
-            'pri'  => '0.7',
+            'pri' => '0.65',
+            'loc' => static fn(array $r): string => mci_sitemap_location('/tag/' . rawurlencode((string)$r['slug']) . '/'),
         ],
-        [
-            'sql' => "
-                SELECT c.slug, MAX(c.created_at) AS ts
-                FROM mci_categories c
-                INNER JOIN mci_business_groups g ON g.parent_category_id = c.id AND g.status = 'live'
-                INNER JOIN mci_business_services s ON s.business_group_id = g.id AND s.is_active = 1
-                WHERE c.parent_id IS NULL AND c.slug <> ''
-                GROUP BY c.id, c.slug
-                ORDER BY c.slug
-            ",
-            'path' => static fn(string $slug): string => '/services/' . rawurlencode($slug) . '/',
-            'freq' => 'weekly',
-            'pri'  => '0.7',
-        ],
-    ];
+        default => null,
+    };
 
-    foreach ($buckets as $bucket) {
-        $stmt = $pdo->query($bucket['sql']);
-        if (!$stmt) {
-            continue;
-        }
-        while ($emitted < $limit) {
-            $r = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($r === false) {
-                break;
-            }
-            $slug = (string)($r['slug'] ?? '');
-            if ($slug === '' && empty($bucket['path_from_row'])) {
-                continue;
-            }
-            if ($skip > 0) {
-                $skip--;
-                continue;
-            }
-            $pathFn = $bucket['path'];
-            if (!empty($bucket['path_from_row'])) {
-                $relPath = $pathFn($r);
-                if ($relPath === '') {
-                    continue;
-                }
-                $absLoc = mci_sitemap_location($relPath);
-            } else {
-                $absLoc = mci_sitemap_location($pathFn($slug));
-            }
-            mci_sitemap_emit_url(
-                $absLoc,
-                $bucket['freq'],
-                $bucket['pri'],
-                mci_sitemap_date((string)($r['ts'] ?? ''))
-            );
-            $emitted++;
-        }
-        if ($emitted >= $limit) {
-            break;
-        }
-    }
-
-    return $emitted;
-}
-
-function mci_sitemap_emit_all_in_one(PDO $pdo): void
-{
-    mci_sitemap_begin_urlset();
-    mci_sitemap_emit_pages_slice($pdo, 0, MCI_SITEMAP_MAX_URLS);
-
-    $bizStmt = $pdo->query("
-        SELECT slug,
-               COALESCE(updated_at, created_at) AS ts
-        FROM mci_business_groups
-        WHERE status = 'live' AND slug <> ''
-        ORDER BY slug
-    ");
-    if ($bizStmt) {
-        while ($r = $bizStmt->fetch(PDO::FETCH_ASSOC)) {
-            $slug = (string)($r['slug'] ?? '');
-            if ($slug === '') {
-                continue;
-            }
-            mci_sitemap_emit_url(
-                mci_sitemap_location('/business/' . rawurlencode($slug) . '/'),
-                'weekly',
-                '0.85',
-                mci_sitemap_date((string)($r['ts'] ?? ''))
-            );
-        }
-    }
-    mci_sitemap_end_urlset();
-}
-
-function mci_sitemap_emit_businesses_part(PDO $pdo, int $part): void
-{
-    $offset = ($part - 1) * MCI_SITEMAP_MAX_URLS;
-    $stmt = $pdo->prepare("
-        SELECT slug,
-               COALESCE(updated_at, created_at) AS ts
-        FROM mci_business_groups
-        WHERE status = 'live' AND slug <> ''
-        ORDER BY slug
-        LIMIT :lim OFFSET :off
-    ");
-    $stmt->bindValue(':lim', MCI_SITEMAP_MAX_URLS, PDO::PARAM_INT);
-    $stmt->bindValue(':off', $offset, PDO::PARAM_INT);
-    $stmt->execute();
-    $first = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($first === false) {
-        http_response_code(404);
-        header('Content-Type: text/plain; charset=UTF-8');
-
+    if (!is_array($cfg)) {
         return;
     }
 
-    mci_sitemap_begin_urlset();
-    for ($r = $first; $r !== false; $r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $slug = (string)($r['slug'] ?? '');
-        if ($slug === '') {
+    $stmt = $pdo->prepare($cfg['sql']);
+    $stmt->bindValue(':lim', MCI_SITEMAP_MAX_URLS, PDO::PARAM_INT);
+    $stmt->bindValue(':off', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+
+    while (($row = $stmt->fetch(PDO::FETCH_ASSOC)) !== false) {
+        $loc = $cfg['loc']($row);
+        if ($loc === '') {
             continue;
         }
-        mci_sitemap_emit_url(
-            mci_sitemap_location('/business/' . rawurlencode($slug) . '/'),
-            'weekly',
-            '0.85',
-            mci_sitemap_date((string)($r['ts'] ?? ''))
-        );
+        mci_sitemap_emit_url($loc, $cfg['freq'], $cfg['pri'], $lastmodFmt($row));
     }
-    mci_sitemap_end_urlset();
 }
 
-function mci_sitemap_max_business_ts(PDO $pdo): ?string
-{
-    $raw = $pdo->query("
-        SELECT MAX(COALESCE(updated_at, created_at)) FROM mci_business_groups
-        WHERE status = 'live' AND slug <> ''
-    ")->fetchColumn();
-    $d = mci_sitemap_date(is_string($raw) ? $raw : null);
-
-    return $d ?? gmdate('Y-m-d');
+// Request routing.
+$kind = isset($_GET['kind']) ? trim((string)$_GET['kind']) : '';
+$part = isset($_GET['part']) ? (int)$_GET['part'] : 1;
+if ($part < 1) {
+    $part = 1;
 }
 
-// ── Request routing (Apache sets GET kind/part; dev server may use same) ──────
-$kind = isset($_GET['kind']) ? (string)$_GET['kind'] : '';
-$part = isset($_GET['part']) ? (int)$_GET['part'] : 0;
-
-$staticOnlyNp = count(mci_sitemap_static_pages());
-$counts = ['np' => $staticOnlyNp, 'nb' => 0, 'cat' => 0, 'tag' => 0, 'prod' => 0, 'svc' => 0, 'loc' => 0];
 $pdo = null;
+$counts = ['common' => count(mci_sitemap_common_pages())];
 try {
     $pdo = api_db();
     $counts = mci_sitemap_counts($pdo);
 } catch (Throwable $ignored) {
 }
 
-$np = (int)$counts['np'];
-$nb = (int)$counts['nb'];
-$nt = $np + $nb;
-$needsSplit = $nt > MCI_SITEMAP_MAX_URLS;
-$numPageParts = $np > 0 ? (int)max(1, (int)ceil($np / MCI_SITEMAP_MAX_URLS)) : 1;
-$numBizParts = $nb > 0 ? (int)ceil($nb / MCI_SITEMAP_MAX_URLS) : 0;
-
-// Child sitemap requests
-if ($kind === 'pages' && $part >= 1) {
-    if (!$pdo instanceof PDO) {
+if ($kind !== '') {
+    if (!in_array($kind, mci_sitemap_kinds(), true)) {
+        http_response_code(404);
+        exit;
+    }
+    if ($kind !== 'common' && !$pdo instanceof PDO) {
         http_response_code(503);
         header('Content-Type: text/plain; charset=UTF-8');
         echo 'Sitemap temporarily unavailable.';
         exit;
     }
-    if (!$needsSplit) {
-        header('Location: ' . mci_sitemap_location('/sitemap.xml'), true, 302);
-        exit;
-    }
-    if ($part > $numPageParts) {
+
+    $count = (int)($counts[$kind] ?? 0);
+    $parts = $count > 0 ? (int)ceil($count / MCI_SITEMAP_MAX_URLS) : 1;
+    if ($part > $parts) {
         http_response_code(404);
         exit;
     }
-    $skip = ($part - 1) * MCI_SITEMAP_MAX_URLS;
-    mci_sitemap_begin_urlset();
-    mci_sitemap_emit_pages_slice($pdo, $skip, MCI_SITEMAP_MAX_URLS);
-    mci_sitemap_end_urlset();
-    exit;
-}
 
-if ($kind === 'businesses' && $part >= 1) {
-    if (!$pdo instanceof PDO) {
-        http_response_code(503);
-        header('Content-Type: text/plain; charset=UTF-8');
-        echo 'Sitemap temporarily unavailable.';
-        exit;
-    }
-    if (!$needsSplit || $numBizParts < 1) {
-        header('Location: ' . mci_sitemap_location('/sitemap.xml'), true, 302);
-        exit;
-    }
-    if ($part > $numBizParts) {
-        http_response_code(404);
-        exit;
-    }
-    mci_sitemap_emit_businesses_part($pdo, $part);
-    exit;
-}
-
-// Main /sitemap.xml
-if (!$pdo instanceof PDO) {
     mci_sitemap_begin_urlset();
-    foreach (mci_sitemap_static_pages() as $row) {
-        mci_sitemap_emit_url(mci_sitemap_location($row[0]), $row[1], $row[2]);
+    if ($kind === 'common') {
+        mci_sitemap_emit_common_slice($part);
+    } else {
+        mci_sitemap_emit_db_slice($pdo, $kind, $part);
     }
     mci_sitemap_end_urlset();
     exit;
 }
 
-if (!$needsSplit) {
-    mci_sitemap_emit_all_in_one($pdo);
-    exit;
-}
-
-// Sitemap index
-$today = gmdate('Y-m-d');
-$bizLastMod = $numBizParts > 0 ? mci_sitemap_max_business_ts($pdo) : null;
-
+// Main master sitemap index (/sitemap.xml).
 mci_sitemap_begin_index();
-for ($p = 1; $p <= $numPageParts; $p++) {
-    mci_sitemap_emit_sitemap_ref('/sitemap-pages-' . $p . '.xml', $today);
+
+$today = gmdate('Y-m-d');
+foreach (mci_sitemap_kinds() as $k) {
+    $count = (int)($counts[$k] ?? 0);
+    if ($k !== 'common' && !$pdo instanceof PDO) {
+        continue;
+    }
+
+    $parts = $count > 0 ? (int)ceil($count / MCI_SITEMAP_MAX_URLS) : 1;
+    $base = mci_sitemap_kind_basename($k);
+    $lastmod = $k === 'common' || !$pdo instanceof PDO
+        ? $today
+        : mci_sitemap_lastmod($pdo, $k);
+
+    for ($i = 1; $i <= $parts; $i++) {
+        $suffix = $parts > 1 ? '-' . $i : '';
+        mci_sitemap_emit_sitemap_ref('/' . $base . $suffix . '.xml', $lastmod);
+    }
 }
-for ($b = 1; $b <= $numBizParts; $b++) {
-    mci_sitemap_emit_sitemap_ref('/sitemap-businesses-' . $b . '.xml', $bizLastMod);
-}
+
 mci_sitemap_end_index();

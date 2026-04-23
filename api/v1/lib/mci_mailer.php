@@ -25,6 +25,13 @@ function mci_mail_contact_email(): string
     return ($v !== null && $v !== '') ? $v : 'hello@mycityinfo.com';
 }
 
+function mci_mail_registration_alert_to(): string
+{
+    $v = api_env_optional('MCI_REGISTRATION_ALERT_TO');
+
+    return ($v !== null && $v !== '') ? $v : 'businessregistrations@mycityinfo.com';
+}
+
 function mci_mail_autoload(): void
 {
     static $loaded = false;
@@ -315,6 +322,302 @@ function mci_mail_send_password_changed(string $toEmail, string $context): void
     mci_mail_try_send(static function (PHPMailer $mail) use ($toEmail, $plain, $html): void {
         $mail->addAddress($toEmail);
         $mail->Subject = 'Your My City Info password was updated';
+        $mail->Body    = $html;
+        $mail->AltBody = $plain;
+        $mail->isHTML(true);
+    });
+}
+
+/**
+ * Internal admin notification when a new user account is registered.
+ */
+function mci_mail_send_admin_new_user_registered(string $userEmail, ?string $displayName, string $channel = 'email_password'): void
+{
+    $to = mci_mail_registration_alert_to();
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL) || !filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
+
+    $base = api_public_site_base_url();
+    $safeName = trim((string)$displayName);
+    $labelName = $safeName !== '' ? $safeName : '(not provided)';
+    $channelLabel = trim($channel) !== '' ? trim($channel) : 'unknown';
+    $when = gmdate('Y-m-d H:i:s') . ' UTC';
+
+    $plain = "New user registration on My City Info\n\n"
+        . "Email: {$userEmail}\n"
+        . "Name: {$labelName}\n"
+        . "Channel: {$channelLabel}\n"
+        . "Time: {$when}\n"
+        . "Site: {$base}/\n";
+
+    $html = '<div style="max-width:560px;font-family:system-ui,Segoe UI,sans-serif;font-size:14px;line-height:1.5;color:#222;">'
+        . '<h2 style="font-size:18px;margin:0 0 12px;">New user registration</h2>'
+        . '<p style="margin:0 0 8px;"><strong>Email:</strong> ' . mci_mail_h($userEmail) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Name:</strong> ' . mci_mail_h($labelName) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Channel:</strong> ' . mci_mail_h($channelLabel) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Time:</strong> ' . mci_mail_h($when) . '</p>'
+        . '<p style="margin:0;"><strong>Site:</strong> <a href="' . mci_mail_h($base . '/') . '">' . mci_mail_h($base . '/') . '</a></p>'
+        . '</div>';
+
+    mci_mail_try_send(static function (PHPMailer $mail) use ($to, $plain, $html): void {
+        $mail->addAddress($to);
+        $mail->Subject = '[My City Info] New user registration';
+        $mail->Body    = $html;
+        $mail->AltBody = $plain;
+        $mail->isHTML(true);
+    });
+}
+
+/**
+ * Internal admin notification when a new business listing is submitted.
+ */
+function mci_mail_send_admin_new_business_registered(
+    string $businessName,
+    string $businessSlug,
+    string $city,
+    string $submittedByRole,
+    string $submittedByEmail = ''
+): void {
+    $to = mci_mail_registration_alert_to();
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
+
+    $base = api_public_site_base_url();
+    $name = trim($businessName) !== '' ? trim($businessName) : '(untitled)';
+    $slug = trim($businessSlug);
+    $cityLabel = trim($city) !== '' ? trim($city) : '(not provided)';
+    $roleLabel = trim($submittedByRole) !== '' ? trim($submittedByRole) : 'unknown';
+    $submitter = trim($submittedByEmail) !== '' ? trim($submittedByEmail) : '(not available)';
+    $listingUrl = $slug !== '' ? ($base . '/business/' . rawurlencode($slug) . '/') : ($base . '/business-listing/');
+    $when = gmdate('Y-m-d H:i:s') . ' UTC';
+
+    $plain = "New business listing registered on My City Info\n\n"
+        . "Business: {$name}\n"
+        . "Slug: " . ($slug !== '' ? $slug : '(not available)') . "\n"
+        . "City: {$cityLabel}\n"
+        . "Submitted by role: {$roleLabel}\n"
+        . "Submitted by email: {$submitter}\n"
+        . "Time: {$when}\n"
+        . "Listing URL: {$listingUrl}\n";
+
+    $html = '<div style="max-width:560px;font-family:system-ui,Segoe UI,sans-serif;font-size:14px;line-height:1.5;color:#222;">'
+        . '<h2 style="font-size:18px;margin:0 0 12px;">New business listing registered</h2>'
+        . '<p style="margin:0 0 8px;"><strong>Business:</strong> ' . mci_mail_h($name) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Slug:</strong> ' . mci_mail_h($slug !== '' ? $slug : '(not available)') . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>City:</strong> ' . mci_mail_h($cityLabel) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Submitted by role:</strong> ' . mci_mail_h($roleLabel) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Submitted by email:</strong> ' . mci_mail_h($submitter) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Time:</strong> ' . mci_mail_h($when) . '</p>'
+        . '<p style="margin:0;"><strong>Listing URL:</strong> <a href="' . mci_mail_h($listingUrl) . '">' . mci_mail_h($listingUrl) . '</a></p>'
+        . '</div>';
+
+    mci_mail_try_send(static function (PHPMailer $mail) use ($to, $plain, $html): void {
+        $mail->addAddress($to);
+        $mail->Subject = '[My City Info] New business registration';
+        $mail->Body    = $html;
+        $mail->AltBody = $plain;
+        $mail->isHTML(true);
+    });
+}
+
+/**
+ * Submitter-facing confirmation when a business listing is created.
+ */
+function mci_mail_send_business_submission_received(
+    string $toEmail,
+    string $businessName,
+    string $businessSlug,
+    string $status = 'draft'
+): void {
+    if (!filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
+
+    $base = api_public_site_base_url();
+    $name = trim($businessName) !== '' ? trim($businessName) : 'Your business listing';
+    $slug = trim($businessSlug);
+    $statusNorm = strtolower(trim($status));
+    $statusLabel = $statusNorm === 'live' ? 'Live' : 'Under review';
+    $listingUrl = $slug !== '' ? ($base . '/business/' . rawurlencode($slug) . '/') : ($base . '/business-listing/');
+    $dashboardUrl = $base . '/subscriber/dashboard/';
+    $contact = mci_mail_contact_email();
+
+    $plain = "Hi,\n\n"
+        . "We received your business listing submission on My City Info.\n\n"
+        . "Business: {$name}\n"
+        . "Status: {$statusLabel}\n"
+        . "Listing URL: {$listingUrl}\n\n"
+        . "You can track your listings in your dashboard: {$dashboardUrl}\n\n"
+        . "Questions? {$contact}\n\n"
+        . "— My City Info\n";
+
+    $html = '<div style="max-width:560px;font-family:system-ui,Segoe UI,sans-serif;font-size:14px;line-height:1.5;color:#222;">'
+        . '<h2 style="font-size:18px;margin:0 0 12px;">Business submission received</h2>'
+        . '<p>Thanks for submitting your listing.</p>'
+        . '<p style="margin:0 0 8px;"><strong>Business:</strong> ' . mci_mail_h($name) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Status:</strong> ' . mci_mail_h($statusLabel) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Listing URL:</strong> <a href="' . mci_mail_h($listingUrl) . '">' . mci_mail_h($listingUrl) . '</a></p>'
+        . '<p style="margin:20px 0;"><a href="' . mci_mail_h($dashboardUrl) . '" style="display:inline-block;padding:10px 18px;background:#111;color:#fff;text-decoration:none;border-radius:6px;">Open dashboard</a></p>'
+        . '<p style="font-size:13px;color:#666;">Questions? <a href="mailto:' . mci_mail_h($contact) . '">' . mci_mail_h($contact) . '</a></p>'
+        . '<p style="font-size:13px;color:#666;">— My City Info</p>'
+        . '</div>';
+
+    mci_mail_try_send(static function (PHPMailer $mail) use ($toEmail, $plain, $html): void {
+        $mail->addAddress($toEmail);
+        $mail->Subject = 'We received your business listing submission';
+        $mail->Body    = $html;
+        $mail->AltBody = $plain;
+        $mail->isHTML(true);
+    });
+}
+
+/**
+ * Owner-facing approval notification when listing goes live.
+ */
+function mci_mail_send_business_approved(string $toEmail, string $businessName, string $businessSlug): void
+{
+    if (!filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
+
+    $base = api_public_site_base_url();
+    $name = trim($businessName) !== '' ? trim($businessName) : 'Your business listing';
+    $slug = trim($businessSlug);
+    $listingUrl = $slug !== '' ? ($base . '/business/' . rawurlencode($slug) . '/') : ($base . '/business-listing/');
+    $dashboardUrl = $base . '/subscriber/dashboard/';
+    $contact = mci_mail_contact_email();
+
+    $plain = "Hi,\n\n"
+        . "Great news — your business listing is now live on My City Info.\n\n"
+        . "Business: {$name}\n"
+        . "Live URL: {$listingUrl}\n\n"
+        . "Manage your listing from dashboard: {$dashboardUrl}\n\n"
+        . "Need help? {$contact}\n\n"
+        . "— My City Info\n";
+
+    $html = '<div style="max-width:560px;font-family:system-ui,Segoe UI,sans-serif;font-size:14px;line-height:1.5;color:#222;">'
+        . '<h2 style="font-size:18px;margin:0 0 12px;">Your listing is now live</h2>'
+        . '<p>Great news — your business listing is now live on My City Info.</p>'
+        . '<p style="margin:0 0 8px;"><strong>Business:</strong> ' . mci_mail_h($name) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Live URL:</strong> <a href="' . mci_mail_h($listingUrl) . '">' . mci_mail_h($listingUrl) . '</a></p>'
+        . '<p style="margin:20px 0;"><a href="' . mci_mail_h($dashboardUrl) . '" style="display:inline-block;padding:10px 18px;background:#111;color:#fff;text-decoration:none;border-radius:6px;">Manage listing</a></p>'
+        . '<p style="font-size:13px;color:#666;">Need help? <a href="mailto:' . mci_mail_h($contact) . '">' . mci_mail_h($contact) . '</a></p>'
+        . '<p style="font-size:13px;color:#666;">— My City Info</p>'
+        . '</div>';
+
+    mci_mail_try_send(static function (PHPMailer $mail) use ($toEmail, $plain, $html): void {
+        $mail->addAddress($toEmail);
+        $mail->Subject = 'Your My City Info listing is now live';
+        $mail->Body    = $html;
+        $mail->AltBody = $plain;
+        $mail->isHTML(true);
+    });
+}
+
+/**
+ * Internal admin notification when a listing is approved and set live.
+ */
+function mci_mail_send_admin_business_approved(
+    string $businessName,
+    string $businessSlug,
+    string $ownerEmail = '',
+    string $reviewedByUserId = ''
+): void {
+    $to = mci_mail_registration_alert_to();
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
+
+    $base = api_public_site_base_url();
+    $name = trim($businessName) !== '' ? trim($businessName) : '(untitled)';
+    $slug = trim($businessSlug);
+    $listingUrl = $slug !== '' ? ($base . '/business/' . rawurlencode($slug) . '/') : ($base . '/business-listing/');
+    $owner = trim($ownerEmail) !== '' ? trim($ownerEmail) : '(not available)';
+    $reviewer = trim($reviewedByUserId) !== '' ? trim($reviewedByUserId) : '(not available)';
+    $when = gmdate('Y-m-d H:i:s') . ' UTC';
+
+    $plain = "Business listing approved and set live\n\n"
+        . "Business: {$name}\n"
+        . "Slug: " . ($slug !== '' ? $slug : '(not available)') . "\n"
+        . "Owner email: {$owner}\n"
+        . "Reviewed by user ID: {$reviewer}\n"
+        . "Time: {$when}\n"
+        . "Listing URL: {$listingUrl}\n";
+
+    $html = '<div style="max-width:560px;font-family:system-ui,Segoe UI,sans-serif;font-size:14px;line-height:1.5;color:#222;">'
+        . '<h2 style="font-size:18px;margin:0 0 12px;">Business listing approved</h2>'
+        . '<p style="margin:0 0 8px;"><strong>Business:</strong> ' . mci_mail_h($name) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Slug:</strong> ' . mci_mail_h($slug !== '' ? $slug : '(not available)') . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Owner email:</strong> ' . mci_mail_h($owner) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Reviewed by user ID:</strong> ' . mci_mail_h($reviewer) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Time:</strong> ' . mci_mail_h($when) . '</p>'
+        . '<p style="margin:0;"><strong>Listing URL:</strong> <a href="' . mci_mail_h($listingUrl) . '">' . mci_mail_h($listingUrl) . '</a></p>'
+        . '</div>';
+
+    mci_mail_try_send(static function (PHPMailer $mail) use ($to, $plain, $html): void {
+        $mail->addAddress($to);
+        $mail->Subject = '[My City Info] Business listing approved';
+        $mail->Body    = $html;
+        $mail->AltBody = $plain;
+        $mail->isHTML(true);
+    });
+}
+
+/**
+ * Notify business email about a newly received enquiry/lead.
+ */
+function mci_mail_send_business_enquiry_received(
+    string $toEmail,
+    string $businessName,
+    string $businessSlug,
+    string $senderName,
+    string $senderPhone,
+    string $senderEmail,
+    string $message,
+    string $type = 'enquiry'
+): void {
+    if (!filter_var($toEmail, FILTER_VALIDATE_EMAIL)) {
+        return;
+    }
+
+    $base = api_public_site_base_url();
+    $contact = mci_mail_contact_email();
+    $name = trim($businessName) !== '' ? trim($businessName) : 'your business';
+    $slug = trim($businessSlug);
+    $listingUrl = $slug !== '' ? ($base . '/business/' . rawurlencode($slug) . '/') : ($base . '/business-listing/');
+    $kind = strtolower(trim($type)) === 'lead' ? 'lead' : 'enquiry';
+    $senderName = trim($senderName) !== '' ? trim($senderName) : '(not provided)';
+    $senderPhone = trim($senderPhone) !== '' ? trim($senderPhone) : '(not provided)';
+    $senderEmail = trim($senderEmail) !== '' ? trim($senderEmail) : '(not provided)';
+    $msg = trim($message) !== '' ? trim($message) : '(empty)';
+
+    $plain = "Hi,\n\n"
+        . "You received a new {$kind} for {$name} on My City Info.\n\n"
+        . "Sender name: {$senderName}\n"
+        . "Sender phone: {$senderPhone}\n"
+        . "Sender email: {$senderEmail}\n"
+        . "Message:\n{$msg}\n\n"
+        . "Listing URL: {$listingUrl}\n\n"
+        . "If this looks suspicious, contact {$contact}.\n\n"
+        . "— My City Info\n";
+
+    $html = '<div style="max-width:560px;font-family:system-ui,Segoe UI,sans-serif;font-size:14px;line-height:1.5;color:#222;">'
+        . '<h2 style="font-size:18px;margin:0 0 12px;">New ' . mci_mail_h($kind) . ' received</h2>'
+        . '<p>You received a new ' . mci_mail_h($kind) . ' for <strong>' . mci_mail_h($name) . '</strong>.</p>'
+        . '<p style="margin:0 0 8px;"><strong>Sender name:</strong> ' . mci_mail_h($senderName) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Sender phone:</strong> ' . mci_mail_h($senderPhone) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Sender email:</strong> ' . mci_mail_h($senderEmail) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Message:</strong><br>' . nl2br(mci_mail_h($msg)) . '</p>'
+        . '<p style="margin:0 0 8px;"><strong>Listing URL:</strong> <a href="' . mci_mail_h($listingUrl) . '">' . mci_mail_h($listingUrl) . '</a></p>'
+        . '<p style="font-size:13px;color:#666;">If this looks suspicious, contact <a href="mailto:' . mci_mail_h($contact) . '">' . mci_mail_h($contact) . '</a>.</p>'
+        . '<p style="font-size:13px;color:#666;">— My City Info</p>'
+        . '</div>';
+
+    mci_mail_try_send(static function (PHPMailer $mail) use ($toEmail, $plain, $html, $name): void {
+        $mail->addAddress($toEmail);
+        $mail->Subject = 'New enquiry for ' . $name;
         $mail->Body    = $html;
         $mail->AltBody = $plain;
         $mail->isHTML(true);

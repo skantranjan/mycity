@@ -241,6 +241,7 @@ function api_direct_subscriber_register(array $data): array
     ]);
 
     mci_mail_send_welcome($email, $displayName !== '' ? $displayName : null, false);
+    mci_mail_send_admin_new_user_registered($email, $displayName !== '' ? $displayName : null, 'email_password');
 
     $exp = time() + 28800;
     $jwt = api_jwt_sign(['sub' => $userId, 'role' => $role, 'iat' => time(), 'exp' => $exp]);

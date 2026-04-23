@@ -131,8 +131,8 @@ RewriteRule ^cp/anonymous-business\.php$ /cp/anonymous-business/ [R=301,L]
 # Pretty URLs -> folder index.php entrypoints
 # ------------------------------------------------------------
 RewriteRule ^$ index.php [L]
-RewriteRule ^sitemap-pages-([1-9][0-9]*)\.xml$ sitemap/index.php?kind=pages&part=$1 [L,QSA]
-RewriteRule ^sitemap-businesses-([1-9][0-9]*)\.xml$ sitemap/index.php?kind=businesses&part=$1 [L,QSA]
+RewriteRule ^sitemap-(common|businesses|business-categories|products|services|locations|tags)-([1-9][0-9]*)\.xml$ sitemap/index.php?kind=$1&part=$2 [L,QSA]
+RewriteRule ^sitemap-(common|businesses|business-categories|products|services|locations|tags)\.xml$ sitemap/index.php?kind=$1 [L,QSA]
 RewriteRule ^sitemap\.xml$ sitemap/index.php [L]
 RewriteRule ^business-listing/?$ business-listing/index.php [L,QSA]
 RewriteRule ^submit-business-listing/?$ submit-business-listing/index.php [L,QSA]

@@ -250,6 +250,7 @@ function mci_oauth_find_or_create_user(
     }
 
     mci_mail_send_welcome($cleanEmail, $cleanName !== '' ? $cleanName : null, true);
+    mci_mail_send_admin_new_user_registered($cleanEmail, $cleanName !== '' ? $cleanName : null, 'oauth_' . $provider);
 
     return _mci_oauth_issue_token($userId, $cleanEmail, $role);
 }
