@@ -163,7 +163,60 @@ CREATE TABLE IF NOT EXISTS `mci_user_auth_providers` (
 
 
 -- =============================================================================
--- 7. mci_password_reset_tokens
+-- 7. mci_subscription_packages
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS `mci_subscription_packages` (
+  `id`              char(36)     NOT NULL COMMENT 'UUID v4',
+  `package_name`    varchar(120) NOT NULL,
+  `package_type`    enum('free','premium') NOT NULL DEFAULT 'free',
+  `is_default`      tinyint(1)   NOT NULL DEFAULT 0,
+  `status`          enum('active','coming_soon','disabled') NOT NULL DEFAULT 'active',
+  `activation_date` datetime(6)  DEFAULT NULL,
+  `expiry_date`     datetime(6)  DEFAULT NULL,
+  `price`           decimal(10,2) NOT NULL DEFAULT 0.00,
+  `features_json`   json         DEFAULT NULL,
+  `created_at`      datetime(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at`      datetime(6)  DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_mci_subscription_packages_name` (`package_name`),
+  KEY `idx_mci_subscription_packages_status_activation` (`status`, `activation_date`),
+  KEY `idx_mci_subscription_packages_default_status` (`is_default`, `status`),
+  KEY `idx_mci_subscription_packages_type` (`package_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Subscription package definitions and feature policy';
+
+
+-- =============================================================================
+-- 8. mci_user_subscriptions
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS `mci_user_subscriptions` (
+  `id`                      char(36)    NOT NULL COMMENT 'UUID v4',
+  `user_id`                 char(36)    NOT NULL COMMENT 'FK → mci_users.id',
+  `package_id`              char(36)    NOT NULL COMMENT 'FK → mci_subscription_packages.id',
+  `subscription_start_date` datetime(6) NOT NULL,
+  `subscription_end_date`   datetime(6) DEFAULT NULL,
+  `subscription_status`     enum('active','inactive','expired','cancelled','pending_activation') NOT NULL DEFAULT 'active',
+  `auto_assigned`           tinyint(1)  NOT NULL DEFAULT 1,
+  `upgrade_source`          varchar(64) DEFAULT NULL,
+  `created_at`              datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at`              datetime(6) DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_mci_user_subscriptions_user_package_status` (`user_id`, `package_id`, `subscription_status`),
+  KEY `idx_mci_user_subscriptions_user_status` (`user_id`, `subscription_status`),
+  KEY `idx_mci_user_subscriptions_package_id` (`package_id`),
+  KEY `idx_mci_user_subscriptions_end_date` (`subscription_end_date`),
+  CONSTRAINT `fk_mci_user_subscriptions_user_id`
+    FOREIGN KEY (`user_id`) REFERENCES `mci_users` (`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_mci_user_subscriptions_package_id`
+    FOREIGN KEY (`package_id`) REFERENCES `mci_subscription_packages` (`id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Current and historical package assignments for users';
+
+
+-- =============================================================================
+-- 9. mci_password_reset_tokens
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS `mci_password_reset_tokens` (
   `id`         char(36)     NOT NULL COMMENT 'UUID v4',
@@ -184,7 +237,7 @@ CREATE TABLE IF NOT EXISTS `mci_password_reset_tokens` (
 
 
 -- =============================================================================
--- 8. mci_category_requests
+-- 10. mci_category_requests
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS `mci_category_requests` (
   `id`                      int unsigned  NOT NULL AUTO_INCREMENT,
@@ -206,7 +259,7 @@ CREATE TABLE IF NOT EXISTS `mci_category_requests` (
 
 
 -- =============================================================================
--- 9. mci_anon_business_submissions
+-- 11. mci_anon_business_submissions
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS `mci_anon_business_submissions` (
   `id`                  int unsigned  NOT NULL AUTO_INCREMENT,
@@ -230,7 +283,7 @@ CREATE TABLE IF NOT EXISTS `mci_anon_business_submissions` (
 
 
 -- =============================================================================
--- 10. mci_error_log
+-- 12. mci_error_log
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS `mci_error_log` (
   `id`         bigint unsigned NOT NULL AUTO_INCREMENT,

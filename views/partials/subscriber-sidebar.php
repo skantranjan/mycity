@@ -3,6 +3,24 @@
 // Expects $subActive: dashboard | list-business | listings | leads | favourites | reviews | '' (no highlight).
 $subActive = $subActive ?? 'dashboard';
 
+$subPackageLabel = null;
+$subPackageStatus = null;
+try {
+    require_once __DIR__ . '/../../api/v1/lib/db.php';
+    require_once __DIR__ . '/../../api/v1/lib/subscription_service.php';
+    $subUid = (string) ($_SESSION['mci_user_id'] ?? '');
+    if ($subUid !== '') {
+        $pdo = api_db();
+        $cur = mci_subscription_get_user_current($pdo, $subUid);
+        if (!empty($cur['ok']) && is_array($cur['subscription'] ?? null)) {
+            $subPackageLabel = (string) (($cur['subscription']['package']['package_name'] ?? ''));
+            $subPackageStatus = (string) (($cur['subscription']['package']['effective_status'] ?? 'active'));
+        }
+    }
+} catch (Throwable $ignored) {
+    // keep sidebar lean if DB/service is unavailable
+}
+
 // Demo notification counts (replace with real DB queries when backend is ready)
 $subBadgeCounts = [
     'leads' => 2, // new leads
@@ -21,6 +39,12 @@ function subLinkClass(string $key, string $subActive): string
       <i class="bi bi-chevron-down mci-sidebar-toggle-icon" aria-hidden="true"></i>
     </div>
     <div class="mci-app-sidebar__sub d-none d-lg-block">Manage your listings — use the top bar for profile &amp; logout.</div>
+    <?php if ($subPackageLabel !== null && $subPackageLabel !== ''): ?>
+      <div class="mt-2 d-none d-lg-flex align-items-center gap-2">
+        <span class="badge text-bg-light border"><?= htmlspecialchars($subPackageLabel, ENT_QUOTES, 'UTF-8') ?></span>
+        <span class="small text-muted"><?= htmlspecialchars($subPackageStatus ?? 'active', ENT_QUOTES, 'UTF-8') ?></span>
+      </div>
+    <?php endif; ?>
   </div>
 
   <nav class="mci-app-sidebar__nav" aria-label="Subscriber navigation">

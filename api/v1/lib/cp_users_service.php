@@ -7,6 +7,7 @@ require_once __DIR__ . '/uuid.php';
 require_once __DIR__ . '/ip.php';
 require_once __DIR__ . '/business_service.php';
 require_once __DIR__ . '/mci_mailer.php';
+require_once __DIR__ . '/subscription_service.php';
 
 /**
  * @return array{ok:true, count:int}|array{ok:false, error:string, status:int}
@@ -171,6 +172,7 @@ function mci_cp_users_create(PDO $pdo, array $data): array
     $ip = api_client_ip();
 
     try {
+        $pdo->beginTransaction();
         $ins = $pdo->prepare('
             INSERT INTO mci_users (
               id, email, password_hash, role_id, display_name, phone, status,
@@ -193,7 +195,18 @@ function mci_cp_users_create(PDO $pdo, array $data): array
             $ip,
             $ip,
         ]);
+
+        if ($roleShort === 'subscriber') {
+            $sub = mci_subscription_assign_default_to_user($pdo, $userId, 'cp_user_create');
+            if (!$sub['ok']) {
+                throw new RuntimeException((string) ($sub['error'] ?? 'subscription_assign_failed'));
+            }
+        }
+        $pdo->commit();
     } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         return ['ok' => false, 'error' => 'create_failed', 'status' => 500];
     }
 

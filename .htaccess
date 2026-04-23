@@ -189,6 +189,8 @@ RewriteRule ^cp/logout/?$ cp/logout/index.php [L,QSA]
 RewriteRule ^cp/categories/?$ cp/categories/index.php [L,QSA]
 RewriteRule ^cp/coadmins/?$ cp/coadmins/index.php [L,QSA]
 RewriteRule ^cp/anonymous-business/?$ cp/anonymous-business/index.php [L,QSA]
+RewriteRule ^cp/subscription-packages/?$ cp/subscription-packages/index.php [L,QSA]
+RewriteRule ^cp/user-subscriptions/?$ cp/user-subscriptions/index.php [L,QSA]
 
 # Legacy .php URLs (root/subscriber scripts removed; internal rewrite to folder entrypoints)
 RewriteRule ^listings\.php$ business-listing/index.php [L,QSA]
@@ -217,6 +219,8 @@ RewriteRule ^cp/login\.php$ cp/login/index.php [L,QSA]
 RewriteRule ^cp/categories\.php$ cp/categories/index.php [L,QSA]
 RewriteRule ^cp/coadmins\.php$ cp/coadmins/index.php [L,QSA]
 RewriteRule ^cp/anonymous-business\.php$ cp/anonymous-business/index.php [L,QSA]
+RewriteRule ^cp/subscription-packages\.php$ cp/subscription-packages/index.php [L,QSA]
+RewriteRule ^cp/user-subscriptions\.php$ cp/user-subscriptions/index.php [L,QSA]
 
 RewriteRule ^subscriber/dashboard\.php$ subscriber/dashboard/index.php [L,QSA]
 RewriteRule ^subscriber/list-business\.php$ subscriber/list-business/index.php [L,QSA]

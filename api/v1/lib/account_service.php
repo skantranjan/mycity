@@ -7,6 +7,7 @@ require_once __DIR__ . '/uuid.php';
 require_once __DIR__ . '/ip.php';
 require_once dirname(__DIR__, 3) . '/includes/mci_timezone.php';
 require_once __DIR__ . '/mci_mailer.php';
+require_once __DIR__ . '/subscription_service.php';
 
 /** @return array{ok:true, profile_id:string}|array{ok:false, error:string} */
 function mci_account_ensure_profile_row(PDO $pdo, string $userId): array
@@ -25,7 +26,7 @@ function mci_account_ensure_profile_row(PDO $pdo, string $userId): array
 }
 
 /**
- * @return array{ok:true, user: array, profile: ?array, auth_providers: array<int, array>}|array{ok:false, error:string, status?:int}
+ * @return array{ok:true, user: array, profile: ?array, auth_providers: array<int, array>, subscription:?array, packages:array<int,array>, can_upgrade_now:bool, paid_coming_soon:bool}|array{ok:false, error:string, status?:int}
  */
 function mci_account_get_profile_bundle(string $userId): array
 {
@@ -65,6 +66,11 @@ function mci_account_get_profile_bundle(string $userId): array
     $stmt->execute([$userId]);
     $providers = $stmt->fetchAll() ?: [];
 
+    $subSummary = mci_subscription_build_user_summary($pdo, $userId);
+    if (!$subSummary['ok']) {
+        return ['ok' => false, 'error' => (string) ($subSummary['error'] ?? 'subscription_error'), 'status' => $subSummary['status'] ?? 500];
+    }
+
     return [
         'ok' => true,
         'user' => [
@@ -99,6 +105,10 @@ function mci_account_get_profile_bundle(string $userId): array
                 'updated_at' => $p['updated_at'],
             ];
         }, $providers),
+        'subscription' => $subSummary['current_subscription'],
+        'packages' => $subSummary['packages'],
+        'can_upgrade_now' => (bool) ($subSummary['can_upgrade_now'] ?? false),
+        'paid_coming_soon' => (bool) ($subSummary['paid_coming_soon'] ?? false),
     ];
 }
 

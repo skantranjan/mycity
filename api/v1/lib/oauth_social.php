@@ -21,6 +21,7 @@ require_once __DIR__ . '/jwt.php';
 require_once __DIR__ . '/uuid.php';
 require_once __DIR__ . '/ip.php';
 require_once __DIR__ . '/mci_mailer.php';
+require_once __DIR__ . '/subscription_service.php';
 
 // ── State token (CSRF guard for OAuth) ───────────────────────────────────────
 
@@ -242,6 +243,11 @@ function mci_oauth_find_or_create_user(
             $providerEmail,
             $profileImageUrl !== '' ? $profileImageUrl : null,
         ]);
+
+        $sub = mci_subscription_assign_default_to_user($pdo, $userId, 'registration_oauth_' . $provider);
+        if (!$sub['ok']) {
+            throw new RuntimeException((string) ($sub['error'] ?? 'subscription_assign_failed'));
+        }
 
         $pdo->commit();
     } catch (Throwable $e) {

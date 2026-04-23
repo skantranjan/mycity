@@ -117,6 +117,9 @@ if ($dob !== '' && strlen($dob) >= 10) {
 }
 $tz = $p ? (string) ($p['timezone'] ?? '') : '';
 $roleLabel = (string) ($u['role'] ?? 'subscriber');
+$subscription = is_array($bundle['subscription'] ?? null) ? $bundle['subscription'] : null;
+$canUpgradeNow = !empty($bundle['can_upgrade_now']);
+$paidComingSoon = !empty($bundle['paid_coming_soon']);
 
 $avatarPreview = mci_app_profile_avatar_for_header('subscriber');
 $devSocial = mci_env_flag('MCI_ALLOW_DEV_SOCIAL_LINK');
@@ -144,6 +147,36 @@ ob_start();
         <?php endif; ?>
         <?php if ($flashErr !== ''): ?>
           <div class="alert alert-danger py-2 small mb-3" role="alert"><?= htmlspecialchars($flashErr, ENT_QUOTES, 'UTF-8') ?></div>
+        <?php endif; ?>
+
+        <?php if ($subscription !== null): ?>
+          <div class="card border mb-3">
+            <div class="card-body p-3">
+              <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                <div class="fw-semibold">Current subscription</div>
+                <span class="badge text-bg-light border"><?= htmlspecialchars((string)($subscription['package']['package_name'] ?? 'FREE'), ENT_QUOTES, 'UTF-8') ?></span>
+              </div>
+              <div class="row g-2 mt-1">
+                <div class="col-12 col-md-6">
+                  <div class="text-muted small">Status</div>
+                  <div class="small fw-semibold"><?= htmlspecialchars((string)($subscription['subscription_status'] ?? 'active'), ENT_QUOTES, 'UTF-8') ?></div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="text-muted small">Valid till</div>
+                  <div class="small fw-semibold"><?= htmlspecialchars((string)($subscription['subscription_end_date'] ?? 'Ongoing'), ENT_QUOTES, 'UTF-8') ?></div>
+                </div>
+              </div>
+              <div class="small text-muted mt-2">
+                <?php if ($canUpgradeNow): ?>
+                  Premium upgrade is currently available.
+                <?php elseif ($paidComingSoon): ?>
+                  Premium upgrade is coming soon (activation date: April 01, 2028).
+                <?php else: ?>
+                  Upgrade options are currently unavailable.
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
         <?php endif; ?>
 
         <?php if ($loadErr === ''): ?>

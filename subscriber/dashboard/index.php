@@ -8,11 +8,16 @@ $appArea = 'subscriber';
 require_once __DIR__ . '/../../includes/mci_config.php';
 require_once __DIR__ . '/../../includes/mci_session.php';
 require_once __DIR__ . '/../../api/v1/lib/db.php';
+require_once __DIR__ . '/../../api/v1/lib/subscription_service.php';
 
 $userId = (string)($_SESSION['mci_user_id'] ?? '');
 
 // ── Real stats from DB ────────────────────────────────────────────────────────
 $stats = ['live' => 0, 'draft' => 0, 'suspended' => 0, 'total' => 0];
+$subscription = null;
+$subscriptionPackages = [];
+$canUpgradeNow = false;
+$paidComingSoon = true;
 
 if ($userId !== '') {
     try {
@@ -29,6 +34,14 @@ if ($userId !== '') {
             $stats[(string)$row['status']] = (int)$row['cnt'];
         }
         $stats['total'] = array_sum($stats);
+
+        $subSummary = mci_subscription_build_user_summary($pdo, $userId);
+        if (!empty($subSummary['ok'])) {
+            $subscription = $subSummary['current_subscription'] ?? null;
+            $subscriptionPackages = is_array($subSummary['packages'] ?? null) ? $subSummary['packages'] : [];
+            $canUpgradeNow = !empty($subSummary['can_upgrade_now']);
+            $paidComingSoon = !empty($subSummary['paid_coming_soon']);
+        }
     } catch (Throwable $e) {
         // Graceful degradation — stats stay 0
     }
@@ -95,6 +108,75 @@ ob_start();
             <div class="mt-1" style="font-size:var(--mci-text-micro);color:var(--mci-text-muted);">Coming soon</div>
           </div>
         </a>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+          <div>
+            <div class="fw-semibold">Subscription</div>
+            <div class="text-muted small">Your current package and upgrade status.</div>
+          </div>
+          <?php if ($subscription !== null): ?>
+            <span class="badge text-bg-light border">
+              <?= htmlspecialchars((string)($subscription['package']['package_name'] ?? 'FREE'), ENT_QUOTES, 'UTF-8') ?>
+            </span>
+          <?php endif; ?>
+        </div>
+
+        <?php if ($subscription !== null): ?>
+          <div class="row g-3 mt-1">
+            <div class="col-12 col-md-6">
+              <div class="small text-muted">Package status</div>
+              <div class="fw-semibold"><?= htmlspecialchars((string)($subscription['package']['effective_status'] ?? 'active'), ENT_QUOTES, 'UTF-8') ?></div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="small text-muted">Validity</div>
+              <div class="fw-semibold">
+                <?= htmlspecialchars((string)($subscription['subscription_start_date'] ?? '—'), ENT_QUOTES, 'UTF-8') ?>
+                <?php if (!empty($subscription['subscription_end_date'])): ?>
+                  <span class="text-muted">to <?= htmlspecialchars((string)$subscription['subscription_end_date'], ENT_QUOTES, 'UTF-8') ?></span>
+                <?php else: ?>
+                  <span class="text-muted">to ongoing</span>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+          <div class="small text-muted mt-3">Included features</div>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <?php
+            $features = is_array($subscription['package']['features'] ?? null) ? $subscription['package']['features'] : [];
+            foreach ($features as $featureKey => $enabled) {
+                if (!$enabled || !is_string($featureKey)) {
+                    continue;
+                }
+                echo '<span class="badge text-bg-light border">' . htmlspecialchars(str_replace('_', ' ', $featureKey), ENT_QUOTES, 'UTF-8') . '</span>';
+            }
+            ?>
+          </div>
+        <?php else: ?>
+          <div class="text-muted small mt-2">No subscription record yet.</div>
+        <?php endif; ?>
+
+        <hr />
+        <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+          <div>
+            <div class="fw-semibold">Upgrade</div>
+            <div class="text-muted small">
+              <?php if ($canUpgradeNow): ?>
+                Premium upgrades are available.
+              <?php elseif ($paidComingSoon): ?>
+                Premium package is marked as Coming Soon until April 01, 2028.
+              <?php else: ?>
+                Upgrade options are not available yet.
+              <?php endif; ?>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-outline-secondary" type="button" disabled>
+            <?= $paidComingSoon ? 'Coming Soon' : 'Upgrade' ?>
+          </button>
+        </div>
       </div>
     </div>
 

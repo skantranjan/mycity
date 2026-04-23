@@ -178,6 +178,6 @@ the migration runner. Use them for new installs or to understand the full table 
 
 | Group | Tables |
 |-------|--------|
-| Core | `mci_roles`, `mci_users`, `mci_userprofiles`, `mci_categories`, `mci_tags`, `mci_user_auth_providers`, `mci_password_reset_tokens`, `mci_category_requests`, `mci_anon_business_submissions`, `mci_error_log` |
+| Core | `mci_roles`, `mci_users`, `mci_userprofiles`, `mci_categories`, `mci_tags`, `mci_user_auth_providers`, `mci_subscription_packages`, `mci_user_subscriptions`, `mci_password_reset_tokens`, `mci_category_requests`, `mci_anon_business_submissions`, `mci_error_log` |
 | Business | `mci_business_groups`, `mci_business_branches`, `mci_business_branch_hours`, `mci_business_subcategories`, `mci_business_tags`, `mci_business_products`, `mci_business_services`, `mci_business_faqs`, `mci_business_images`, `mci_business_social_links`, `mci_business_approvals`, `mci_business_claims`, `mci_business_reviews`, `mci_business_review_replies` |
 | User Features | `mci_user_favourites`, `mci_business_reviews` (group-level), `mci_business_review_history` |

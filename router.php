@@ -165,6 +165,8 @@ $folderMap = [
     '/cp/categories'             => '/cp/categories/index.php',
     '/cp/coadmins'               => '/cp/coadmins/index.php',
     '/cp/anonymous-business'     => '/cp/anonymous-business/index.php',
+    '/cp/subscription-packages'  => '/cp/subscription-packages/index.php',
+    '/cp/user-subscriptions'     => '/cp/user-subscriptions/index.php',
 ];
 
 $uriNormalized = rtrim($uri, '/');
