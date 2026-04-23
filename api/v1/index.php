@@ -45,6 +45,7 @@ require_once __DIR__ . '/lib/uuid.php';
 require_once __DIR__ . '/lib/ip.php';
 require_once __DIR__ . '/lib/rate_limit.php';
 require_once __DIR__ . '/lib/account_service.php';
+require_once __DIR__ . '/lib/subscription_service.php';
 require_once __DIR__ . '/lib/cp_users_service.php';
 require_once __DIR__ . '/lib/mci_mailer.php';
 require_once __DIR__ . '/lib/slug.php';
@@ -321,6 +322,26 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'subscriber' && ($segments[1]
     api_json(['ok' => true]);
 }
 
+if ($method === 'GET' && ($segments[0] ?? '') === 'subscriber' && ($segments[1] ?? '') === 'subscription') {
+    $auth = api_require_auth(['subscriber']);
+    try {
+        $pdo = api_db();
+    } catch (Throwable $e) {
+        api_error('server_config', 500);
+    }
+    $summary = mci_subscription_build_user_summary($pdo, $auth['user_id']);
+    if (!$summary['ok']) {
+        api_error($summary['error'], $summary['status'] ?? 500);
+    }
+    api_json([
+        'ok' => true,
+        'subscription' => $summary['current_subscription'],
+        'packages' => $summary['packages'],
+        'can_upgrade_now' => $summary['can_upgrade_now'],
+        'paid_coming_soon' => $summary['paid_coming_soon'],
+    ]);
+}
+
 // -----------------------------------------------------------------------------
 // Control panel account: profile + password + social providers
 // -----------------------------------------------------------------------------
@@ -403,6 +424,96 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') 
         api_error($res['error'], $res['status'] ?? 400);
     }
     api_json(['ok' => true]);
+}
+
+if ($method === 'GET' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'subscription-packages' && !isset($segments[2])) {
+    api_require_auth(['super_admin']);
+    try {
+        $pdo = api_db();
+    } catch (Throwable $e) {
+        api_error('server_config', 500);
+    }
+    $res = mci_subscription_list_packages($pdo);
+    if (!$res['ok']) {
+        api_error($res['error'], $res['status'] ?? 500);
+    }
+    api_json(['ok' => true, 'packages' => $res['packages']]);
+}
+
+if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'subscription-packages' && !isset($segments[2])) {
+    api_require_auth(['super_admin']);
+    $data = api_request_data();
+    $action = api_body_get_string($data, 'action');
+    try {
+        $pdo = api_db();
+    } catch (Throwable $e) {
+        api_error('server_config', 500);
+    }
+
+    if ($action === 'create') {
+        $res = mci_cp_subscription_packages_create($pdo, $data);
+        if (!$res['ok']) {
+            api_error($res['error'], $res['status'] ?? 400);
+        }
+        api_json(['ok' => true, 'id' => $res['id']]);
+    }
+    if ($action === 'update') {
+        $res = mci_cp_subscription_packages_update($pdo, $data);
+        if (!$res['ok']) {
+            api_error($res['error'], $res['status'] ?? 400);
+        }
+        api_json(['ok' => true]);
+    }
+    if ($action === 'set_default') {
+        $res = mci_cp_subscription_packages_set_default($pdo, api_body_get_string($data, 'id'));
+        if (!$res['ok']) {
+            api_error($res['error'], $res['status'] ?? 400);
+        }
+        api_json(['ok' => true]);
+    }
+    api_error('invalid_action', 400);
+}
+
+if ($method === 'GET' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'user-subscriptions' && !isset($segments[2])) {
+    api_require_auth(['super_admin']);
+    try {
+        $pdo = api_db();
+    } catch (Throwable $e) {
+        api_error('server_config', 500);
+    }
+    $page = (int) ($_GET['page'] ?? 1);
+    $perPage = (int) ($_GET['per_page'] ?? 25);
+    $q = isset($_GET['q']) ? trim((string) $_GET['q']) : null;
+    $res = mci_cp_user_subscriptions_list($pdo, $page, $perPage, $q);
+    if (!$res['ok']) {
+        api_error($res['error'], $res['status'] ?? 500);
+    }
+    api_json([
+        'ok' => true,
+        'items' => $res['items'],
+        'total' => $res['total'],
+        'page' => $res['page'],
+        'per_page' => $res['per_page'],
+    ]);
+}
+
+if ($method === 'POST' && ($segments[0] ?? '') === 'cp' && ($segments[1] ?? '') === 'user-subscriptions' && !isset($segments[2])) {
+    api_require_auth(['super_admin']);
+    $data = api_request_data();
+    $action = api_body_get_string($data, 'action');
+    try {
+        $pdo = api_db();
+    } catch (Throwable $e) {
+        api_error('server_config', 500);
+    }
+    if ($action === 'assign') {
+        $res = mci_cp_user_subscription_assign($pdo, $data);
+        if (!$res['ok']) {
+            api_error($res['error'], $res['status'] ?? 400);
+        }
+        api_json(['ok' => true, 'id' => $res['id']]);
+    }
+    api_error('invalid_action', 400);
 }
 
 // Super-admin user management (all roles; soft delete)

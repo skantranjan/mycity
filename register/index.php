@@ -152,6 +152,28 @@ ob_start();
         <div class="fw-bold fs-4 mb-1">Create account</div>
         <p class="text-muted small mb-3">Create an account with your email and password.</p>
 
+        <div class="alert alert-success small mb-3" role="note">
+          <div class="fw-semibold mb-1">FREE plan (default on registration)</div>
+          <div>You get full access to all premium business features under the FREE plan till March 31, 2028.</div>
+          <div class="mt-1 fw-semibold">Enjoy full features for free till March 2028</div>
+        </div>
+
+        <div class="card border mb-3">
+          <div class="card-body p-3">
+            <div class="d-flex align-items-center justify-content-between gap-2">
+              <div class="fw-semibold">PAID plan</div>
+              <span class="badge text-bg-warning">Coming Soon</span>
+            </div>
+            <div class="text-muted small mt-1">Activation date: April 01, 2028</div>
+            <ul class="small mb-0 mt-2 ps-3">
+              <li>Unlimited business listings</li>
+              <li>Dedicated business profile page</li>
+              <li>Accept business enquiries</li>
+              <li>Manage products and services</li>
+            </ul>
+          </div>
+        </div>
+
         <?php if ($authError): ?>
           <div class="alert alert-danger small mb-3" role="alert">
             <?= htmlspecialchars($authError) ?>

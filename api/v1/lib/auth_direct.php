@@ -15,6 +15,7 @@ require_once __DIR__ . '/jwt.php';
 require_once __DIR__ . '/uuid.php';
 require_once __DIR__ . '/ip.php';
 require_once __DIR__ . '/mci_mailer.php';
+require_once __DIR__ . '/subscription_service.php';
 
 /**
  * Unified login — same contract as `POST /api/v1/auth/login` (`audience` / `type`).
@@ -217,28 +218,43 @@ function api_direct_subscriber_register(array $data): array
     $role = 'subscriber';
     $ip = api_client_ip();
 
-    $ins = $pdo->prepare(
-        'INSERT INTO mci_users (
-          id, email, password_hash, role_id, display_name,
-          terms_accepted_at, privacy_policy_accepted_at,
-          registration_ip, last_update_ip,
-          password_changed_at, last_login_at, is_logged_in
-        ) VALUES (
-          ?, ?, ?, (SELECT id FROM mci_roles WHERE short_name = ? LIMIT 1), ?,
-          NOW(6), NOW(6),
-          ?, ?,
-          NOW(6), NOW(6), 1
-        )'
-    );
-    $ins->execute([
-        $userId,
-        $email,
-        $hash,
-        $role,
-        $displayName !== '' ? $displayName : null,
-        $ip,
-        $ip,
-    ]);
+    try {
+        $pdo->beginTransaction();
+        $ins = $pdo->prepare(
+            'INSERT INTO mci_users (
+              id, email, password_hash, role_id, display_name,
+              terms_accepted_at, privacy_policy_accepted_at,
+              registration_ip, last_update_ip,
+              password_changed_at, last_login_at, is_logged_in
+            ) VALUES (
+              ?, ?, ?, (SELECT id FROM mci_roles WHERE short_name = ? LIMIT 1), ?,
+              NOW(6), NOW(6),
+              ?, ?,
+              NOW(6), NOW(6), 1
+            )'
+        );
+        $ins->execute([
+            $userId,
+            $email,
+            $hash,
+            $role,
+            $displayName !== '' ? $displayName : null,
+            $ip,
+            $ip,
+        ]);
+
+        $sub = mci_subscription_assign_default_to_user($pdo, $userId, 'registration_email_password');
+        if (!$sub['ok']) {
+            throw new RuntimeException((string) ($sub['error'] ?? 'subscription_assign_failed'));
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        return ['ok' => false, 'error' => 'register_failed', 'status' => 500];
+    }
 
     mci_mail_send_welcome($email, $displayName !== '' ? $displayName : null, false);
     mci_mail_send_admin_new_user_registered($email, $displayName !== '' ? $displayName : null, 'email_password');

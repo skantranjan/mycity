@@ -3,7 +3,7 @@
  * CP sidebar partial.
  *
  * Expects:
- *   $cpActive  — one of: dashboard | listings | anonymous | categories | subscribers | coadmins | add-business | error-log | ''
+ *   $cpActive  — one of: dashboard | listings | anonymous | categories | subscribers | coadmins | add-business | error-log | subscription-packages | user-subscriptions | ''
  *   $cpRole    — 'super_admin' | 'co_admin'  (falls back to session)
  */
 $cpActive = $cpActive ?? 'dashboard';
@@ -119,6 +119,12 @@ $isSuperAdmin = ($cpRole === 'super_admin');
     <?php cpNavLink('subscribers', '/cp/subscribers/', 'bi-people-fill', 'Subscribers', $cpActive); ?>
     <?php if ($isSuperAdmin): ?>
       <?php cpNavLink('coadmins', '/cp/coadmins/', 'bi-shield-lock', 'Co-admins', $cpActive); ?>
+    <?php endif; ?>
+
+    <?php if ($isSuperAdmin): ?>
+      <div class="mci-sidebar-group-label mt-2">Subscriptions</div>
+      <?php cpNavLink('subscription-packages', '/cp/subscription-packages/', 'bi-box-seam', 'Subscription packages', $cpActive); ?>
+      <?php cpNavLink('user-subscriptions', '/cp/user-subscriptions/', 'bi-person-badge', 'User subscriptions', $cpActive); ?>
     <?php endif; ?>
 
     <!-- ── Tools ────────────────────────────── -->
