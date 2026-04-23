@@ -37,6 +37,9 @@ if ($slug !== '') {
                 g.id,
                 g.name AS title,
                 g.claimed_by_user_id,
+                g.status,
+                g.added_by_role,
+                g.added_by_user_id,
                 c.name AS category,
                 TRIM(CONCAT_WS(', ',
                     NULLIF(b.address_line1, ''),
@@ -63,7 +66,11 @@ if ($slug !== '') {
                 'title'    => (string)$row['title'],
                 'address'  => (string)$row['address'],
                 'category' => (string)$row['category'],
-                'claimed'  => !empty($row['claimed_by_user_id']),
+                'claimed'  => !empty($row['claimed_by_user_id']) || (
+                    (string)($row['status'] ?? '') === 'live'
+                    && strtolower(trim((string)($row['added_by_role'] ?? ''))) === 'subscriber'
+                    && trim((string)($row['added_by_user_id'] ?? '')) !== ''
+                ),
             ];
         }
     } catch (Throwable $ignored) {}

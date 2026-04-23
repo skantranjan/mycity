@@ -46,6 +46,7 @@ require_once __DIR__ . '/lib/ip.php';
 require_once __DIR__ . '/lib/rate_limit.php';
 require_once __DIR__ . '/lib/account_service.php';
 require_once __DIR__ . '/lib/cp_users_service.php';
+require_once __DIR__ . '/lib/mci_mailer.php';
 require_once __DIR__ . '/lib/slug.php';
 require_once __DIR__ . '/lib/category_helpers.php';
 require_once __DIR__ . '/lib/tag_helpers.php';
@@ -1305,9 +1306,10 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? 
 
     // Verify the business group exists and is live
     $pdo    = api_db();
-    $bgStmt = $pdo->prepare("SELECT id FROM mci_business_groups WHERE id = ? AND status = 'live' LIMIT 1");
+    $bgStmt = $pdo->prepare("SELECT id, name, slug, email FROM mci_business_groups WHERE id = ? AND status = 'live' LIMIT 1");
     $bgStmt->execute([$bgId]);
-    if (!$bgStmt->fetch()) {
+    $bg = $bgStmt->fetch(PDO::FETCH_ASSOC);
+    if (!$bg) {
         api_error('business_not_found', 404);
     }
 
@@ -1315,6 +1317,19 @@ if ($method === 'POST' && ($segments[0] ?? '') === 'public' && ($segments[1] ?? 
     if ($newId === '') {
         api_error('create_failed', 500);
     }
+
+    try {
+        mci_mail_send_business_enquiry_received(
+            trim((string)($bg['email'] ?? '')),
+            trim((string)($bg['name'] ?? '')),
+            trim((string)($bg['slug'] ?? '')),
+            $name,
+            $phone,
+            $email,
+            $message,
+            $type
+        );
+    } catch (Throwable $ignored) {}
 
     api_json(['ok' => true, 'id' => $newId], 201);
 }

@@ -6,6 +6,7 @@ require_once __DIR__ . '/uuid.php';
 require_once __DIR__ . '/business_helpers.php';
 require_once __DIR__ . '/auth_direct.php';
 require_once __DIR__ . '/location_service.php';
+require_once __DIR__ . '/mci_mailer.php';
 
 // ---------------------------------------------------------------------------
 // Create
@@ -82,9 +83,11 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
     $subcategoryIds = array_map('intval', (array)($group['subcategory_ids'] ?? []));
     $tagIds         = array_map('intval', (array)($group['tag_ids'] ?? []));
 
-    $logoPah    = trim((string)($group['logo_path'] ?? ''));
-    $profilePah = trim((string)($group['profile_path'] ?? ''));
-    $bannerPah  = trim((string)($group['banner_path'] ?? ''));
+    $logoPah        = trim((string)($group['logo_path'] ?? ''));
+    $profilePah     = trim((string)($group['profile_path'] ?? ''));
+    $bannerPah      = trim((string)($group['banner_path'] ?? ''));
+    $groupWebsite   = trim((string)($group['website_url'] ?? ($branch['website'] ?? '')));
+    $groupEmail     = trim((string)($group['email'] ?? ($branch['email_contact'] ?? '')));
 
     $actorId    = $ctx['added_by_user_id'];
     $productIds = [];   // ← add
@@ -117,6 +120,7 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
                price_range, video_url,
                page_title, meta_description, meta_keywords,
                logo_path, profile_path, banner_path,
+               website_url, email,
                status, added_by_role, added_by_user_id,
                created_by_user_id)
             VALUES
@@ -124,6 +128,7 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
                ?, ?,
                ?, ?, ?,
                ?, ?, ?,
+               ?, ?,
                ?, ?, ?,
                ?)
         ')->execute([
@@ -141,6 +146,8 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
             $logoPah !== '' ? $logoPah : null,
             $profilePah !== '' ? $profilePah : null,
             $bannerPah !== '' ? $bannerPah : null,
+            $groupWebsite !== '' ? $groupWebsite : null,
+            $groupEmail !== '' ? $groupEmail : null,
             $ctx['status'],
             $ctx['added_by_role'],
             $ctx['added_by_user_id'],
@@ -182,12 +189,12 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
 
         $pdo->prepare('
             INSERT INTO mci_business_branches
-              (id, business_group_id, slug, address_line1, address_line2, city, state, country,
+              (id, business_group_id, slug, branch_label, address_line1, address_line2, city, state, country,
                pincode, latitude, longitude,
                phone_primary, phone_secondary, whatsapp_number, website,
                status, created_by_user_id)
             VALUES
-              (?, ?, ?, ?, ?, ?, ?, ?,
+              (?, ?, ?, ?, ?, ?, ?, ?, ?,
                ?, ?, ?,
                ?, ?, ?, ?,
                \'active\', ?)
@@ -195,6 +202,7 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
             $branchId,
             $groupId,
             $branchSlug,
+            trim((string)($branch['branch_label']    ?? '')) ?: null,
             trim((string)($branch['full_address']    ?? '')) ?: '',     // address_line1 is NOT NULL; empty string is safe
             trim((string)($branch['address_line2']   ?? '')) ?: null,
             $city !== '' ? $city : '',
@@ -362,6 +370,11 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
             'youtube'   => 'youtube',
             'linkedin'  => 'linkedin',
             'tiktok'    => 'tiktok',
+            'pinterest' => 'pinterest',
+            'telegram'  => 'telegram',
+            'threads'   => 'threads',
+            'snapchat'  => 'snapchat',
+            'whatsapp_channel' => 'whatsapp_channel',
         ];
         if (is_array($socialLinks)) {
             $socStmt = $pdo->prepare('
@@ -401,6 +414,33 @@ function api_business_create(PDO $pdo, array $data, ?array $auth): array
     // Sync to mci_locations — outside transaction; failure must never block listing
     try {
         api_locations_upsert($pdo, $branchCountry, $branchState, $city);
+    } catch (Throwable $ignored) {}
+
+    // Notify internal mailbox about new business submissions.
+    try {
+        $submitterEmail = '';
+        $submitterUserId = trim((string)($ctx['added_by_user_id'] ?? ''));
+        if ($submitterUserId !== '') {
+            $emStmt = $pdo->prepare('SELECT email FROM mci_users WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+            $emStmt->execute([$submitterUserId]);
+            $submitterEmail = trim((string)($emStmt->fetchColumn() ?: ''));
+        }
+        if ($submitterEmail === '' && !empty($data['account']['email'])) {
+            $submitterEmail = mb_strtolower(trim((string)$data['account']['email']));
+        }
+        mci_mail_send_business_submission_received(
+            $submitterEmail,
+            $name,
+            $groupSlug,
+            (string)($ctx['status'] ?? 'draft')
+        );
+        mci_mail_send_admin_new_business_registered(
+            $name,
+            $groupSlug,
+            $city,
+            (string)($ctx['added_by_role'] ?? ''),
+            $submitterEmail
+        );
     } catch (Throwable $ignored) {}
 
     $result = [
@@ -523,8 +563,10 @@ function api_business_update(PDO $pdo, string $groupId, array $data, string $act
         $editSections = ['core', 'products', 'services', 'seo', 'location', 'faqs', 'social'];
     }
 
-    $logoPath   = trim((string)($group['logo_path']   ?? ''));
-    $bannerPath = trim((string)($group['banner_path'] ?? ''));
+    $logoPath        = trim((string)($group['logo_path']   ?? ''));
+    $bannerPath      = trim((string)($group['banner_path'] ?? ''));
+    $groupWebsiteUrl = trim((string)($group['website_url'] ?? ($branch['website'] ?? '')));
+    $groupEmail      = trim((string)($group['email'] ?? ($branch['email_contact'] ?? '')));
 
     $pdo->beginTransaction();
     try {
@@ -541,6 +583,8 @@ function api_business_update(PDO $pdo, string $groupId, array $data, string $act
                     page_title          = ?,
                     meta_description    = ?,
                     meta_keywords       = ?,
+                    website_url         = ?,
+                    email               = ?,
                     logo_path           = ?,
                     banner_path         = ?
                 WHERE id = ?
@@ -554,6 +598,8 @@ function api_business_update(PDO $pdo, string $groupId, array $data, string $act
                 $pageTitle !== '' ? $pageTitle : null,
                 $metaDesc !== '' ? $metaDesc : null,
                 $metaKey !== '' ? $metaKey : null,
+                $groupWebsiteUrl !== '' ? $groupWebsiteUrl : null,
+                $groupEmail !== '' ? $groupEmail : null,
                 $logoPath !== '' ? $logoPath : null,
                 $bannerPath !== '' ? $bannerPath : null,
                 $groupId,
@@ -614,6 +660,7 @@ function api_business_update(PDO $pdo, string $groupId, array $data, string $act
             $pdo->prepare('
             UPDATE mci_business_branches
             SET address_line1   = ?,
+                branch_label    = ?,
                 address_line2   = ?,
                 city            = ?,
                 state           = ?,
@@ -630,6 +677,7 @@ function api_business_update(PDO $pdo, string $groupId, array $data, string $act
             LIMIT 1
         ')->execute([
             trim((string)($branch['full_address']    ?? '')) ?: '',
+            trim((string)($branch['branch_label']    ?? '')) ?: null,
             trim((string)($branch['address_line2']   ?? '')) ?: null,
             $city !== '' ? $city : '',
             $branchState  !== '' ? $branchState  : null,
@@ -643,6 +691,15 @@ function api_business_update(PDO $pdo, string $groupId, array $data, string $act
             trim((string)($branch['website']         ?? '')) ?: null,
             $groupId,
         ]);
+            $pdo->prepare('
+                UPDATE mci_business_groups
+                SET website_url = ?, email = ?
+                WHERE id = ?
+            ')->execute([
+                $groupWebsiteUrl !== '' ? $groupWebsiteUrl : null,
+                $groupEmail !== '' ? $groupEmail : null,
+                $groupId,
+            ]);
         }
 
         // --- mci_business_branch_hours: upsert (same ON DUPLICATE KEY pattern as create) ---
@@ -947,13 +1004,26 @@ function api_business_update_status(
         return false;
     }
 
-    $stmt = $pdo->prepare('SELECT status FROM mci_business_groups WHERE id = ? LIMIT 1');
+    $stmt = $pdo->prepare('
+        SELECT status, added_by_role, added_by_user_id, claimed_by_user_id, name, slug
+        FROM mci_business_groups
+        WHERE id = ? LIMIT 1
+    ');
     $stmt->execute([$groupId]);
     $row = $stmt->fetch();
     if (!$row) {
         return false;
     }
     $previousStatus = (string)$row['status'];
+    $addedByRole = strtolower(trim((string)($row['added_by_role'] ?? '')));
+    $addedByUserId = trim((string)($row['added_by_user_id'] ?? ''));
+    $claimedByUserId = trim((string)($row['claimed_by_user_id'] ?? ''));
+    $bizName = trim((string)($row['name'] ?? ''));
+    $bizSlug = trim((string)($row['slug'] ?? ''));
+    $autoClaimOnApprove = $newStatus === 'live'
+        && $claimedByUserId === ''
+        && $addedByRole === 'subscriber'
+        && $addedByUserId !== '';
 
     $actionMap = [
         'live'      => 'approved',
@@ -966,8 +1036,17 @@ function api_business_update_status(
 
     $pdo->beginTransaction();
     try {
-        $pdo->prepare('UPDATE mci_business_groups SET status = ?, updated_by_user_id = ? WHERE id = ?')
-            ->execute([$newStatus, $actorId, $groupId]);
+        if ($autoClaimOnApprove) {
+            $pdo->prepare('
+                UPDATE mci_business_groups
+                SET status = ?, updated_by_user_id = ?,
+                    claimed_by_user_id = ?, claimed_at = COALESCE(claimed_at, NOW(6))
+                WHERE id = ?
+            ')->execute([$newStatus, $actorId, $addedByUserId, $groupId]);
+        } else {
+            $pdo->prepare('UPDATE mci_business_groups SET status = ?, updated_by_user_id = ? WHERE id = ?')
+                ->execute([$newStatus, $actorId, $groupId]);
+        }
 
         $pdo->prepare('
             INSERT INTO mci_business_approvals
@@ -990,6 +1069,19 @@ function api_business_update_status(
 
     if ($previousStatus !== $newStatus) {
         api_business_invalidate_public_directory_cache();
+    }
+
+    if ($previousStatus !== 'live' && $newStatus === 'live') {
+        try {
+            $ownerEmail = '';
+            if ($addedByUserId !== '') {
+                $emStmt = $pdo->prepare('SELECT email FROM mci_users WHERE id = ? AND deleted_at IS NULL LIMIT 1');
+                $emStmt->execute([$addedByUserId]);
+                $ownerEmail = trim((string)($emStmt->fetchColumn() ?: ''));
+            }
+            mci_mail_send_business_approved($ownerEmail, $bizName, $bizSlug);
+            mci_mail_send_admin_business_approved($bizName, $bizSlug, $ownerEmail, $actorId);
+        } catch (Throwable $ignored) {}
     }
 
     return true;

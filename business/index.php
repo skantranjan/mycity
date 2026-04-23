@@ -135,6 +135,137 @@ function mci_osm_embed_url(float $lat, float $lon): string
   );
 }
 
+function mci_price_range_label(?string $value): string
+{
+    $key = strtolower(trim((string) $value));
+    return match ($key) {
+        'free' => 'Free / Budget friendly',
+        'moderate' => 'Moderate',
+        'pricey' => 'Premium',
+        'ultra' => 'Luxury',
+        default => '',
+    };
+}
+
+function mci_normalize_external_url(string $raw, string $platform = ''): string
+{
+    $raw = trim($raw);
+    if ($raw === '') {
+        return '';
+    }
+    if (preg_match('#^(https?:)?//#i', $raw) === 1) {
+        return str_starts_with($raw, '//') ? 'https:' . $raw : $raw;
+    }
+    if (preg_match('#^(mailto:|tel:)#i', $raw) === 1) {
+        return $raw;
+    }
+
+    $platform = strtolower(trim($platform));
+    $value = ltrim($raw, '@');
+    return match ($platform) {
+        'twitter' => str_contains($value, '.') || str_contains($value, '/')
+            ? 'https://' . $value
+            : 'https://x.com/' . $value,
+        'instagram' => str_contains($value, '.') || str_contains($value, '/')
+            ? 'https://' . $value
+            : 'https://instagram.com/' . $value,
+        'facebook' => str_contains($value, '.')
+            ? 'https://' . $value
+            : 'https://facebook.com/' . $value,
+        'youtube' => str_contains($value, '.')
+            ? 'https://' . $value
+            : 'https://youtube.com/' . $value,
+        'linkedin' => str_contains($value, '.')
+            ? 'https://' . $value
+            : 'https://linkedin.com/' . $value,
+        'tiktok' => str_contains($value, '.')
+            ? 'https://' . $value
+            : 'https://tiktok.com/@' . $value,
+        'pinterest' => str_contains($value, '.')
+            ? 'https://' . $value
+            : 'https://pinterest.com/' . $value,
+        'telegram' => str_contains($value, '.')
+            ? 'https://' . $value
+            : 'https://t.me/' . $value,
+        'threads' => str_contains($value, '.')
+            ? 'https://' . $value
+            : 'https://threads.net/@' . $value,
+        'snapchat' => str_contains($value, '.')
+            ? 'https://' . $value
+            : 'https://snapchat.com/add/' . $value,
+        'whatsapp_channel' => str_contains($value, '.')
+            ? 'https://' . $value
+            : 'https://whatsapp.com/channel/' . $value,
+        default => 'https://' . $value,
+    };
+}
+
+/**
+ * @param array<string,string> $rawSocialLinks
+ * @return list<array{platform:string,label:string,icon:string,url:string}>
+ */
+function mci_business_social_links_for_display(array $rawSocialLinks): array
+{
+    $platformMeta = [
+        'facebook' => ['label' => 'Facebook', 'icon' => 'bi-facebook'],
+        'instagram' => ['label' => 'Instagram', 'icon' => 'bi-instagram'],
+        'twitter' => ['label' => 'X (Twitter)', 'icon' => 'bi-twitter-x'],
+        'youtube' => ['label' => 'YouTube', 'icon' => 'bi-youtube'],
+        'linkedin' => ['label' => 'LinkedIn', 'icon' => 'bi-linkedin'],
+        'tiktok' => ['label' => 'TikTok', 'icon' => 'bi-tiktok'],
+        'pinterest' => ['label' => 'Pinterest', 'icon' => 'bi-pinterest'],
+        'telegram' => ['label' => 'Telegram', 'icon' => 'bi-telegram'],
+        'threads' => ['label' => 'Threads', 'icon' => 'bi-chat-dots'],
+        'snapchat' => ['label' => 'Snapchat', 'icon' => 'bi-snapchat'],
+        'whatsapp_channel' => ['label' => 'WhatsApp Channel', 'icon' => 'bi-whatsapp'],
+    ];
+
+    $items = [];
+    foreach ($platformMeta as $platform => $meta) {
+        $rawUrl = trim((string) ($rawSocialLinks[$platform] ?? ''));
+        if ($rawUrl === '') {
+            continue;
+        }
+        $url = mci_normalize_external_url($rawUrl, $platform);
+        if ($url === '') {
+            continue;
+        }
+        $items[] = [
+            'platform' => $platform,
+            'label' => $meta['label'],
+            'icon' => $meta['icon'],
+            'url' => $url,
+        ];
+    }
+
+    return $items;
+}
+
+function mci_item_price_label(mixed $min, mixed $max, string $unit = 'INR'): string
+{
+    $hasMin = is_numeric($min);
+    $hasMax = is_numeric($max);
+    if (!$hasMin && !$hasMax) {
+        return '';
+    }
+
+    $fmt = static function (mixed $value) use ($unit): string {
+        $num = (float)$value;
+        $pretty = fmod($num, 1.0) === 0.0
+            ? number_format($num, 0)
+            : number_format($num, 2);
+        return strtoupper(trim($unit)) . ' ' . $pretty;
+    };
+
+    if ($hasMin && $hasMax) {
+        return $fmt($min) . ' - ' . $fmt($max);
+    }
+    if ($hasMin) {
+        return 'From ' . $fmt($min);
+    }
+    return 'Up to ' . $fmt($max);
+}
+
 // ── Fetch business from DB by slug ───────────────────────────────────────────
 if ($slug === '') {
     header('Location: /business-listing/', true, 301);
@@ -183,14 +314,36 @@ if ($dbBiz === null) {
 // ── Map DB record to the $listing shape the view expects ─────────────────────
 $branch  = !empty($dbBiz['branches']) ? $dbBiz['branches'][0] : [];
 $tagNames = $dbBiz['tags'] ?? []; // keep full [{id, name, slug}] for URL generation
-$serviceNames = array_map(
-    static fn(array $s): string => (string)($s['name'] ?? ''),
+$servicesDetailed = array_values(array_filter(array_map(
+    static function (array $s): array {
+        $name = trim((string)($s['name'] ?? ''));
+        if ($name === '') {
+            return [];
+        }
+        return [
+            'name' => $name,
+            'description' => mci_plain_text_flat((string)($s['description'] ?? '')),
+            'image_path' => trim((string)($s['image_path'] ?? '')),
+            'price_label' => mci_item_price_label($s['price_min'] ?? null, $s['price_max'] ?? null, (string)($s['price_unit'] ?? 'INR')),
+        ];
+    },
     $dbBiz['services'] ?? []
-);
-$productNames = array_map(
-    static fn(array $p): string => (string)($p['name'] ?? ''),
+), static fn(array $row): bool => $row !== []));
+$productsDetailed = array_values(array_filter(array_map(
+    static function (array $p): array {
+        $name = trim((string)($p['name'] ?? ''));
+        if ($name === '') {
+            return [];
+        }
+        return [
+            'name' => $name,
+            'description' => mci_plain_text_flat((string)($p['description'] ?? '')),
+            'image_path' => trim((string)($p['image_path'] ?? '')),
+            'price_label' => mci_item_price_label($p['price_min'] ?? null, $p['price_max'] ?? null, (string)($p['price_unit'] ?? 'INR')),
+        ];
+    },
     $dbBiz['products'] ?? []
-);
+), static fn(array $row): bool => $row !== []));
 $faqsRaw = $dbBiz['faqs'] ?? [];
 $listingFaqs = array_map(
     static function (array $f): array {
@@ -211,6 +364,7 @@ foreach ($dbBiz['social_links'] ?? [] as $sl) {
 }
 
 $galleryImages = $dbBiz['images'] ?? [];
+$groupWebsite = trim((string)($dbBiz['website_url'] ?? ''));
 
 $listing = [
     'title'    => (string)($dbBiz['name']        ?? 'Business'),
@@ -225,9 +379,10 @@ $listing = [
                       (string)($branch['pincode']       ?? ''),
                   ]))),
     'phone'    => (string)($branch['phone_primary']    ?? ''),
+    'phone_secondary' => (string)($branch['phone_secondary'] ?? ''),
     'whatsapp' => (string)($branch['whatsapp_number']  ?? ''),
     'email'    => (string)($dbBiz['email']             ?? ''),
-    'website'  => (string)($dbBiz['website_url']       ?? ''),
+    'website'  => $groupWebsite !== '' ? $groupWebsite : (string)($branch['website'] ?? ''),
     'image'    => !empty($dbBiz['banner_path'])
                     ? $dbBiz['banner_path']
                     : (!empty($dbBiz['logo_path'])
@@ -236,14 +391,21 @@ $listing = [
     'map_lat'  => (float)($branch['latitude']  ?? 0),
     'map_lon'  => (float)($branch['longitude'] ?? 0),
     'about'    => mci_plain_paragraphs_from_html((string)($dbBiz['description'] ?? '')),
-    'services' => $serviceNames,
-    'products' => $productNames,
+    'services' => $servicesDetailed,
+    'products' => $productsDetailed,
     'tags'     => $tagNames,
     'faqs'     => $listingFaqs,
     'social_links' => $socialLinks,
+    'subcategories' => $dbBiz['subcategories'] ?? [],
+    'branch_label' => (string)($branch['branch_label'] ?? ''),
     'price_range'  => $dbBiz['price_range'] ?? null,
     'video_url'    => $dbBiz['video_url']   ?? null,
 ];
+
+$socialLinkItems = mci_business_social_links_for_display((array)($listing['social_links'] ?? []));
+$priceRangeLabel = mci_price_range_label((string)($listing['price_range'] ?? ''));
+$videoUrl = mci_normalize_external_url((string)($listing['video_url'] ?? ''));
+$subCategories = is_array($listing['subcategories']) ? $listing['subcategories'] : [];
 
 $heroBannerUrl = !empty($dbBiz['banner_path'])
     ? (string) $dbBiz['banner_path']
@@ -255,7 +417,11 @@ $profilePhotoUrl = !empty($dbBiz['profile_path'])
         : mci_business_profile_placeholder_url());
 
 $bizGroupId          = (string)($dbBiz['id'] ?? '');
-$listingIsClaimed    = !empty($dbBiz['claimed_by_user_id']);
+$listingIsClaimed    = !empty($dbBiz['claimed_by_user_id']) || (
+    (string)($dbBiz['status'] ?? '') === 'live'
+    && strtolower(trim((string)($dbBiz['added_by_role'] ?? ''))) === 'subscriber'
+    && trim((string)($dbBiz['added_by_user_id'] ?? '')) !== ''
+);
 $listingClaimPending = false;
 // Check if the current user has a pending claim for this business
 if ($isLoggedIn && $bizGroupId !== '' && !$listingIsClaimed) {
@@ -577,7 +743,16 @@ $__schema = [
 ];
 if ($listing['phone'] !== '')   { $__schema['telephone'] = $listing['phone']; }
 if ($listing['email'] !== '')   { $__schema['email']     = $listing['email']; }
-if ($listing['website'] !== '') { $__schema['sameAs']    = [$listing['website']]; }
+$__schemaSameAs = [];
+if ($listing['website'] !== '') {
+    $__schemaSameAs[] = mci_normalize_external_url($listing['website']);
+}
+foreach ($socialLinkItems as $socialItem) {
+    $__schemaSameAs[] = $socialItem['url'];
+}
+if ($__schemaSameAs !== []) {
+    $__schema['sameAs'] = array_values(array_unique($__schemaSameAs));
+}
 if (!empty($reviewSummary['count']) && (int)$reviewSummary['count'] > 0) {
     $aggRating = round((float)($reviewSummary['average'] ?? 0), 1);
     $aggRating = max(1.0, min(5.0, $aggRating));
@@ -777,6 +952,20 @@ ob_start();
             </div>
           <?php endif; ?>
           <p class="text-muted mb-2"><?= htmlspecialchars($listing['tagline']) ?></p>
+          <?php if ($priceRangeLabel !== '' || $videoUrl !== ''): ?>
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+              <?php if ($priceRangeLabel !== ''): ?>
+                <span class="badge rounded-pill text-bg-light border">
+                  <i class="bi bi-cash-stack me-1" aria-hidden="true"></i><?= htmlspecialchars($priceRangeLabel) ?>
+                </span>
+              <?php endif; ?>
+              <?php if ($videoUrl !== ''): ?>
+                <a href="<?= htmlspecialchars($videoUrl) ?>" target="_blank" rel="noopener noreferrer" class="badge rounded-pill text-bg-light border text-decoration-none">
+                  <i class="bi bi-play-circle me-1" aria-hidden="true"></i>Watch video
+                </a>
+              <?php endif; ?>
+            </div>
+          <?php endif; ?>
           <?php
           $bizTags = $listing['tags'] ?? [];
           $bizTags = is_array($bizTags) ? $bizTags : [];
@@ -824,6 +1013,18 @@ ob_start();
             </div>
             <p class="text-muted small mt-2 mb-0">Click a tag to open the directory filtered by that tag (also searchable via the “What” field).</p>
           <?php endif; ?>
+
+          <?php if (!empty($subCategories)): ?>
+            <div class="mci-business-tags mt-3" aria-label="Business subcategories">
+              <span class="mci-business-tags__label text-muted small fw-semibold me-2 align-middle">Subcategories</span>
+              <div class="d-inline-flex flex-wrap gap-2 align-middle">
+                <?php foreach ($subCategories as $sc): ?>
+                  <?php $scName = trim((string)($sc['name'] ?? '')); if ($scName === '') { continue; } ?>
+                  <span class="mci-business-tag"><?= htmlspecialchars($scName) ?></span>
+                <?php endforeach; ?>
+              </div>
+            </div>
+          <?php endif; ?>
         </div>
 
         <div class="card mci-business-card border-0 bg-white mb-4">
@@ -843,9 +1044,37 @@ ob_start();
               Services
             </div>
             <?php if (!empty($listing['services'])): ?>
-              <div class="d-flex flex-wrap gap-2">
+              <div class="d-flex flex-column gap-3">
                 <?php foreach ($listing['services'] as $svc): ?>
-                  <span class="mci-business-chip"><?= htmlspecialchars($svc) ?></span>
+                  <?php
+                  if (!is_array($svc)) { continue; }
+                  $svcName = trim((string)($svc['name'] ?? ''));
+                  if ($svcName === '') { continue; }
+                  $svcDesc = trim((string)($svc['description'] ?? ''));
+                  $svcImg  = trim((string)($svc['image_path'] ?? ''));
+                  $svcImgDisplay = $svcImg !== '' ? $svcImg : mci_listing_placeholder_url();
+                  ?>
+                  <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                      <div class="row g-3 align-items-start">
+                        <div class="col-12 col-sm-auto">
+                          <img
+                            src="<?= htmlspecialchars($svcImgDisplay, ENT_QUOTES, 'UTF-8') ?>"
+                            alt="<?= htmlspecialchars($svcName, ENT_QUOTES, 'UTF-8') ?>"
+                            class="rounded-3"
+                            style="width: 140px; height: 110px; object-fit: cover;"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div class="col">
+                          <div class="fw-semibold"><?= htmlspecialchars($svcName) ?></div>
+                          <?php if ($svcDesc !== ''): ?>
+                            <p class="small text-muted mt-2 mb-0"><?= htmlspecialchars($svcDesc) ?></p>
+                          <?php endif; ?>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 <?php endforeach; ?>
               </div>
             <?php else: ?>
@@ -857,9 +1086,37 @@ ob_start();
               Products
             </div>
             <?php if (!empty($listing['products'])): ?>
-              <div class="d-flex flex-wrap gap-2">
+              <div class="d-flex flex-column gap-3">
                 <?php foreach ($listing['products'] as $prd): ?>
-                  <span class="mci-business-chip"><?= htmlspecialchars($prd) ?></span>
+                  <?php
+                  if (!is_array($prd)) { continue; }
+                  $prdName = trim((string)($prd['name'] ?? ''));
+                  if ($prdName === '') { continue; }
+                  $prdDesc = trim((string)($prd['description'] ?? ''));
+                  $prdImg  = trim((string)($prd['image_path'] ?? ''));
+                  $prdImgDisplay = $prdImg !== '' ? $prdImg : mci_listing_placeholder_url();
+                  ?>
+                  <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                      <div class="row g-3 align-items-start">
+                        <div class="col-12 col-sm-auto">
+                          <img
+                            src="<?= htmlspecialchars($prdImgDisplay, ENT_QUOTES, 'UTF-8') ?>"
+                            alt="<?= htmlspecialchars($prdName, ENT_QUOTES, 'UTF-8') ?>"
+                            class="rounded-3"
+                            style="width: 140px; height: 110px; object-fit: cover;"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div class="col">
+                          <div class="fw-semibold"><?= htmlspecialchars($prdName) ?></div>
+                          <?php if ($prdDesc !== ''): ?>
+                            <p class="small text-muted mt-2 mb-0"><?= htmlspecialchars($prdDesc) ?></p>
+                          <?php endif; ?>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 <?php endforeach; ?>
               </div>
             <?php else: ?>
@@ -1143,6 +1400,16 @@ ob_start();
           <div class="mci-business-side-contact-block">
             <div class="mci-business-side-contact-heading">Contact</div>
 
+          <?php if (($listing['branch_label'] ?? '') !== ''): ?>
+          <div class="mci-business-contact-row">
+            <div class="mci-business-contact-icon" aria-hidden="true"><i class="bi bi-signpost-2"></i></div>
+            <div>
+              <div class="mci-business-contact-label">Branch</div>
+              <div class="mci-business-contact-value"><?= htmlspecialchars((string)$listing['branch_label']) ?></div>
+            </div>
+          </div>
+          <?php endif; ?>
+
           <div class="mci-business-contact-row">
             <div class="mci-business-contact-icon" aria-hidden="true"><i class="bi bi-geo-alt"></i></div>
             <div>
@@ -1158,6 +1425,20 @@ ob_start();
               <div class="mci-business-contact-value">
                 <?php if ($listing['phone'] !== ''): ?>
                   <a href="tel:<?= htmlspecialchars(preg_replace('/\s+/', '', $listing['phone'])) ?>"><?= htmlspecialchars($listing['phone']) ?></a>
+                <?php else: ?>
+                  Not provided
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+
+          <div class="mci-business-contact-row">
+            <div class="mci-business-contact-icon" aria-hidden="true"><i class="bi bi-telephone-plus"></i></div>
+            <div>
+              <div class="mci-business-contact-label">Phone 2</div>
+              <div class="mci-business-contact-value">
+                <?php if (($listing['phone_secondary'] ?? '') !== ''): ?>
+                  <a href="tel:<?= htmlspecialchars(preg_replace('/\s+/', '', (string)$listing['phone_secondary'])) ?>"><?= htmlspecialchars((string)$listing['phone_secondary']) ?></a>
                 <?php else: ?>
                   Not provided
                 <?php endif; ?>
@@ -1182,6 +1463,20 @@ ob_start();
           </div>
 
           <div class="mci-business-contact-row">
+            <div class="mci-business-contact-icon" aria-hidden="true"><i class="bi bi-envelope"></i></div>
+            <div>
+              <div class="mci-business-contact-label">Email</div>
+              <div class="mci-business-contact-value">
+                <?php if (($listing['email'] ?? '') !== ''): ?>
+                  <a href="mailto:<?= htmlspecialchars((string)$listing['email']) ?>"><?= htmlspecialchars((string)$listing['email']) ?></a>
+                <?php else: ?>
+                  Not provided
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+
+          <div class="mci-business-contact-row">
             <div class="mci-business-contact-icon" aria-hidden="true"><i class="bi bi-globe2"></i></div>
             <div>
               <div class="mci-business-contact-label">Website</div>
@@ -1194,6 +1489,22 @@ ob_start();
               </div>
             </div>
           </div>
+
+          <?php if (!empty($socialLinkItems)): ?>
+          <div class="mci-business-contact-row">
+            <div class="mci-business-contact-icon" aria-hidden="true"><i class="bi bi-share"></i></div>
+            <div>
+              <div class="mci-business-contact-label">Social profiles</div>
+              <div class="mci-business-contact-value d-flex flex-wrap gap-2">
+                <?php foreach ($socialLinkItems as $socialItem): ?>
+                  <a href="<?= htmlspecialchars($socialItem['url']) ?>" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi <?= htmlspecialchars($socialItem['icon']) ?> me-1" aria-hidden="true"></i><?= htmlspecialchars($socialItem['label']) ?>
+                  </a>
+                <?php endforeach; ?>
+              </div>
+            </div>
+          </div>
+          <?php endif; ?>
           </div>
 
           <!-- Enquiry form -->
@@ -1207,8 +1518,12 @@ ob_start();
                   <form method="post" action="" id="mciEnquiryForm" novalidate>
                     <input type="hidden" name="mci_enquiry_submit" value="1" />
                     <input type="hidden" name="business_slug" value="<?= htmlspecialchars($slug, ENT_QUOTES, 'UTF-8') ?>" />
+                    <input type="hidden" name="business_group_id" value="<?= htmlspecialchars($bizGroupId, ENT_QUOTES, 'UTF-8') ?>" />
                     <div id="mciEnquirySuccess" class="alert alert-success py-2 small mb-2" style="display:none;" role="status">
                       Thank you! Your enquiry has been sent.
+                    </div>
+                    <div id="mciEnquiryError" class="alert alert-danger py-2 small mb-2" style="display:none;" role="alert">
+                      We could not send your enquiry right now. Please try again.
                     </div>
                     <div class="mb-2">
                       <input type="text" class="form-control form-control-sm" name="enquiry_name"
@@ -1236,11 +1551,51 @@ ob_start();
                   (function () {
                     var form = document.getElementById('mciEnquiryForm');
                     if (!form) return;
+                    var successEl = document.getElementById('mciEnquirySuccess');
+                    var errorEl = document.getElementById('mciEnquiryError');
                     form.addEventListener('submit', function (e) {
                       if (!form.checkValidity()) { form.reportValidity(); e.preventDefault(); return; }
                       e.preventDefault();
-                      form.style.display = 'none';
-                      document.getElementById('mciEnquirySuccess').style.display = '';
+                      if (successEl) successEl.style.display = 'none';
+                      if (errorEl) errorEl.style.display = 'none';
+                      var submitBtn = form.querySelector('button[type="submit"]');
+                      if (submitBtn) submitBtn.disabled = true;
+
+                      var payload = {
+                        business_group_id: (form.querySelector('input[name="business_group_id"]') || {}).value || '',
+                        type: 'enquiry',
+                        sender_name: (form.querySelector('input[name="enquiry_name"]') || {}).value || '',
+                        sender_phone: (form.querySelector('input[name="enquiry_phone"]') || {}).value || '',
+                        sender_email: (form.querySelector('input[name="enquiry_email"]') || {}).value || '',
+                        message: (form.querySelector('textarea[name="enquiry_message"]') || {}).value || ''
+                      };
+
+                      fetch('/api/v1/public/leads', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                      })
+                        .then(function (r) {
+                          return r.text().then(function (t) {
+                            var d = {};
+                            try { d = t ? JSON.parse(t) : {}; } catch (e2) {}
+                            return { ok: r.ok, data: d };
+                          });
+                        })
+                        .then(function (res) {
+                          if (!res.ok || !res.data || !res.data.ok) {
+                            throw new Error((res.data && (res.data.error || res.data.message)) || 'send_failed');
+                          }
+                          form.reset();
+                          if (successEl) successEl.style.display = '';
+                        })
+                        .catch(function () {
+                          if (errorEl) errorEl.style.display = '';
+                        })
+                        .finally(function () {
+                          if (submitBtn) submitBtn.disabled = false;
+                        });
                     });
                   }());
                   </script>
